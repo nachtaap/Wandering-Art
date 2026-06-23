@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Effulgence — ASCII Face</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:100%;height:100%;background:#030208;overflow:hidden;}
+  body{display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;}
+  #stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+  canvas{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);}
+  #bg{z-index:1;} #face{z-index:2;}
+  #stage::after{
+    content:'';position:absolute;inset:0;z-index:3;pointer-events:none;
+    background:radial-gradient(ellipse 66% 64% at 48% 47%,
+      transparent 46%, rgba(3,2,8,0.5) 82%, rgba(2,1,5,0.94) 100%);
+  }
+  /* expression controls */
+  #controls{
+    position:absolute;z-index:5;left:50%;bottom:4%;transform:translateX(-50%);
+    display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:94vw;padding:0 8px;
+  }
+  .exbtn{
+    font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;
+    color:#9a8fb5;background:rgba(14,10,26,0.55);border:1px solid rgba(150,120,210,0.28);
+    border-radius:999px;padding:7px 14px;cursor:pointer;backdrop-filter:blur(6px);
+    transition:color .25s,border-color .25s,box-shadow .25s,background .25s;white-space:nowrap;
+  }
+  .exbtn:hover{color:#e7dcff;border-color:rgba(180,150,255,0.6);box-shadow:0 0 16px rgba(150,90,255,0.35);}
+  .exbtn.on{
+    color:#fff;border-color:rgba(120,210,255,0.8);
+    background:rgba(30,30,60,0.6);box-shadow:0 0 20px rgba(90,200,255,0.45);
+  }
+  .exbtn:focus-visible{outline:2px solid #8fdcff;outline-offset:2px;}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="bg"></canvas>
+    <canvas id="face"></canvas>
+    <div id="controls"></div>
+  </div>
+
+<script>
+/* ===================== HELPERS ===================== */
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+function smoothstep(e0,e1,x){let t=clamp((x-e0)/(e1-e0),0,1);return t*t*(3-2*t);}
+function g2(x,y,cx,cy,sx,sy){const dx=(x-cx)/sx,dy=(y-cy)/sy;return Math.exp(-0.5*(dx*dx+dy*dy));}
+function gx(d,s){const t=d/s;return Math.exp(-0.5*t*t);}
+function interp(pts,y){
+  if(y<=pts[0][0])return pts[0][1];
+  if(y>=pts[pts.length-1][0])return pts[pts.length-1][1];
+  for(let i=0;i<pts.length-1;i++){const[y0,w0]=pts[i],[y1,w1]=pts[i+1];
+    if(y>=y0&&y<=y1){const t=smoothstep(y0,y1,y);return w0+(w1-w0)*t;}}
+  return 0;
+}
+function faceHalfWidth(y){
+  const pts=[[0.12,0.135],[0.20,0.190],[0.31,0.232],[0.44,0.255],[0.53,0.250],
+             [0.63,0.212],[0.72,0.150],[0.80,0.075],[0.845,0.022]];
+  if(y<=pts[0][0])return pts[0][1]*smoothstep(0.04,0.12,y);
+  if(y>=pts[pts.length-1][0])return 0;
+  for(let i=0;i<pts.length-1;i++){const[y0,w0]=pts[i],[y1,w1]=pts[i+1];
+    if(y>=y0&&y<=y1){const t=smoothstep(y0,y1,y);return w0+(w1-w0)*t;}}
+  return 0;
+}
+
+/* ===================== STATIC FACE (no brows/eyes/mouth) ===================== */
+function staticPart(x,y){
+  const cx=0.5,dx=Math.abs(x-cx);let b=0;
+  const hw=faceHalfWidth(y);
+  if(hw>1e-4){const t=dx/hw;const edge=smoothstep(1.02,0.80,t);
+    b=0.34*edge+0.06*edge*Math.cos(clamp(t,0,1)*Math.PI*0.5);}
+  /* organic neck and shoulders */
+  if (y > 0.76) {
+
+    const neckWidth =
+      0.075 +
+      0.045 * smoothstep(0.76, 0.98, y);
+
+    const neck =
+      0.24 *
+      smoothstep(neckWidth, neckWidth * 0.72, dx) *
+      smoothstep(0.76, 0.84, y);
+
+    b = Math.max(b, neck);
+
+    const shoulder =
+        0.16 * g2(x,y,0.34,0.95,0.14,0.08) +
+        0.16 * g2(x,y,0.66,0.95,0.14,0.08);
+
+    b = Math.max(b, shoulder);
+
+    b += 0.08 * g2(x,y,0.50,1.02,0.24,0.12);
+
+    b -= 0.10 * g2(x,y,0.50,0.80,0.09,0.025);
+  }
+  b+=0.24*g2(x,y,cx,0.285,0.120,0.070);
+  b+=0.22*g2(x,y,cx,0.40,0.085,0.045);
+  b+=0.15*g2(x,y,cx,0.50,0.024,0.070);
+  b+=0.24*g2(x,y,cx,0.585,0.040,0.028);
+  b+=0.26*g2(x,y,0.305,0.552,0.078,0.046);
+  b+=0.26*g2(x,y,0.695,0.552,0.078,0.046);
+  b+=0.24*g2(x,y,cx,0.785,0.090,0.045);
+  b-=0.30*g2(x,y,0.385,0.455,0.078,0.050);
+  b-=0.30*g2(x,y,0.615,0.455,0.078,0.050);
+  b-=0.18*g2(x,y,0.452,0.510,0.018,0.085);
+  b-=0.18*g2(x,y,0.548,0.510,0.018,0.085);
+  b-=0.16*g2(x,y,cx,0.628,0.070,0.028);
+  b-=0.14*g2(x,y,cx,0.730,0.080,0.022);
+  b-=0.20*g2(x,y,0.255,0.620,0.090,0.065);
+  b-=0.20*g2(x,y,0.745,0.620,0.090,0.065);
+  b-=0.16*g2(x,y,0.255,0.310,0.065,0.085);
+  b-=0.16*g2(x,y,0.745,0.310,0.065,0.085);
+  b-=0.18*g2(x,y,cx,0.845,0.140,0.040);
+  b-=0.14*g2(x,y,0.468,0.602,0.013,0.011);
+  b-=0.14*g2(x,y,0.532,0.602,0.013,0.011);
+  b-=0.05*g2(x,y,cx,0.672,0.010,0.008);
+  return b;
+}
+
+/* ===================== DYNAMIC FEATURES (expression-driven) ===================== */
+function featurePart(x,y,E){
+  let b=0;
+  const exL=0.382, exR=0.618, eyeY=0.456;
+  // BROWS
+  function brow(bx){
+    const toC=(0.5-bx)>=0?1:-1;
+    let tIn=clamp((x-bx)*toC/0.082,-1,1);
+    const arch=0.014*Math.cos((x-bx)/0.082*Math.PI*0.5);
+    const innerUp=E.browInner*0.024*clamp(tIn,0,1);
+    const by=0.388-0.030*E.browRaise+arch-innerUp;
+    return g2(x,y,bx,by,0.082,0.011);
+  }
+  b-=0.34*brow(exL); b-=0.34*brow(exR);
+  // EYES
+  function eye(ex){
+    const open=clamp(E.eyeOpenEff,0,1.5);
+    const apH=0.026*open, lower=E.lowerLid*0.012;
+    let sc=g2(x,y,ex,eyeY+lower*0.5,0.060,Math.max(0.004,apH*0.7));
+    sc=Math.pow(clamp(sc,0,1),0.7)*smoothstep(0.04,0.18,open);
+    let e=0.30*sc;
+    const irisVis=smoothstep(0.12,0.35,open);
+    e-=0.30*g2(x,y,ex,eyeY,0.022,Math.min(0.020,apH*0.8))*irisVis;
+    e-=0.58*g2(x,y,ex,eyeY,0.013,Math.min(0.012,apH*0.6))*irisVis;
+    e+=0.85*g2(x,y,ex-0.007,eyeY-0.007,0.005,0.005)*irisVis;
+    const lashTopY=0.438-(apH-0.026);
+    e-=0.48*g2(x,y,ex,lashTopY,0.072,0.0085);
+    e-=0.16*g2(x,y,ex,0.476-lower,0.060,0.007);
+    const cs=(ex>0.5?+0.060:-0.060);
+    e-=0.20*g2(x,y,ex+cs,eyeY,0.012,0.012);
+    const closed=1-smoothstep(0.04,0.16,open);
+    e-=0.42*closed*g2(x,y,ex,0.452,0.070,0.006);
+    return e;
+  }
+  b+=eye(exL)+eye(exR);
+  // MOUTH (contained within the face silhouette, clear smile arc)
+  const mw=0.080*E.mouthWidth, u=(x-0.5)/mw;
+  if(Math.abs(u)<1.4){
+    const fhw=faceHalfWidth(y);
+    const contain=smoothstep(fhw, fhw*0.70, Math.abs(x-0.5)); // fade before the cheek edge
+    if(contain>0){
+      const curveLift=E.mouthCurve*0.055;                 // upward corner lift = smile
+      const lineY=0.694 - curveLift*(u*u) - E.mouthCurve*0.004;
+      const dy=y-lineY, af=gx(u,0.80);
+      let m=0;
+      m-=0.30*af*gx(dy,0.0058);                            // curved lip seam
+      m-=0.09*gx(y-(lineY-0.010),0.011)*af;                // upper lip body
+      m+=0.15*gx(y-(lineY+0.024+E.mouthOpen*0.014),0.014)*gx(u,0.82);  // lower lip (drops when open)
+      if(E.mouthOpen>0){
+        const op=E.mouthOpen;
+        if(E.teeth>0){                                      // BOLD bright teeth band under the upper lip
+          const tCy=lineY+0.011, tSig=0.0118;
+          const bandV=gx(y-tCy,tSig);
+          const inBand=bandV*gx(u,0.78)*smoothstep(0,0.08,op);
+          m+=0.80*inBand*E.teeth;                            // strong bright teeth
+          // individual front teeth: narrow dark gaps (midline at u=0), kept subtle
+          const sep=Math.pow(0.5+0.5*Math.cos(u*Math.PI/0.20),6);
+          m-=0.22*sep*bandV*gx(u,0.80)*E.teeth;
+        }
+        const dCy=lineY+0.030+op*0.014, dSig=0.006+op*0.010; // dark inner mouth, clearly BELOW teeth
+        m-=(0.16+0.20*op)*gx(y-dCy,dSig)*gx(u,0.70);
+      }
+      const cornerY=0.694 - curveLift - E.mouthCurve*0.004;
+      m-=0.14*(g2(x,y,0.5-mw,cornerY,0.0085,0.0085)+g2(x,y,0.5+mw,cornerY,0.0085,0.0085)); // upturned corners
+      b+=m*contain;
+    }
+  }
+  // CHEEK raise
+  if(E.cheek>0) b+=0.10*E.cheek*(g2(x,y,0.33,0.560,0.060,0.040)+g2(x,y,0.67,0.560,0.060,0.040));
+  return b;
+}
+
+function eyeColMask(x,y){const eyeY=0.456,exL=0.382,exR=0.618;
+  return clamp(1.2*(g2(x,y,exL,eyeY,0.052,0.034)+g2(x,y,exR,eyeY,0.052,0.034)),0,1);}
+function eyeGlowRing(x,y){const eyeY=0.456,exL=0.382,exR=0.618;
+  const wide=g2(x,y,exL,eyeY,0.050,0.032)+g2(x,y,exR,eyeY,0.050,0.032);
+  const pup=g2(x,y,exL,eyeY,0.013,0.012)+g2(x,y,exR,eyeY,0.013,0.012);
+  return clamp(wide-1.5*pup,0,1);}
+
+/* ===================== HAIR ===================== */
+function hairOuter(y,side,t){
+  const pts=[[0.02,0.075],[0.10,0.185],[0.20,0.290],[0.33,0.345],[0.50,0.375],
+             [0.66,0.400],[0.82,0.402],[0.95,0.372],[1.05,0.305],[1.12,0.200]];
+  let base=interp(pts,y); if(base<=0)return 0;
+  const growth=smoothstep(0.12,0.92,y);
+  const wave=0.034*growth*Math.sin(y*5.0 - t*0.00060 + (side>0?0.0:1.3));
+  const curl=0.020*growth*Math.sin(y*11.0 + (side>0?0.5:2.0) + t*0.00040);
+  return base+wave+curl;
+}
+function hairInner(y){
+  const fhw=faceHalfWidth(y);
+  if(y<0.31){const open=smoothstep(0.12,0.30,y);return fhw*open;}
+  if(fhw>1e-4)return fhw*0.97+0.010;
+  return 0.105;
+}
+function hairLum(x,y,t){
+  const side=(x>=0.5)?1:-1, dxc=Math.abs(x-0.5);
+  const out=hairOuter(y,side,t); if(out<=1e-4)return 0;
+  const inn=hairInner(y);
+  if(dxc<=inn||dxc>=out+0.025)return 0;
+  const span=Math.max(out-inn,1e-3), tin=(dxc-inn)/span;
+  let edge=smoothstep(1.06,0.80,tin)*smoothstep(-0.08,0.14,tin);
+  edge*=smoothstep(0.00,0.06,y)*smoothstep(1.16,0.96,y);
+  if(edge<=0)return 0;
+  const growth=smoothstep(0.06,0.85,y), phase=side*0.9;
+  const lat=(0.040*Math.sin(y*5.0 + t*0.00060*side + phase)
+            +0.020*Math.sin(y*10.5 + 1.7*phase + t*0.00035)
+            +0.012*growth*Math.sin(y*19.0 + phase))*growth;
+  const v=dxc-lat, F=24.0;
+  let strand=Math.pow(0.5+0.5*Math.cos(v*F*Math.PI),1.15);
+  const lenShade=0.62+0.34*smoothstep(0.10,0.45,y)-0.22*smoothstep(0.86,1.14,y);
+  let b=edge*(0.32+0.40*strand)*lenShade;
+  const sheen=Math.pow(0.5+0.5*Math.cos(v*F*0.5*Math.PI + y*4.0 + phase),7.0);
+  b+=edge*0.26*sheen*smoothstep(0.18,0.5,y)*lenShade;
+  return clamp(b,0,1);
+}
+
+function warmthAt(x,y){const axis=x+0.13*(y-0.5);return smoothstep(0.66,0.30,axis);}
+
+/* ===================== COLOR ===================== */
+function hsv2rgb(h,s,v){
+  h=((h%360)+360)%360;const c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=x;}else if(h<120){r=x;g=c;}else if(h<180){g=c;b=x;}
+  else if(h<240){g=x;b=c;}else if(h<300){r=x;b=c;}else{r=c;b=x;}
+  return [(r+m)*255,(g+m)*255,(b+m)*255];
+}
+const CHARS=" .'`^\",:;Il!i~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@";
+const NC=CHARS.length;
+
+/* ===================== EXPRESSIONS ===================== */
+const N={browRaise:0,browInner:0,eyeOpen:1.0,lowerLid:0,mouthCurve:0,mouthOpen:0,mouthWidth:1.0,cheek:0,teeth:0};
+const EXPR={
+  neutral:{...N,mouthCurve:0.06},
+  happy:{...N,mouthCurve:0.70,mouthWidth:1.08,cheek:0.85,lowerLid:0.45,eyeOpen:0.93,browRaise:0.10},
+  sad:{...N,browInner:1.0,browRaise:-0.10,mouthCurve:-0.5,eyeOpen:0.92},
+  angry:{...N,browInner:-1.0,browRaise:-0.35,eyeOpen:0.90,mouthCurve:-0.30,mouthWidth:0.96},
+  surprised:{...N,browRaise:1.0,browInner:0.30,eyeOpen:1.35,mouthOpen:0.80,mouthWidth:0.96,mouthCurve:0.10},
+  joy:{...N,mouthCurve:1.0,mouthOpen:0.48,mouthWidth:1.18,cheek:1.0,lowerLid:0.55,eyeOpen:0.90,browRaise:0.16,teeth:1.0},
+};
+const LABELS={neutral:'Neutraal',happy:'Blij',sad:'Verdrietig',angry:'Boos',surprised:'Verrast',joy:'Lach'};
+let currentE={...EXPR.neutral};
+let targetE={...EXPR.neutral};
+let currentName='neutral';
+function setExpression(name){
+  targetE={...EXPR[name]}; currentName=name;
+  document.querySelectorAll('.exbtn').forEach(btn=>btn.classList.toggle('on',btn.dataset.name===name));
+}
+
+/* ===================== RENDERER ===================== */
+const faceCanvas=document.getElementById('face');
+const fctx=faceCanvas.getContext('2d');
+const glow=document.createElement('canvas');
+const gctx=glow.getContext('2d');
+const bgCanvas=document.getElementById('bg');
+const bgctx=bgCanvas.getContext('2d');
+
+let DPR=1,SIZE=0,cellW=0,cellH=0,cols=0,rows=0,fontPx=0;
+let staticLum=null,dirArr=null,hueArr=null,eyeColArr=null,eyeGlowArr=null,teethArr=null,cellPx=null;
+let bgGlyphs=[],stars=[],particles=[];
+let lastT=performance.now();
+let blink=1, nextBlink=performance.now()+2000, blinkStart=-1;
+
+function hash(i,j){let h=(i*374761393+j*668265263)>>>0;h=(h^(h>>>13))*1274126177>>>0;return (h>>>0)/4294967295;}
+
+function setup(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  const vw=window.innerWidth,vh=window.innerHeight;
+  SIZE=Math.min(vw*0.96,vh*0.96,820);
+  fontPx=Math.max(7,Math.round(SIZE/92));
+  fctx.font=`${fontPx}px "Share Tech Mono", monospace`;
+  const charW=fctx.measureText('M').width||fontPx*0.6;
+  cellW=charW; cellH=fontPx;
+  cols=Math.ceil(SIZE/cellW); rows=Math.ceil(SIZE/cellH);
+  for(const c of [faceCanvas,glow,bgCanvas]){
+    c.width=Math.round(SIZE*DPR); c.height=Math.round(SIZE*DPR);
+    c.style.width=SIZE+'px'; c.style.height=SIZE+'px';
+  }
+  fctx.setTransform(DPR,0,0,DPR,0,0); gctx.setTransform(DPR,0,0,DPR,0,0); bgctx.setTransform(DPR,0,0,DPR,0,0);
+  fctx.textBaseline='top'; fctx.font=`${fontPx}px "Share Tech Mono", monospace`;
+  bgctx.textBaseline='top'; bgctx.font=`${fontPx}px "Share Tech Mono", monospace`;
+
+  const NN=cols*rows;
+  staticLum=new Float32Array(NN); dirArr=new Float32Array(NN); hueArr=new Float32Array(NN);
+  eyeColArr=new Float32Array(NN); eyeGlowArr=new Float32Array(NN);
+  teethArr=new Float32Array(NN); cellPx=new Array(NN);
+  for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
+    const idx=j*cols+i, px=i*cellW, py=j*cellH;
+    const fx=(px+cellW*0.5)/SIZE, fy=(py+cellH*0.5)/SIZE;
+    staticLum[idx]=(staticPart(fx,fy)+staticPart(fx,(py+cellH*0.25)/SIZE)+staticPart(fx,(py+cellH*0.75)/SIZE))/3;
+    dirArr[idx]=0.82+0.18*smoothstep(0.92,0.16,fx+0.12*(fy-0.5));
+    hueArr[idx]=28-146*(1-warmthAt(fx,fy));
+    eyeColArr[idx]=eyeColMask(fx,fy);
+    eyeGlowArr[idx]=eyeGlowRing(fx,fy);
+    teethArr[idx]=clamp(g2(fx,fy,0.500,0.700,0.100,0.034)*1.9,0,1);
+    cellPx[idx]={px,py,fx,fy};
+  }
+
+  bgGlyphs=[];
+  const target=Math.min(780,Math.round(cols*rows*0.045)); let tries=0;
+  while(bgGlyphs.length<target && tries<target*6){tries++;
+    const gxr=Math.random(), gyr=Math.random();
+    const dxc=(gxr-0.48), dyc=(gyr-0.5);
+    const near=Math.exp(-((dxc*dxc)/0.10 + (dyc*dyc)/0.18));
+    if(Math.random()>near*0.95+0.05) continue;
+    bgGlyphs.push({x:gxr,y:gyr,ch:CHARS[8+((Math.random()*(NC-10))|0)],
+      lum:0.10+Math.random()*0.15+near*0.05, hue:28-146*(1-warmthAt(gxr,gyr)),
+      sp:Math.random()*1.4+0.3, ph:Math.random()*6.28});
+  }
+  stars=[];
+  for(let i=0;i<100;i++) stars.push({x:Math.random(),y:Math.random(),
+    r:Math.random()*1.1+0.2,base:Math.random()*0.4+0.1,sp:Math.random()*1.6+0.4,ph:Math.random()*6.28});
+  particles=[];
+}
+
+function drawBG(t){
+  const W=SIZE,H=SIZE;
+  bgctx.clearRect(0,0,W,H);
+  let g=bgctx.createRadialGradient(W*0.5,H*0.46,0,W*0.5,H*0.5,W*0.62);
+  g.addColorStop(0,'#0b0716'); g.addColorStop(1,'#030208');
+  bgctx.fillStyle=g; bgctx.fillRect(0,0,W,H);
+  const pulse=0.5+0.5*Math.sin(t*0.0007);
+  bgctx.globalCompositeOperation='lighter';
+  let warmG=bgctx.createRadialGradient(W*0.36,H*0.42,0,W*0.40,H*0.46,W*0.34);
+  warmG.addColorStop(0,`rgba(220,90,40,${0.12+0.05*pulse})`); warmG.addColorStop(1,'rgba(20,8,6,0)');
+  bgctx.fillStyle=warmG; bgctx.fillRect(0,0,W,H);
+  let coolG=bgctx.createRadialGradient(W*0.62,H*0.5,0,W*0.60,H*0.5,W*0.36);
+  coolG.addColorStop(0,`rgba(70,70,210,${0.11+0.04*pulse})`); coolG.addColorStop(1,'rgba(8,8,30,0)');
+  bgctx.fillStyle=coolG; bgctx.fillRect(0,0,W,H);
+  for(const s of stars){const a=s.base*(0.4+0.6*Math.sin(t*0.001*s.sp+s.ph));
+    bgctx.fillStyle=`rgba(200,210,255,${Math.max(0,a)})`; bgctx.fillRect(s.x*W,s.y*H,s.r,s.r);}
+  bgctx.globalCompositeOperation='source-over';
+  for(const gl of bgGlyphs){const tw=0.6+0.4*Math.sin(t*0.001*gl.sp+gl.ph);
+    const v=gl.lum*tw; if(v<0.03) continue;
+    const rgb=hsv2rgb(gl.hue,0.8,Math.pow(v,0.9));
+    bgctx.fillStyle=`rgb(${rgb[0]|0},${rgb[1]|0},${rgb[2]|0})`; bgctx.fillText(gl.ch, gl.x*W, gl.y*H);}
+}
+
+function spawnParticles(){
+  if(particles.length>64) return;
+  for(let k=0;k<2;k++){
+    const ang=Math.random()*6.283, rad=0.30+Math.random()*0.06;
+    const fx=0.5+Math.cos(ang)*rad*0.95, fy=0.5+Math.sin(ang)*rad*1.05;
+    if(fy<0.05||fy>1.08) continue;
+    particles.push({x:fx,y:fy,vx:Math.cos(ang)*0.00022+(Math.random()-0.5)*0.0001,
+      vy:Math.sin(ang)*0.00018-0.00024, hue:28-146*(1-warmthAt(fx,fy)),
+      life:0,max:1600+Math.random()*1400});
+  }
+}
+
+function updateExpression(t,dt,reduce){
+  const k=reduce?1:clamp(dt*7,0,1);
+  for(const key in targetE){ currentE[key]+=(targetE[key]-currentE[key])*k; }
+  // blink
+  if(reduce){blink=1;}
+  else{
+    if(blinkStart<0 && t>=nextBlink){blinkStart=t;}
+    if(blinkStart>=0){
+      const p=(t-blinkStart)/150;
+      if(p>=1){blink=1;blinkStart=-1;nextBlink=t+2500+Math.random()*4000;}
+      else{blink=1-Math.sin(p*Math.PI);}
+    }
+  }
+  currentE.eyeOpenEff=currentE.eyeOpen*blink;
+}
+
+function render(t){
+  const W=SIZE,H=SIZE;
+  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tt=reduce?0:t;
+  const dt=Math.min(0.05,(t-lastT)/1000); lastT=t;
+  updateExpression(t,dt,reduce);
+  drawBG(tt);
+
+  const lx=0.46+0.16*Math.cos(tt*0.0006);
+  const ly=0.45+0.12*Math.sin(tt*0.00078);
+  const breathe=0.94+0.06*Math.sin(tt*0.0011);
+  const E=currentE;
+  const eyeOpenNow=clamp(E.eyeOpenEff,0,1.5);
+  const eyeFade=smoothstep(0.06,0.34,eyeOpenNow);
+
+  fctx.clearRect(0,0,W,H);
+  fctx.textBaseline='top'; fctx.font=`${fontPx}px "Share Tech Mono", monospace`;
+
+  for(let idx=0;idx<staticLum.length;idx++){
+    const cp=cellPx[idx];
+    let feat=0;
+    if(cp.fx>=0.26&&cp.fx<=0.74&&cp.fy>=0.33&&cp.fy<=0.78) feat=featurePart(cp.fx,cp.fy,E);
+    let faceB=clamp((staticLum[idx]+feat)*dirArr[idx],0,1);
+    const hairB=hairLum(cp.fx,cp.fy,tt)*0.9;
+    let b=faceB>hairB?faceB:hairB;
+    const eMask=eyeColArr[idx];
+    if(b<0.06 && eMask<0.05) continue;
+
+    const dxl=(cp.fx-lx)/0.20, dyl=(cp.fy-ly)/0.20;
+    const sweep=0.16*Math.exp(-0.5*(dxl*dxl+dyl*dyl));
+    const i=idx%cols, j=(idx/cols)|0;
+    const sh=reduce?0:(b*0.09*Math.sin(tt*0.004+hash(i,j)*6.283));
+    let lum=clamp(b*breathe+sweep+sh,0,1);
+    const eMaskEff=eMask*eyeFade;
+    if(lum<0.05 && eMaskEff<0.05) continue;
+
+    const V=Math.pow(lum,0.85);
+    let sat=0.90-0.55*smoothstep(0.62,1.0,lum);
+    sat*=smoothstep(0.02,0.14,lum);
+    const tCol=hsv2rgb(hueArr[idx],sat,V);
+    let r=tCol[0],g=tCol[1],bl=tCol[2];
+
+    if(eMaskEff>0.02){
+      const iceLum=clamp(lum+0.30*eyeGlowArr[idx],0,1);
+      let iceSat=clamp(0.62-0.5*smoothstep(0.72,1.0,iceLum),0,0.7);
+      const iCol=hsv2rgb(199,iceSat,Math.pow(iceLum,0.78));
+      r+=(iCol[0]-r)*eMaskEff; g+=(iCol[1]-g)*eMaskEff; bl+=(iCol[2]-bl)*eMaskEff;
+    }
+    const tMask=teethArr[idx];
+    if(tMask>0.04 && E.teeth>0 && lum>0.45){
+      const tBlend=tMask*E.teeth*smoothstep(0.45,0.65,lum);
+      const tcCol=hsv2rgb(45, 0.05, Math.min(1, Math.pow(lum,0.7)+0.10));
+      r+=(tcCol[0]-r)*tBlend; g+=(tcCol[1]-g)*tBlend; bl+=(tcCol[2]-bl)*tBlend;
+    }
+
+    const useLum=Math.max(lum, eMaskEff*clamp(lum+0.30*eyeGlowArr[idx],0,1));
+    const ch=CHARS[clamp((useLum*(NC-1))|0,0,NC-1)];
+    fctx.fillStyle=`rgb(${r|0},${g|0},${bl|0})`;
+    fctx.fillText(ch,cp.px,cp.py);
+  }
+
+  if(!reduce){
+    spawnParticles();
+    for(let p of particles){p.life+=16;p.x+=p.vx*16;p.y+=p.vy*16;p.vy+=0.0000009*16;}
+    particles=particles.filter(p=>p.life<p.max&&p.y>0.02&&p.y<1.10);
+    for(const p of particles){
+      const lifeT=p.life/p.max, a=Math.sin((1-lifeT)*Math.PI)*0.85;
+      if(a<=0.02) continue;
+      const lum=0.55*a+0.25;
+      let sat=0.85-0.5*smoothstep(0.7,1.0,lum);
+      const rgb=hsv2rgb(p.hue,sat,Math.pow(lum,0.85));
+      const ch=CHARS[clamp((lum*(NC-1))|0,0,NC-1)];
+      fctx.globalAlpha=a; fctx.fillStyle=`rgb(${rgb[0]|0},${rgb[1]|0},${rgb[2]|0})`;
+      fctx.fillText(ch,p.x*SIZE,p.y*SIZE);
+    }
+    fctx.globalAlpha=1;
+  }
+
+  // BLOOM
+  gctx.clearRect(0,0,W,H);
+  gctx.globalCompositeOperation='source-over';
+  gctx.filter=`blur(${Math.max(2,fontPx*0.35)}px)`; gctx.drawImage(faceCanvas,0,0,W,H);
+  gctx.filter=`blur(${Math.max(5,fontPx*0.9)}px)`; gctx.globalAlpha=0.8; gctx.drawImage(faceCanvas,0,0,W,H);
+  gctx.filter='none'; gctx.globalAlpha=1;
+  fctx.globalCompositeOperation='lighter';
+  fctx.globalAlpha=0.85; fctx.drawImage(glow,0,0,W,H);
+  fctx.globalAlpha=0.45; fctx.drawImage(glow,0,0,W,H);
+  fctx.globalAlpha=1; fctx.globalCompositeOperation='source-over';
+
+  requestAnimationFrame(render);
+}
+
+/* build controls */
+(function buildControls(){
+  const wrap=document.getElementById('controls');
+  for(const name of ['neutral','happy','sad','angry','surprised','joy']){
+    const btn=document.createElement('button');
+    btn.className='exbtn'+(name==='neutral'?' on':'');
+    btn.textContent=LABELS[name]; btn.dataset.name=name;
+    btn.addEventListener('click',()=>setExpression(name));
+    wrap.appendChild(btn);
+  }
+})();
+
+window.addEventListener('resize',setup);
+setup();
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
