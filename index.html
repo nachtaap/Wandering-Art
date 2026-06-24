@@ -3,20 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — Organic Pixel Entity</title>
+  <title>Wandering Art — Living World</title>
   <style>
-    :root{
-      --bg:#020207;
-    }
-
-    *{box-sizing:border-box;margin:0;padding:0;}
-    html,body{
-      width:100%;
-      height:100%;
-      overflow:hidden;
-      background:var(--bg);
-    }
-
+    :root{ --bg:#020207; }
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    html,body{ width:100%; height:100%; overflow:hidden; background:var(--bg); }
     body{
       display:grid;
       place-items:center;
@@ -26,7 +17,6 @@
       touch-action:none;
       cursor:none;
     }
-
     #stage{
       position:fixed;
       inset:0;
@@ -38,30 +28,26 @@
         radial-gradient(circle at 48% 50%, rgba(14,80,100,.10), transparent 48%),
         #020207;
     }
-
     canvas{
       display:block;
       width:min(100vw, calc(100vh * 1.384615));
       height:min(100vh, calc(100vw / 1.384615));
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
       filter:
         contrast(1.08)
         saturate(1.12)
         drop-shadow(0 0 22px rgba(0,255,214,.16))
         drop-shadow(0 0 56px rgba(35,255,87,.08));
     }
-
     #stage::before{
       content:"";
       position:absolute;
       inset:-12%;
       pointer-events:none;
-      background:
-        radial-gradient(circle at 50% 45%, transparent 0 48%, rgba(0,0,0,.36) 82%);
+      background:radial-gradient(circle at 50% 45%, transparent 0 48%, rgba(0,0,0,.36) 82%);
       opacity:.8;
     }
-
     #stage::after{
       content:"";
       position:absolute;
@@ -71,14 +57,8 @@
         linear-gradient(90deg, rgba(255,0,170,.028), transparent 18%, transparent 82%, rgba(0,255,180,.035)),
         radial-gradient(circle at center, transparent 0 62%, rgba(0,0,0,.72) 100%);
     }
-
     @media (prefers-reduced-motion: reduce){
-      canvas{
-        filter:
-          contrast(1.06)
-          saturate(1.08)
-          drop-shadow(0 0 18px rgba(0,255,214,.12));
-      }
+      canvas{ filter:contrast(1.06) saturate(1.08) drop-shadow(0 0 18px rgba(0,255,214,.12)); }
     }
   </style>
 </head>
@@ -92,471 +72,524 @@
     'use strict';
 
     const STATIC_PREVIEW = new URLSearchParams(location.search).has('static');
-
     const canvas = document.getElementById('entity');
-    const ctx = canvas.getContext('2d', { alpha: false });
+    const ctx = canvas.getContext('2d', { alpha:false });
     const W = canvas.width;
     const H = canvas.height;
     ctx.imageSmoothingEnabled = false;
 
     const C = {
-      bg: '#020207',
-      black: '#000006',
-      cyan0: '#063941',
-      cyan1: '#087f89',
-      cyan2: '#0bb8bd',
-      cyan3: '#13e1df',
-      cyan4: '#69fff3',
-      hair0: '#57dccd',
-      hair1: '#a8fff2',
-      white: '#f7fff8',
-      green0: '#0a5f24',
-      green1: '#22e64f',
-      green2: '#a2ff75',
-      magenta: '#ff2bd6',
-      magentaSoft: '#ff7bea',
-      red: '#ff3159',
-      amber: '#ffd35d',
-      bubble: '#d9fff9',
-      bubbleFill: '#06161a'
+      bg:'#020207', black:'#000006', ink:'#01020a',
+      cyan0:'#063941', cyan1:'#087f89', cyan2:'#0bb8bd', cyan3:'#13e1df', cyan4:'#69fff3',
+      hair0:'#57dccd', hair1:'#a8fff2', white:'#f7fff8',
+      green0:'#0a5f24', green1:'#22e64f', green2:'#a2ff75',
+      magenta:'#ff2bd6', magentaSoft:'#ff7bea', red:'#ff3159', amber:'#ffd35d',
+      bubble:'#d9fff9', bubbleFill:'#06161a', fog:'#b8fff8', storm:'#8a9cff'
     };
 
     const PROTO = {
-      neutral:    { eye:0.84, smile:0.05, open:0.04, brow:0.05, anger:0.00, sad:0.00, blush:0.00, tear:0.00, gazeX:0.00, gazeY:0.00, accent:0.00 },
-      interested: { eye:0.92, smile:0.12, open:0.06, brow:0.32, anger:0.00, sad:0.00, blush:0.04, tear:0.00, gazeX:0.45, gazeY:-0.10, accent:0.05 },
-      surprised:  { eye:1.24, smile:0.00, open:0.73, brow:0.68, anger:0.00, sad:0.02, blush:0.00, tear:0.00, gazeX:0.00, gazeY:-0.10, accent:0.16 },
-      happy:      { eye:0.76, smile:0.67, open:0.14, brow:0.12, anger:0.00, sad:0.00, blush:0.22, tear:0.00, gazeX:-0.12, gazeY:0.00, accent:0.08 },
-      laugh:      { eye:0.54, smile:0.96, open:0.88, brow:0.18, anger:0.00, sad:0.00, blush:0.36, tear:0.00, gazeX:0.08, gazeY:-0.10, accent:0.12 },
-      cry:        { eye:0.62, smile:-0.58, open:0.25, brow:0.18, anger:0.00, sad:0.88, blush:0.10, tear:1.00, gazeX:-0.28, gazeY:0.42, accent:0.00 },
-      angry:      { eye:0.62, smile:-0.22, open:0.06, brow:-0.08, anger:1.00, sad:0.00, blush:0.00, tear:0.00, gazeX:0.00, gazeY:-0.12, accent:0.32 },
-      shy:        { eye:0.60, smile:0.20, open:0.05, brow:0.14, anger:0.00, sad:0.14, blush:0.88, tear:0.00, gazeX:-0.76, gazeY:0.58, accent:0.04 }
+      neutral:    { eye:.84, smile:.05, open:.04, brow:.05, anger:0,    sad:0,    blush:0,    tear:0,    gazeX:0,     gazeY:0,     accent:0 },
+      interested: { eye:.92, smile:.12, open:.06, brow:.32, anger:0,    sad:0,    blush:.04,  tear:0,    gazeX:.45,   gazeY:-.10,  accent:.05 },
+      surprised:  { eye:1.24, smile:0,   open:.73, brow:.68, anger:0,    sad:.02,  blush:0,    tear:0,    gazeX:0,     gazeY:-.10,  accent:.16 },
+      happy:      { eye:.76, smile:.67, open:.14, brow:.12, anger:0,    sad:0,    blush:.22,  tear:0,    gazeX:-.12,  gazeY:0,     accent:.08 },
+      laugh:      { eye:.54, smile:.96, open:.88, brow:.18, anger:0,    sad:0,    blush:.36,  tear:0,    gazeX:.08,   gazeY:-.10,  accent:.12 },
+      cry:        { eye:.62, smile:-.58,open:.25, brow:.18, anger:0,    sad:.88,  blush:.10,  tear:1,    gazeX:-.28,  gazeY:.42,   accent:0 },
+      angry:      { eye:.62, smile:-.22,open:.06, brow:-.08,anger:1,    sad:0,    blush:0,    tear:0,    gazeX:0,     gazeY:-.12,  accent:.30 },
+      shy:        { eye:.60, smile:.20, open:.05, brow:.14, anger:0,    sad:.14,  blush:.88,  tear:0,    gazeX:-.76,  gazeY:.58,   accent:.04 }
     };
 
     const FEATURE_KEYS = ['eye','smile','open','brow','anger','sad','blush','tear','gazeX','gazeY','accent'];
-
     const expr = {...PROTO.neutral};
+    const weights = { neutral:1, interested:0, surprised:0, happy:0, laugh:0, cry:0, angry:0, shy:0 };
 
-    const weights = {
-      neutral:1,
-      interested:0,
-      surprised:0,
-      happy:0,
-      laugh:0,
-      cry:0,
-      angry:0,
-      shy:0
+    const WorldBrain = {
+      status:'booting',
+      location:{ allowed:false, attempted:false, lat:null, lon:null, rounded:null },
+      time:{ hour:12, dayPhase:.5, light:.7, isNight:false, phaseName:'day' },
+      weather:{
+        status:'simulated', temperature:18, weatherCode:0, windSpeed:4, precipitation:0, cloudCover:25, isDay:true,
+        visual:{ rain:0, snow:0, fog:0, wind:.12, storm:0, cloud:.2, clarity:.75, heat:0, cold:0 },
+        nextFetchAt:0
+      },
+      words:['wereld','ruimte','licht','signaal']
     };
 
-    const emotion = {
-      valence: 0.06,
-      arousal: 0.36,
-      tension: 0.14,
-      curiosity: 0.52,
-      sadness: 0.08,
-      shyness: 0.10,
-
-      impulseKind: 'neutral',
-      impulseStrength: 0,
-      impulseDecay: 0.985,
-      nextImpulseAt: performance.now() + rnd(8000, 16000)
+    const WeatherBrain = {
+      requestStarted:false,
+      lastWeatherAt:0,
+      fallbackSeed:rnd(1,9999),
+      locationDelayAt:performance.now() + 1800
     };
 
-    const blink = {
-      nextAt: performance.now() + rnd(1800, 5200),
-      until: performance.now() + 120,
-      strength: 0
+    const NewsBrain = {
+      enabled:true, loading:false, lastFetch:0, nextFetchAt:0, failures:0,
+      keywords:['signaal','ruimte','wereld','licht','verandering'], topics:[], tone:0
     };
 
-    const gaze = {
-      x:0, y:0,
-      tx:0, ty:0,
-      nextAt: performance.now() + 1200
+    const MemoryBrain = {
+      trace:{ neutral:1, interested:0, surprised:0, happy:0, laugh:0, cry:0, angry:0, shy:0 },
+      lastDominant:'neutral', lastSpeechAt:0, pressure:0, silence:1, recentWeather:'clear', recentOutfit:'cloak'
     };
 
-    const motion = {
-      x:0, y:0, tilt:0,
-      tx:0, ty:0, ttilt:0,
-      nextAt: performance.now() + rnd(3500, 7000)
+    const WardrobeBrain = {
+      current:null, from:null, target:null, blend:1,
+      nextChangeAt:performance.now() + rnd(25000, 52000),
+      outfits:['cloak','suit','robe','armor','raincoat','nightdress','storm-jacket','ceremonial']
+    };
+
+    const ShipBrain = {
+      ships:[], nextSpawnAt:performance.now() + rnd(1800, 4800), seed:1000,
+      maxShips:5, rareAt:performance.now() + rnd(35000, 70000)
     };
 
     const speech = {
-      active:false,
-      start:0,
-      duration:0,
-      nextAt: performance.now() + rnd(4500, 9000),
-      text:'',
-      mood:'neutral',
-      meaningful:false,
-      phase:rnd(0, 999)
+      active:false, start:0, duration:0, nextAt:performance.now() + rnd(4500, 9000),
+      text:'', mood:'neutral', meaningful:false, phase:rnd(0,999)
     };
 
-    const newsBrain = {
-      enabled: true,
-      loading: false,
-      lastFetch: 0,
-      nextFetchAt: 0,
-      keywords: ['signaal', 'ruimte', 'wereld', 'licht', 'verandering'],
-      topics: [],
-      failures: 0
-    };
-
-    const NEWS_API_URL =
-      'https://api.gdeltproject.org/api/v2/doc/doc' +
-      '?query=' + encodeURIComponent('(technology OR climate OR economy OR conflict OR science OR energy OR AI OR politics)') +
-      '&mode=ArtList' +
-      '&format=json' +
-      '&maxrecords=60' +
-      '&timespan=24h' +
-      '&sort=HybridRel';
-
-    const STOPWORDS = new Set([
-      'de','het','een','en','van','voor','met','naar','door','over','onder','tegen','uit','bij','aan','dat','dit','die','wat','zijn','haar','hun','als','maar','niet','wel','ook','nog','meer','minder',
-      'the','and','for','with','from','this','that','are','was','were','have','has','will','about','after','before','into','over','under','than','then','they','them','their',
-      'nieuws','vandaag','update','live','video','foto','laatste','breaking','report','says','said','could','would','should','there','where','which','while'
-    ]);
+    const blink = { nextAt:performance.now() + rnd(1800, 5200), until:performance.now() + 120, strength:0 };
+    const gaze = { x:0, y:0, tx:0, ty:0, nextAt:performance.now() + 1200 };
+    const motion = { x:0, y:0, tilt:0, tx:0, ty:0, ttilt:0, nextAt:performance.now() + rnd(3500,7000) };
 
     const bgEvents = {
-      star: {
-        active:false, start:0, duration:0, nextAt:performance.now() + rnd(1800, 5200),
-        x0:0, y0:0, x1:0, y1:0
-      },
-      rocket: {
-        active:false, start:0, duration:0, nextAt:performance.now() + rnd(8000, 15000),
-        y:0, fromX:0, toX:0, dir:1
-      },
-      ufo: {
-        active:false, start:0, duration:0, nextAt:performance.now() + rnd(13000, 23000),
-        y:0, fromX:0, toX:0, dir:1, bob:0
-      }
+      star:{ active:false, start:0, duration:0, nextAt:performance.now() + rnd(2200, 6800), x0:0, y0:0, x1:0, y1:0 },
+      signal:{ active:false, start:0, duration:0, nextAt:performance.now() + rnd(10000, 22000), x:0, y:0 }
     };
 
-    const stars = Array.from({length: 18}, (_, i) => ({
-      x: Math.floor(hash(i * 91.1) * (W - 12)) + 6,
-      y: Math.floor(hash(i * 41.7) * 170) + 10,
-      phase: hash(i * 17.4) * Math.PI * 2,
-      size: hash(i * 7.3) > 0.72 ? 2 : 1,
-      c: hash(i * 5.1) > 0.5 ? C.white : C.cyan4
+    const stars = Array.from({length:34}, (_, i) => ({
+      x:Math.floor(hash(i * 91.1) * (W - 12)) + 6,
+      y:Math.floor(hash(i * 41.7) * 176) + 8,
+      phase:hash(i * 17.4) * Math.PI * 2,
+      size:hash(i * 7.3) > .78 ? 2 : 1,
+      c:hash(i * 5.1) > .5 ? C.white : C.cyan4
     }));
+
+    const rainDrops = Array.from({length:46}, (_,i)=>({x:hash(i*13.1)*W, y:hash(i*19.9)*H, s:.4+hash(i*2.1)*1.4}));
+    const snowFlakes = Array.from({length:38}, (_,i)=>({x:hash(i*31.7)*W, y:hash(i*7.9)*H, s:.4+hash(i*4.4)*1.3, p:hash(i*11.3)*9}));
 
     let glitchUntil = 0;
     let glitchAt = performance.now() + rnd(9000, 18000);
     let lastNow = performance.now();
 
-    function rnd(min, max){ return min + Math.random() * (max - min); }
-    function rndInt(min, max){ return Math.floor(rnd(min, max + 1)); }
-    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-    function lerp(a, b, t){ return a + (b - a) * t; }
+    const NEWS_API_URL =
+      'https://api.gdeltproject.org/api/v2/doc/doc' +
+      '?query=' + encodeURIComponent('(technology OR climate OR economy OR conflict OR science OR energy OR AI OR politics OR space)') +
+      '&mode=ArtList&format=json&maxrecords=70&timespan=24h&sort=HybridRel';
+
+    const STOPWORDS = new Set([
+      'de','het','een','en','van','voor','met','naar','door','over','onder','tegen','uit','bij','aan','dat','dit','die','wat','zijn','haar','hun','als','maar','niet','wel','ook','nog','meer','minder','geen','veel','waar','wie','hoe','waarom','omdat','heeft','hebben','wordt','worden','jaar','jaren',
+      'the','and','for','with','from','this','that','are','was','were','have','has','will','about','after','before','into','over','under','than','then','they','them','their','could','would','should','there','where','which','while','when','what','your',
+      'nieuws','vandaag','update','live','video','foto','laatste','breaking','report','says','said','watch','read','shows','after'
+    ]);
+
+    function rnd(min,max){ return min + Math.random() * (max - min); }
+    function rndInt(min,max){ return Math.floor(rnd(min, max + 1)); }
+    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+    function lerp(a,b,t){ return a + (b - a) * t; }
     function ease(t){ return t * t * (3 - 2 * t); }
-    function damp(current, target, lambda, dt){
-      return lerp(current, target, 1 - Math.exp(-lambda * dt));
-    }
+    function damp(current,target,lambda,dt){ return lerp(current, target, 1 - Math.exp(-lambda * dt)); }
     function pick(arr){ return arr[(Math.random() * arr.length) | 0]; }
+    function hash(n){ const v=(Math.sin(n*127.1+311.7)*43758.5453)%1; return v<0?v+1:v; }
+    function slowNoise(t,a1,f1,a2,f2,off=0){ return Math.sin(t*f1+off)*a1 + Math.sin(t*f2+off*1.7)*a2; }
+    function mulberry32(a){ return function(){ let t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15, t|1); t^=t+Math.imul(t^t>>>7, t|61); return ((t^t>>>14)>>>0)/4294967296; }; }
 
-    function hash(n){
-      const v = (Math.sin(n * 127.1 + 311.7) * 43758.5453) % 1;
-      return v < 0 ? v + 1 : v;
+    function hexToRgb(hex){
+      const h = hex.replace('#','');
+      return { r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16) };
+    }
+    function rgbToHex(r,g,b){
+      return '#' + [r,g,b].map(v => clamp(Math.round(v),0,255).toString(16).padStart(2,'0')).join('');
+    }
+    function mixHex(a,b,t){
+      const A=hexToRgb(a), B=hexToRgb(b);
+      return rgbToHex(lerp(A.r,B.r,t), lerp(A.g,B.g,t), lerp(A.b,B.b,t));
     }
 
-    function slowNoise(t, a1, f1, a2, f2, off=0){
-      return Math.sin(t * f1 + off) * a1 + Math.sin(t * f2 + off * 1.7) * a2;
+    function rect(x,y,w,h,color){ ctx.fillStyle=color; ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); }
+    function poly(points,color){
+      ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(Math.round(points[0][0]),Math.round(points[0][1]));
+      for(let i=1;i<points.length;i++) ctx.lineTo(Math.round(points[i][0]),Math.round(points[i][1]));
+      ctx.closePath(); ctx.fill();
     }
-
-    function dominantMood(){
-      let best = 'neutral';
-      let bestScore = -1;
-      for (const k in weights) {
-        if (weights[k] > bestScore) {
-          bestScore = weights[k];
-          best = k;
-        }
+    function path(color, commands){
+      ctx.fillStyle=color; ctx.beginPath();
+      for(const c of commands){
+        if(c[0]==='M') ctx.moveTo(c[1],c[2]);
+        if(c[0]==='L') ctx.lineTo(c[1],c[2]);
+        if(c[0]==='Q') ctx.quadraticCurveTo(c[1],c[2],c[3],c[4]);
+        if(c[0]==='C') ctx.bezierCurveTo(c[1],c[2],c[3],c[4],c[5],c[6]);
       }
-      return best;
+      ctx.closePath(); ctx.fill();
+    }
+    function ellipse(x,y,rx,ry,color){ ctx.fillStyle=color; ctx.beginPath(); ctx.ellipse(Math.round(x),Math.round(y),rx,ry,0,0,Math.PI*2); ctx.fill(); }
+    function line(x1,y1,x2,y2,width,color){ ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineCap='butt'; ctx.lineJoin='miter'; ctx.beginPath(); ctx.moveTo(Math.round(x1),Math.round(y1)); ctx.lineTo(Math.round(x2),Math.round(y2)); ctx.stroke(); }
+
+    function updateTimeBrain(now){
+      const d = new Date();
+      const hour = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+      WorldBrain.time.hour = hour;
+
+      const dawn = 6.2, day = 10.0, dusk = 18.2, night = 22.0;
+      let light;
+      if (hour < dawn) light = .08;
+      else if (hour < day) light = lerp(.08, .86, ease((hour - dawn) / (day - dawn)));
+      else if (hour < dusk) light = .86;
+      else if (hour < night) light = lerp(.86, .10, ease((hour - dusk) / (night - dusk)));
+      else light = .08;
+
+      WorldBrain.time.light = damp(WorldBrain.time.light, light, .45, Math.min(.05, (now-lastNow)/1000 || .016));
+      WorldBrain.time.isNight = WorldBrain.time.light < .22;
+
+      let phaseName = 'day';
+      if (hour < 5 || hour >= 23) phaseName = 'deep-night';
+      else if (hour < 8) phaseName = 'dawn';
+      else if (hour < 17) phaseName = 'day';
+      else if (hour < 21) phaseName = 'dusk';
+      else phaseName = 'night';
+      WorldBrain.time.phaseName = phaseName;
+      WorldBrain.time.dayPhase = hour / 24;
     }
 
-    function glyphCluster(len){
-      const chars = ['.',':',';','/','\\','|','~','*','+','^','<','>','=','░','▒','°','·','#'];
-      let s = '';
-      for (let i=0;i<len;i++) s += pick(chars);
-      return s;
+    function startLocationWeather(){
+      if (WeatherBrain.requestStarted) return;
+      WeatherBrain.requestStarted = true;
+      WorldBrain.location.attempted = true;
+
+      if (!navigator.geolocation || location.protocol !== 'https:') {
+        WorldBrain.weather.status = 'simulated';
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          WorldBrain.location.allowed = true;
+          WorldBrain.location.lat = lat;
+          WorldBrain.location.lon = lon;
+          WorldBrain.location.rounded = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+          fetchWeather(lat, lon, true);
+        },
+        () => { WorldBrain.weather.status = 'simulated'; },
+        { enableHighAccuracy:false, maximumAge:1000*60*30, timeout:8000 }
+      );
     }
 
-    async function fetchNewsKeywords(force = false){
+    async function fetchWeather(lat, lon, force=false){
       const now = performance.now();
+      if (!force && now < WorldBrain.weather.nextFetchAt) return;
+      WorldBrain.weather.nextFetchAt = now + 1000 * 60 * 20;
 
-      if (!newsBrain.enabled) return;
-      if (newsBrain.loading) return;
-      if (!force && now < newsBrain.nextFetchAt) return;
-
-      newsBrain.loading = true;
+      const url = 'https://api.open-meteo.com/v1/forecast'
+        + `?latitude=${encodeURIComponent(lat.toFixed(4))}`
+        + `&longitude=${encodeURIComponent(lon.toFixed(4))}`
+        + '&current=temperature_2m,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m'
+        + '&timezone=auto';
 
       try {
-        const res = await fetch(NEWS_API_URL, {
-          headers: { 'Accept': 'application/json' },
-          cache: 'no-store'
-        });
+        const res = await fetch(url, { cache:'no-store' });
+        if (!res.ok) throw new Error('weather status ' + res.status);
+        const data = await res.json();
+        const cur = data.current || {};
+        WorldBrain.weather.status = 'live';
+        WorldBrain.weather.temperature = Number(cur.temperature_2m ?? 18);
+        WorldBrain.weather.weatherCode = Number(cur.weather_code ?? 0);
+        WorldBrain.weather.windSpeed = Number(cur.wind_speed_10m ?? 0);
+        WorldBrain.weather.precipitation = Number((cur.precipitation ?? 0) + (cur.rain ?? 0) + (cur.showers ?? 0) + (cur.snowfall ?? 0));
+        WorldBrain.weather.cloudCover = Number(cur.cloud_cover ?? 0);
+        WorldBrain.weather.isDay = Number(cur.is_day ?? 1) === 1;
+        WeatherBrain.lastWeatherAt = now;
+      } catch (err) {
+        WorldBrain.weather.status = 'simulated';
+        WorldBrain.weather.nextFetchAt = now + 1000 * 60 * 8;
+      }
+    }
 
-        if (!res.ok) throw new Error('News API returned ' + res.status);
+    function classifyWeather(code){
+      if ([45,48].includes(code)) return 'fog';
+      if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'rain';
+      if (code >= 71 && code <= 77) return 'snow';
+      if (code >= 95) return 'storm';
+      if (code >= 1 && code <= 3) return 'cloud';
+      return 'clear';
+    }
 
+    function updateWeatherBrain(now, dt){
+      if (!WeatherBrain.requestStarted && now > WeatherBrain.locationDelayAt) startLocationWeather();
+      if (WorldBrain.location.allowed) fetchWeather(WorldBrain.location.lat, WorldBrain.location.lon, false);
+
+      if (WorldBrain.weather.status === 'simulated') {
+        const t = now * .001;
+        const simCloud = clamp(.38 + slowNoise(t,.20,.035,.10,.011,WeatherBrain.fallbackSeed), 0, 1);
+        WorldBrain.weather.cloudCover = Math.round(simCloud * 100);
+        WorldBrain.weather.windSpeed = clamp(5 + slowNoise(t,3,.03,2,.013,2), 0, 22);
+        WorldBrain.weather.temperature = 18 + slowNoise(t,4,.018,2,.007,3);
+        WorldBrain.weather.weatherCode = simCloud > .68 ? 3 : 0;
+      }
+
+      const mood = classifyWeather(WorldBrain.weather.weatherCode);
+      const v = WorldBrain.weather.visual;
+      const temp = WorldBrain.weather.temperature;
+      const cloud = clamp(WorldBrain.weather.cloudCover / 100, 0, 1);
+      const precip = clamp(WorldBrain.weather.precipitation / 2, 0, 1);
+      const wind = clamp(WorldBrain.weather.windSpeed / 34, 0, 1);
+
+      const target = {
+        rain: mood === 'rain' ? Math.max(.35, precip) : 0,
+        snow: mood === 'snow' ? Math.max(.35, precip) : 0,
+        fog: mood === 'fog' ? .78 : cloud > .72 ? .24 : 0,
+        wind: wind,
+        storm: mood === 'storm' ? .85 : 0,
+        cloud: cloud,
+        clarity: clamp(1 - cloud * .65 - precip * .35, .08, 1),
+        heat: clamp((temp - 26) / 12, 0, 1),
+        cold: clamp((6 - temp) / 12, 0, 1)
+      };
+
+      for (const k in target) v[k] = damp(v[k], target[k], .65, dt);
+      WorldBrain.weather.mood = mood;
+      WorldBrain.words = [mood, String(Math.round(temp)) + 'c', WorldBrain.time.phaseName];
+    }
+
+    async function fetchNewsKeywords(force=false){
+      const now = performance.now();
+      if (!NewsBrain.enabled || NewsBrain.loading) return;
+      if (!force && now < NewsBrain.nextFetchAt) return;
+      NewsBrain.loading = true;
+      try {
+        const res = await fetch(NEWS_API_URL, { headers:{Accept:'application/json'}, cache:'no-store' });
+        if (!res.ok) throw new Error('news status ' + res.status);
         const data = await res.json();
         const articles = Array.isArray(data.articles) ? data.articles : [];
-
-        const titles = articles
-          .map(a => a.title || '')
-          .filter(Boolean)
-          .slice(0, 50);
-
+        const titles = articles.map(a => a.title || '').filter(Boolean).slice(0,60);
         const keywords = extractNewsKeywords(titles);
-
         if (keywords.length) {
-          newsBrain.keywords = keywords.slice(0, 28);
-          newsBrain.topics = titles.slice(0, 8);
-          newsBrain.failures = 0;
+          NewsBrain.keywords = keywords.slice(0,30);
+          NewsBrain.topics = titles.slice(0,10);
+          NewsBrain.tone = estimateNewsTone(keywords);
+          NewsBrain.failures = 0;
         }
-
-        newsBrain.lastFetch = now;
-        newsBrain.nextFetchAt = now + 1000 * 60 * 20;
+        NewsBrain.lastFetch = now;
+        NewsBrain.nextFetchAt = now + 1000 * 60 * 20;
       } catch (err) {
-        newsBrain.failures++;
-        newsBrain.nextFetchAt = now + 1000 * 60 * Math.min(30, 5 + newsBrain.failures * 5);
+        NewsBrain.failures++;
+        NewsBrain.nextFetchAt = now + 1000 * 60 * Math.min(35, 6 + NewsBrain.failures * 6);
       } finally {
-        newsBrain.loading = false;
+        NewsBrain.loading = false;
       }
     }
 
     function extractNewsKeywords(titles){
       const counts = new Map();
-
       for (const title of titles) {
         const clean = title
           .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/https?:\/\/\S+/g, ' ')
-          .replace(/[^a-z0-9\u00c0-\u024f]+/gi, ' ');
-
-        const words = clean
-          .split(/\s+/)
-          .map(w => w.trim())
-          .filter(w =>
-            w.length >= 5 &&
-            w.length <= 18 &&
-            !STOPWORDS.has(w) &&
-            !/^\d+$/.test(w)
-          );
-
-        for (const w of words) {
-          counts.set(w, (counts.get(w) || 0) + 1);
-        }
+          .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+          .replace(/https?:\/\/\S+/g,' ')
+          .replace(/[^a-z0-9\u00c0-\u024f]+/gi,' ');
+        const words = clean.split(/\s+/).map(w=>w.trim()).filter(w =>
+          w.length >= 5 && w.length <= 18 && !STOPWORDS.has(w) && !/^\d+$/.test(w)
+        );
+        for (const w of words) counts.set(w, (counts.get(w) || 0) + 1);
       }
-
-      return [...counts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([word]) => word);
+      return [...counts.entries()].sort((a,b)=>b[1]-a[1]).map(([word])=>word);
     }
 
-    function newsWord(){
-      if (!newsBrain.keywords.length) return pick(['signaal','wereld','ruimte','verandering']);
-      return pick(newsBrain.keywords);
+    function estimateNewsTone(words){
+      const heavy = ['conflict','war','attack','crisis','flood','death','killed','storm','climate','trump','russia','israel','gaza','iran','china','economy','inflation'];
+      const curious = ['science','space','energy','robot','technology','quantum','ai','nasa','research'];
+      let tone = 0;
+      for (const w of words) {
+        if (heavy.some(h => w.includes(h))) tone -= .12;
+        if (curious.some(h => w.includes(h))) tone += .08;
+      }
+      return clamp(tone, -.7, .45);
+    }
+
+    function newsWord(){ return pick(NewsBrain.keywords.length ? NewsBrain.keywords : ['signaal','wereld','ruimte','verandering']); }
+    function weatherWord(){
+      const mood = WorldBrain.weather.mood || 'clear';
+      const words = {
+        clear:['helder','sterren','licht'], cloud:['wolken','sluier','laag'], rain:['regen','druppel','nat'], snow:['sneeuw','wit','stil'], fog:['mist','waas','verdwaal'], storm:['storm','druk','ruis']
+      };
+      return pick(words[mood] || words.clear);
+    }
+
+    function glyphCluster(len){
+      const chars = ['.',':',';','/','\\','|','~','*','+','^','<','>','=','░','▒','°','·','#'];
+      let s=''; for(let i=0;i<len;i++) s += pick(chars); return s;
     }
 
     function newsFragment(mood){
-      const wordCount =
-        mood === 'interested' ? rndInt(2, 4) :
-        mood === 'surprised'  ? rndInt(1, 3) :
-        mood === 'angry'      ? rndInt(1, 2) :
-        mood === 'cry'        ? rndInt(1, 2) :
-        rndInt(1, 3);
-
+      const count = mood === 'interested' ? rndInt(2,4) : mood === 'angry' || mood === 'cry' ? rndInt(1,2) : rndInt(1,3);
       const parts = [];
-      for (let i = 0; i < wordCount; i++) parts.push(newsWord());
+      for (let i=0;i<count;i++) parts.push(Math.random() < .32 ? weatherWord() : newsWord());
       return parts.join(' / ');
     }
 
     function generateSpeechText(mood){
       const phrases = {
-        neutral:    ['... stil ...', '... wacht ...', '... ergens ...'],
-        interested: ['... wat is dit ...', '... dichterbij ...', '... ik kijk ...'],
-        surprised:  ['... oh ...', '... ineens ...', '... wat ...'],
-        happy:      ['... zacht licht ...', '... mooi ...', '... ja ...'],
-        laugh:      ['... haha ...', '... levend ...', '... goed ...'],
-        cry:        ['... stil ...', '... koud ...', '... weg ...'],
-        angry:      ['... nee ...', '... scherp ...', '... genoeg ...'],
-        shy:        ['... misschien ...', '... zacht ...', '... niet kijken ...']
+        neutral:['... stil ...','... wacht ...','... ergens ...'], interested:['... wat is dit ...','... dichterbij ...','... ik kijk ...'],
+        surprised:['... oh ...','... ineens ...','... wat ...'], happy:['... zacht licht ...','... mooi ...','... ja ...'],
+        laugh:['... haha ...','... levend ...','... goed ...'], cry:['... stil ...','... koud ...','... weg ...'],
+        angry:['... nee ...','... scherp ...','... genoeg ...'], shy:['... misschien ...','... zacht ...','... niet kijken ...']
       };
-
-      const includeNews = Math.random() < 0.72;
-      const meaningful = Math.random() < 0.18;
-
+      const includeNews = Math.random() < .76;
+      const meaningful = Math.random() < .18;
+      const left = glyphCluster(rndInt(2,6));
+      const right = glyphCluster(rndInt(2,6));
       if (includeNews) {
-        const leftNoise = glyphCluster(rndInt(2, 6));
-        const rightNoise = glyphCluster(rndInt(2, 6));
         const middle = newsFragment(mood);
-
-        if (meaningful) {
-          return {
-            text:
-              leftNoise + ' ' +
-              pick(phrases[mood] || phrases.neutral) + ' ' +
-              middle + ' ' +
-              rightNoise,
-            meaningful: true
-          };
-        }
-
-        return {
-          text: leftNoise + ' ' + middle + ' ' + rightNoise,
-          meaningful: false
-        };
+        return { text: meaningful ? `${left} ${pick(phrases[mood]||phrases.neutral)} ${middle} ${right}` : `${left} ${middle} ${right}`, meaningful };
       }
-
-      if (meaningful) {
-        return {
-          text:
-            glyphCluster(rndInt(2,4)) + ' ' +
-            pick(phrases[mood] || phrases.neutral) + ' ' +
-            glyphCluster(rndInt(2,4)),
-          meaningful: true
-        };
-      }
-
-      const pieces = [];
-      const count = rndInt(2, 4);
-      for (let i = 0; i < count; i++) {
-        pieces.push(glyphCluster(rndInt(3, 8)));
-      }
-
-      return {
-        text: pieces.join(' '),
-        meaningful: false
-      };
+      if (meaningful) return { text:`${left} ${pick(phrases[mood]||phrases.neutral)} ${right}`, meaningful:true };
+      return { text:Array.from({length:rndInt(2,4)},()=>glyphCluster(rndInt(3,8))).join(' '), meaningful:false };
     }
+
+    function dominantMood(){
+      let best='neutral', score=-1;
+      for (const k in weights) if (weights[k] > score) { score=weights[k]; best=k; }
+      return best;
+    }
+
+    const emotion = {
+      valence:.06, arousal:.36, tension:.14, curiosity:.52, sadness:.08, shyness:.10,
+      impulseKind:'neutral', impulseStrength:0, impulseDecay:.985, nextImpulseAt:performance.now() + rnd(8000,16000)
+    };
 
     function spawnImpulse(now){
       const kinds = ['curious','joy','surprise','sadness','anger','shy'];
       let kind = pick(kinds);
-
-      if (emotion.valence > 0.28 && Math.random() > 0.45) kind = pick(['joy','curious','shy']);
-      if (emotion.tension > 0.32 && Math.random() > 0.55) kind = pick(['anger','surprise']);
-      if (emotion.sadness > 0.24 && Math.random() > 0.55) kind = pick(['sadness','shy']);
-
+      if (WorldBrain.weather.visual.rain > .35 && Math.random() > .45) kind = pick(['sadness','shy','curious']);
+      if (WorldBrain.weather.visual.storm > .25 && Math.random() > .35) kind = pick(['anger','surprise']);
+      if (WorldBrain.time.isNight && Math.random() > .55) kind = pick(['curious','shy','surprise']);
+      if (emotion.valence > .28 && Math.random() > .45) kind = pick(['joy','curious','shy']);
       emotion.impulseKind = kind;
-      emotion.impulseStrength = rnd(0.45, 1.0);
-      emotion.impulseDecay = rnd(0.982, 0.991);
-      emotion.nextImpulseAt = now + rnd(10000, 22000);
+      emotion.impulseStrength = rnd(.36, .90);
+      emotion.impulseDecay = rnd(.982, .991);
+      emotion.nextImpulseAt = now + rnd(12000, 26000);
     }
 
     function updateEmotion(now, dt){
-      const t = now * 0.001;
+      const t = now * .001;
+      const wv = WorldBrain.weather.visual;
+      const night = WorldBrain.time.isNight ? 1 : 0;
+      const newsTone = NewsBrain.tone;
+      const memoryPressure = MemoryBrain.pressure;
 
-      const targetValence   = clamp(slowNoise(t, 0.18, 0.13, 0.12, 0.043, 0.8), -0.48, 0.60);
-      const targetArousal   = clamp(0.36 + slowNoise(t, 0.10, 0.09, 0.08, 0.027, 1.6), 0.18, 0.92);
-      const targetTension   = clamp(0.16 + slowNoise(t, 0.10, 0.11, 0.05, 0.031, 2.1), 0.04, 0.84);
-      const targetCuriosity = clamp(0.48 + slowNoise(t, 0.12, 0.07, 0.09, 0.019, 4.2), 0.08, 0.98);
-      const targetSadness   = clamp(0.10 + slowNoise(t, 0.08, 0.05, 0.07, 0.021, 3.3) - targetValence * 0.12, 0.00, 0.78);
-      const targetShyness   = clamp(0.10 + slowNoise(t, 0.06, 0.06, 0.05, 0.018, 5.1), 0.00, 0.68);
+      let targetValence   = clamp(slowNoise(t,.18,.13,.12,.043,.8) + newsTone*.10 - wv.rain*.16 - wv.storm*.20 + (1-night)*.06, -.55, .62);
+      let targetArousal   = clamp(.34 + slowNoise(t,.10,.09,.08,.027,1.6) + wv.wind*.20 + wv.storm*.28 + wv.heat*.08, .14, .95);
+      let targetTension   = clamp(.14 + slowNoise(t,.10,.11,.05,.031,2.1) + wv.storm*.45 + wv.wind*.12 - wv.fog*.03 - newsTone*.16, .03, .92);
+      let targetCuriosity = clamp(.48 + slowNoise(t,.12,.07,.09,.019,4.2) + night*.20 + (NewsBrain.keywords.length ? .06 : 0), .08, 1);
+      let targetSadness   = clamp(.08 + slowNoise(t,.08,.05,.07,.021,3.3) + wv.rain*.22 + wv.fog*.12 - targetValence*.10, 0, .82);
+      let targetShyness   = clamp(.10 + slowNoise(t,.06,.06,.05,.018,5.1) + night*.08 + wv.fog*.10, 0, .74);
 
-      emotion.valence   = damp(emotion.valence,   targetValence,   0.42, dt);
-      emotion.arousal   = damp(emotion.arousal,   targetArousal,   0.44, dt);
-      emotion.tension   = damp(emotion.tension,   targetTension,   0.34, dt);
-      emotion.curiosity = damp(emotion.curiosity, targetCuriosity, 0.38, dt);
-      emotion.sadness   = damp(emotion.sadness,   targetSadness,   0.30, dt);
-      emotion.shyness   = damp(emotion.shyness,   targetShyness,   0.27, dt);
+      emotion.valence   = damp(emotion.valence,   targetValence,   .36, dt);
+      emotion.arousal   = damp(emotion.arousal,   targetArousal,   .40, dt);
+      emotion.tension   = damp(emotion.tension,   targetTension,   .32, dt);
+      emotion.curiosity = damp(emotion.curiosity, targetCuriosity, .35, dt);
+      emotion.sadness   = damp(emotion.sadness,   targetSadness,   .28, dt);
+      emotion.shyness   = damp(emotion.shyness,   targetShyness,   .25, dt);
 
-      if (now > emotion.nextImpulseAt) {
-        spawnImpulse(now);
-      }
+      if (now > emotion.nextImpulseAt) spawnImpulse(now);
 
-      if (emotion.impulseStrength > 0.001) {
+      if (emotion.impulseStrength > .001) {
         const s = emotion.impulseStrength;
-
-        if (emotion.impulseKind === 'curious') {
-          emotion.curiosity = clamp(emotion.curiosity + 0.20 * s, 0, 1);
-          emotion.arousal   = clamp(emotion.arousal   + 0.08 * s, 0, 1);
-        }
-        if (emotion.impulseKind === 'joy') {
-          emotion.valence   = clamp(emotion.valence   + 0.28 * s, -1, 1);
-          emotion.arousal   = clamp(emotion.arousal   + 0.12 * s, 0, 1);
-        }
-        if (emotion.impulseKind === 'surprise') {
-          emotion.arousal   = clamp(emotion.arousal   + 0.25 * s, 0, 1);
-          emotion.tension   = clamp(emotion.tension   + 0.10 * s, 0, 1);
-          emotion.curiosity = clamp(emotion.curiosity + 0.10 * s, 0, 1);
-        }
-        if (emotion.impulseKind === 'sadness') {
-          emotion.sadness   = clamp(emotion.sadness   + 0.22 * s, 0, 1);
-          emotion.valence   = clamp(emotion.valence   - 0.20 * s, -1, 1);
-          emotion.arousal   = clamp(emotion.arousal   - 0.06 * s, 0, 1);
-        }
-        if (emotion.impulseKind === 'anger') {
-          emotion.tension   = clamp(emotion.tension   + 0.28 * s, 0, 1);
-          emotion.valence   = clamp(emotion.valence   - 0.22 * s, -1, 1);
-          emotion.arousal   = clamp(emotion.arousal   + 0.12 * s, 0, 1);
-        }
-        if (emotion.impulseKind === 'shy') {
-          emotion.shyness   = clamp(emotion.shyness   + 0.28 * s, 0, 1);
-          emotion.curiosity = clamp(emotion.curiosity + 0.05 * s, 0, 1);
-          emotion.valence   = clamp(emotion.valence   + 0.04 * s, -1, 1);
-        }
-
+        if (emotion.impulseKind === 'curious') { emotion.curiosity=clamp(emotion.curiosity+.20*s,0,1); emotion.arousal=clamp(emotion.arousal+.06*s,0,1); }
+        if (emotion.impulseKind === 'joy') { emotion.valence=clamp(emotion.valence+.26*s,-1,1); emotion.arousal=clamp(emotion.arousal+.10*s,0,1); }
+        if (emotion.impulseKind === 'surprise') { emotion.arousal=clamp(emotion.arousal+.24*s,0,1); emotion.tension=clamp(emotion.tension+.09*s,0,1); }
+        if (emotion.impulseKind === 'sadness') { emotion.sadness=clamp(emotion.sadness+.22*s,0,1); emotion.valence=clamp(emotion.valence-.18*s,-1,1); }
+        if (emotion.impulseKind === 'anger') { emotion.tension=clamp(emotion.tension+.26*s,0,1); emotion.valence=clamp(emotion.valence-.20*s,-1,1); emotion.arousal=clamp(emotion.arousal+.10*s,0,1); }
+        if (emotion.impulseKind === 'shy') { emotion.shyness=clamp(emotion.shyness+.26*s,0,1); emotion.valence=clamp(emotion.valence+.04*s,-1,1); }
         emotion.impulseStrength *= emotion.impulseDecay;
       }
 
       const positive = Math.max(0, emotion.valence);
       const negative = Math.max(0, -emotion.valence);
-
       const raw = {
-        neutral:
-          0.25 + (1 - emotion.arousal) * 0.30 + (1 - emotion.tension) * 0.16,
-
-        interested:
-          0.15 + emotion.curiosity * 0.95 + emotion.arousal * 0.12,
-
-        surprised:
-          0.04 + emotion.arousal * 0.30 + (emotion.impulseKind === 'surprise' ? 0.82 * emotion.impulseStrength + 0.18 : 0),
-
-        happy:
-          0.06 + positive * 1.05 + Math.max(0, 0.15 - emotion.sadness) * 0.28,
-
-        laugh:
-          0.02 + positive * emotion.arousal * 1.08 + (emotion.impulseKind === 'joy' ? 0.54 * emotion.impulseStrength + 0.12 : 0),
-
-        cry:
-          0.02 + emotion.sadness * 1.12 + negative * 0.44 + (emotion.impulseKind === 'sadness' ? 0.52 * emotion.impulseStrength + 0.10 : 0),
-
-        angry:
-          0.02 + emotion.tension * 0.92 + negative * 0.52 + (emotion.impulseKind === 'anger' ? 0.64 * emotion.impulseStrength + 0.14 : 0),
-
-        shy:
-          0.06 + emotion.shyness * 1.00 + emotion.curiosity * 0.16 + (emotion.impulseKind === 'shy' ? 0.48 * emotion.impulseStrength + 0.10 : 0)
+        neutral:.24 + (1-emotion.arousal)*.32 + (1-emotion.tension)*.14,
+        interested:.14 + emotion.curiosity*.96 + emotion.arousal*.10,
+        surprised:.03 + emotion.arousal*.26 + (emotion.impulseKind==='surprise' ? .72*emotion.impulseStrength + .10 : 0),
+        happy:.05 + positive*.95 + Math.max(0,.18-emotion.sadness)*.26,
+        laugh:.02 + positive*emotion.arousal*.92 + (emotion.impulseKind==='joy' ? .42*emotion.impulseStrength + .08 : 0),
+        cry:.02 + emotion.sadness*1.08 + negative*.38 + (emotion.impulseKind==='sadness' ? .44*emotion.impulseStrength + .08 : 0),
+        angry:.015 + emotion.tension*.82 + negative*.42 + memoryPressure*.12 + (emotion.impulseKind==='anger' ? .54*emotion.impulseStrength + .10 : 0),
+        shy:.05 + emotion.shyness*.92 + emotion.curiosity*.14 + (emotion.impulseKind==='shy' ? .38*emotion.impulseStrength + .08 : 0)
       };
-
-      let sum = 0;
-      for (const k in raw) {
-        raw[k] = Math.max(0.001, Math.pow(raw[k], 1.5));
-        sum += raw[k];
-      }
-
-      for (const k in raw) {
-        weights[k] = damp(weights[k], raw[k] / sum, 1.55, dt);
-      }
-
-      const sum2 = Object.values(weights).reduce((a,b)=>a+b, 0) || 1;
+      let sum=0;
+      for (const k in raw){ raw[k]=Math.max(.001, Math.pow(raw[k], 1.45)); sum+=raw[k]; }
+      for (const k in raw) weights[k] = damp(weights[k], raw[k]/sum, 1.25, dt);
+      const sum2 = Object.values(weights).reduce((a,b)=>a+b,0) || 1;
       for (const k in weights) weights[k] /= sum2;
-
       for (const key of FEATURE_KEYS) {
-        let v = 0;
-        for (const name in weights) {
-          v += PROTO[name][key] * weights[name];
-        }
-        expr[key] = damp(expr[key], v, 2.2, dt);
+        let v=0;
+        for (const name in weights) v += PROTO[name][key] * weights[name];
+        expr[key] = damp(expr[key], v, 1.85, dt);
       }
+    }
+
+    function updateMemory(dt){
+      const mood = dominantMood();
+      MemoryBrain.lastDominant = mood;
+      for (const k in MemoryBrain.trace) MemoryBrain.trace[k] = damp(MemoryBrain.trace[k], k === mood ? 1 : 0, .045, dt);
+      MemoryBrain.pressure = damp(MemoryBrain.pressure, weights.angry*.45 + WorldBrain.weather.visual.storm*.20 + Math.max(0, -NewsBrain.tone)*.12, .08, dt);
+      MemoryBrain.silence = speech.active ? 0 : clamp(MemoryBrain.silence + dt * .05, 0, 1);
+      MemoryBrain.recentWeather = WorldBrain.weather.mood || 'clear';
+    }
+
+    function chooseWardrobeTarget(){
+      const mood = dominantMood();
+      const weather = WorldBrain.weather.mood || 'clear';
+      const phase = WorldBrain.time.phaseName;
+      let outfit = 'cloak';
+      if (weather === 'rain') outfit = 'raincoat';
+      else if (weather === 'storm') outfit = 'storm-jacket';
+      else if (phase === 'night' || phase === 'deep-night') outfit = 'nightdress';
+      else if (mood === 'angry') outfit = 'armor';
+      else if (mood === 'shy' || mood === 'cry') outfit = 'robe';
+      else if (mood === 'happy' || mood === 'laugh') outfit = Math.random() > .55 ? 'ceremonial' : 'suit';
+      else if (mood === 'interested') outfit = 'suit';
+
+      const palettes = {
+        cloak:{ base:'#0b3b44', shade:'#061b23', accent:'#22e64f', line:'#69fff3' },
+        suit:{ base:'#0b6f7a', shade:'#063941', accent:'#a2ff75', line:'#f7fff8' },
+        robe:{ base:'#102d3e', shade:'#06141d', accent:'#ff7bea', line:'#69fff3' },
+        armor:{ base:'#14343f', shade:'#071016', accent:'#ff3159', line:'#f7fff8' },
+        raincoat:{ base:'#09566c', shade:'#062331', accent:'#69fff3', line:'#a8fff2' },
+        nightdress:{ base:'#081527', shade:'#03070f', accent:'#ff2bd6', line:'#69fff3' },
+        'storm-jacket':{ base:'#17254d', shade:'#060916', accent:'#8a9cff', line:'#ffd35d' },
+        ceremonial:{ base:'#11523c', shade:'#061b16', accent:'#ff2bd6', line:'#a2ff75' }
+      };
+      return { outfit, ...palettes[outfit] };
+    }
+
+    function initWardrobe(){
+      WardrobeBrain.current = chooseWardrobeTarget();
+      WardrobeBrain.from = {...WardrobeBrain.current};
+      WardrobeBrain.target = {...WardrobeBrain.current};
+    }
+
+    function updateWardrobe(now, dt){
+      if (!WardrobeBrain.current) initWardrobe();
+      if (now > WardrobeBrain.nextChangeAt) {
+        WardrobeBrain.from = {...WardrobeBrain.current};
+        WardrobeBrain.target = chooseWardrobeTarget();
+        WardrobeBrain.blend = 0;
+        WardrobeBrain.nextChangeAt = now + rnd(65000, 190000);
+        MemoryBrain.recentOutfit = WardrobeBrain.target.outfit;
+      }
+      WardrobeBrain.blend = clamp(WardrobeBrain.blend + dt * .08, 0, 1);
+      const b = ease(WardrobeBrain.blend);
+      const keys = ['base','shade','accent','line'];
+      for (const k of keys) WardrobeBrain.current[k] = mixHex(WardrobeBrain.from[k], WardrobeBrain.target[k], b);
+      WardrobeBrain.current.outfit = WardrobeBrain.target.outfit;
     }
 
     function updateBlink(now){
       if (now > blink.nextAt) {
-        blink.until = now + rnd(95, 165);
-        blink.nextAt = now + rnd(2300, 6200);
-        if (Math.random() > .88) blink.nextAt += 180;
+        blink.until = now + rnd(95,165);
+        blink.nextAt = now + rnd(2600,6800) - WorldBrain.weather.visual.wind * 260;
+        if (Math.random() > .88) blink.nextAt += 190;
       }
       const b = clamp(1 - Math.abs(now - (blink.until - 76)) / 78, 0, 1);
       blink.strength = Math.max(blink.strength * .65, b);
@@ -564,656 +597,467 @@
 
     function updateGaze(now, dt){
       const mood = dominantMood();
-
       if (now > gaze.nextAt) {
-        const biasX = expr.gazeX;
-        const biasY = expr.gazeY;
-
-        let spreadX = 0.36 + emotion.curiosity * 0.28;
-        let spreadY = 0.16 + emotion.sadness * 0.20;
-
-        if (mood === 'shy') {
-          spreadX = 0.22;
-          spreadY = 0.14;
-        }
-        if (mood === 'surprised') {
-          spreadX = 0.10;
-          spreadY = 0.12;
-        }
-
-        gaze.tx = clamp(biasX + rnd(-spreadX, spreadX), -1.2, 1.2);
-        gaze.ty = clamp(biasY + rnd(-spreadY, spreadY), -0.8, 0.9);
-        gaze.nextAt = now + rnd(1200, 3600);
+        let spreadX = .34 + emotion.curiosity*.25;
+        let spreadY = .15 + emotion.sadness*.18;
+        if (mood === 'shy') { spreadX=.20; spreadY=.14; }
+        if (mood === 'surprised') { spreadX=.10; spreadY=.12; }
+        gaze.tx = clamp(expr.gazeX + rnd(-spreadX, spreadX), -1.2, 1.2);
+        gaze.ty = clamp(expr.gazeY + rnd(-spreadY, spreadY), -.8, .9);
+        gaze.nextAt = now + rnd(1400, 4200);
       }
-
-      gaze.x = damp(gaze.x, gaze.tx, 4.0, dt);
-      gaze.y = damp(gaze.y, gaze.ty, 4.0, dt);
+      gaze.x = damp(gaze.x, gaze.tx, 3.7, dt);
+      gaze.y = damp(gaze.y, gaze.ty, 3.7, dt);
     }
 
     function updateMotion(now, dt){
       const mood = dominantMood();
-
+      const wind = WorldBrain.weather.visual.wind;
       if (now > motion.nextAt) {
-        let rangeX = 3.2;
-        let rangeY = 2.2;
-        let rangeTilt = 0.012;
-
-        if (mood === 'laugh' || mood === 'happy') rangeX = 4.2;
-        if (mood === 'shy') rangeX = 2.0;
-        if (mood === 'angry') rangeTilt = 0.008;
-        if (mood === 'surprised') rangeY = 1.4;
-
+        let rangeX = 2.8 + wind * 2.2;
+        let rangeY = 1.6 + WorldBrain.weather.visual.fog * .8;
+        let rangeTilt = .007 + wind * .007;
+        if (mood === 'laugh' || mood === 'happy') rangeX += 1.3;
+        if (mood === 'angry') rangeTilt *= .65;
+        if (mood === 'shy') rangeX *= .65;
         motion.tx = rnd(-rangeX, rangeX);
         motion.ty = rnd(-rangeY, rangeY);
         motion.ttilt = rnd(-rangeTilt, rangeTilt);
-
-        motion.nextAt = now + rnd(4500, 9500);
+        motion.nextAt = now + rnd(5200, 11000);
       }
-
-      motion.x = damp(motion.x, motion.tx, 0.55, dt);
-      motion.y = damp(motion.y, motion.ty, 0.55, dt);
-      motion.tilt = damp(motion.tilt, motion.ttilt, 0.55, dt);
+      motion.x = damp(motion.x, motion.tx, .45, dt);
+      motion.y = damp(motion.y, motion.ty, .45, dt);
+      motion.tilt = damp(motion.tilt, motion.ttilt, .45, dt);
     }
 
     function updateSpeech(now){
       const mood = dominantMood();
-
       if (!speech.active && now > speech.nextAt) {
         const data = generateSpeechText(mood);
         speech.active = true;
         speech.start = now;
-        speech.duration = rnd(1800, 3800);
+        speech.duration = rnd(1900, 4200);
         speech.text = data.text;
         speech.mood = mood;
         speech.meaningful = data.meaningful;
-        speech.phase = rnd(0, 999);
+        speech.phase = rnd(0,999);
+        MemoryBrain.lastSpeechAt = now;
       }
-
       if (speech.active && now > speech.start + speech.duration) {
         speech.active = false;
-        speech.nextAt = now + rnd(7000, 18000);
+        speech.nextAt = now + rnd(8500, 22000) - emotion.arousal * 1600;
       }
     }
 
     function speechAlpha(now){
       if (!speech.active) return 0;
       const t = now - speech.start;
-      const inDur = 240;
-      const outDur = 320;
-      const total = speech.duration;
-
-      if (t < inDur) return clamp(t / inDur, 0, 1);
-      if (t > total - outDur) return clamp((total - t) / outDur, 0, 1);
+      const inDur = 260, outDur = 360, total = speech.duration;
+      if (t < inDur) return clamp(t/inDur,0,1);
+      if (t > total-outDur) return clamp((total-t)/outDur,0,1);
       return 1;
     }
 
     function speakOpen(now){
       if (!speech.active) return 0;
       const a = speechAlpha(now);
-      const rhythm =
-        0.35 +
-        0.35 * (0.5 + 0.5 * Math.sin(now * 0.018 + speech.phase)) +
-        0.18 * (0.5 + 0.5 * Math.sin(now * 0.041 + speech.phase * 0.67));
-      return a * rhythm * 0.72;
+      const rhythm = .35 + .35 * (0.5 + 0.5 * Math.sin(now*.018 + speech.phase)) + .18 * (0.5 + 0.5 * Math.sin(now*.041 + speech.phase*.67));
+      return a * rhythm * .72;
+    }
+
+    function createShip(seed, archetype, depth){
+      const rng = mulberry32(seed);
+      const specs = {
+        needle:[13,5], freighter:[17,7], drone:[9,5], saucer:[15,5], organic:[13,7], broken:[15,7], carrier:[25,9]
+      };
+      const [gw, gh] = specs[archetype] || specs.needle;
+      const grid = Array.from({length:gh},()=>Array(gw).fill(0));
+      const midY = Math.floor(gh/2), midX = Math.floor(gw/2);
+      const cell = (x,y,v) => { if (x>=0 && x<gw && y>=0 && y<gh) grid[y][x] = Math.max(grid[y][x], v); };
+
+      for (let x=1; x<gw-1; x++) {
+        const bodyChance = archetype === 'needle' ? .78 : archetype === 'freighter' ? .82 : .62;
+        if (rng() < bodyChance) { cell(x,midY,2); if (rng()>.55) cell(x,midY-1,1); if (rng()>.55) cell(x,midY+1,1); }
+      }
+      const wingSpan = archetype === 'carrier' ? 4 : archetype === 'freighter' ? 3 : 2;
+      for (let x=2; x<gw-2; x++) {
+        if (rng()>.52) {
+          const span = 1 + Math.floor(rng()*wingSpan);
+          for(let s=1;s<=span;s++){ cell(x,midY-s,1); cell(x,midY+s,1); }
+        }
+      }
+      if (archetype === 'saucer') {
+        for(let x=2;x<gw-2;x++){ cell(x,midY,2); if (x>4 && x<gw-5) { cell(x,midY-1,1); cell(x,midY+1,1); } }
+      }
+      if (archetype === 'organic') {
+        for(let y=1;y<gh-1;y++) for(let x=2;x<gw-2;x++) if (Math.abs(y-midY)+rng()*2 < 2.4) cell(x,y,rng()>.55?2:1);
+      }
+      if (archetype === 'broken') {
+        for(let i=0;i<Math.floor(gw*gh*.08);i++) cell(Math.floor(rng()*gw), Math.floor(rng()*gh), 0);
+      }
+      cell(midX, midY-1, 3);
+      cell(gw-2, midY, 4);
+      cell(1, midY, 5);
+      if (rng()>.52) cell(midX + Math.floor(rng()*4)-2, 0, 6);
+      if (rng()>.55) cell(midX + Math.floor(rng()*4)-2, gh-1, 6);
+
+      const dir = rng() > .5 ? 1 : -1;
+      const y = rnd(18, 126);
+      const speedBase = archetype === 'carrier' ? .010 : archetype === 'freighter' ? .018 : archetype === 'needle' ? .055 : .028;
+      return {
+        seed, archetype, grid, gw, gh, depth, dir,
+        x:dir > 0 ? -gw*7 : W + gw*7,
+        y, scale:lerp(.75, 1.9, depth),
+        speed:speedBase * lerp(.55, 1.7, depth),
+        alpha:lerp(.28, .88, depth),
+        phase:rng()*999,
+        behavior:pick(['straight','hover','arc','burst','glitch'])
+      };
+    }
+
+    function spawnShip(now, rare=false){
+      const night = WorldBrain.time.isNight;
+      const archetypes = rare ? ['carrier','organic','broken'] : night ? ['needle','freighter','drone','saucer','organic','broken'] : ['needle','freighter','drone','saucer'];
+      const archetype = pick(archetypes);
+      const depth = rare ? rnd(.46,.78) : Math.pow(rnd(.10, .95), 1.25);
+      ShipBrain.ships.push(createShip(++ShipBrain.seed, archetype, depth));
+    }
+
+    function updateShips(now, dt){
+      const quietness = WorldBrain.weather.visual.fog * 1800 + WorldBrain.time.isNight * -900;
+      if (now > ShipBrain.nextSpawnAt && ShipBrain.ships.length < ShipBrain.maxShips) {
+        spawnShip(now, false);
+        ShipBrain.nextSpawnAt = now + rnd(3600, 15000) + quietness;
+      }
+      if (now > ShipBrain.rareAt) {
+        spawnShip(now, true);
+        ShipBrain.rareAt = now + rnd(45000, 95000);
+      }
+      const wind = WorldBrain.weather.visual.wind;
+      for (const s of ShipBrain.ships) {
+        let factor = 1 + wind * .42;
+        if (s.behavior === 'burst') factor += .45 * (0.5 + 0.5*Math.sin(now*.003 + s.phase));
+        s.x += s.dir * s.speed * 1000 * dt * factor;
+        if (s.behavior === 'arc') s.y += Math.sin(now*.0015 + s.phase) * dt * 10;
+        if (s.behavior === 'hover') s.y += Math.sin(now*.004 + s.phase) * dt * 6;
+        if (s.behavior === 'glitch' && hash(Math.floor(now/180) + s.seed) > .985) s.x += s.dir * rnd(8,18);
+      }
+      ShipBrain.ships = ShipBrain.ships.filter(s => s.dir > 0 ? s.x < W + 120 : s.x > -120);
     }
 
     function updateBackgroundEvents(now){
       const star = bgEvents.star;
       if (!star.active && now > star.nextAt) {
-        star.active = true;
-        star.start = now;
-        star.duration = rnd(650, 1200);
-        star.x0 = rnd(W * 0.66, W - 20);
-        star.y0 = rnd(14, 70);
-        star.x1 = star.x0 - rnd(90, 150);
-        star.y1 = star.y0 + rnd(34, 64);
+        star.active = true; star.start = now; star.duration = rnd(650, 1200);
+        star.x0 = rnd(W*.62,W-20); star.y0 = rnd(12,70); star.x1 = star.x0 - rnd(90,150); star.y1 = star.y0 + rnd(34,64);
       }
-      if (star.active && now > star.start + star.duration) {
-        star.active = false;
-        star.nextAt = now + rnd(5500, 12000);
-      }
+      if (star.active && now > star.start + star.duration) { star.active=false; star.nextAt = now + rnd(6500,15000); }
 
-      const rocket = bgEvents.rocket;
-      if (!rocket.active && now > rocket.nextAt) {
-        rocket.active = true;
-        rocket.start = now;
-        rocket.duration = rnd(1700, 2800);
-        rocket.dir = Math.random() > 0.5 ? 1 : -1;
-        rocket.y = rnd(42, 104);
-        if (rocket.dir === 1) {
-          rocket.fromX = -30;
-          rocket.toX = W + 30;
-        } else {
-          rocket.fromX = W + 30;
-          rocket.toX = -30;
-        }
+      const sig = bgEvents.signal;
+      if (!sig.active && now > sig.nextAt) {
+        sig.active = true; sig.start = now; sig.duration = rnd(900, 1800); sig.x = rnd(30,330); sig.y = rnd(26,132);
       }
-      if (rocket.active && now > rocket.start + rocket.duration) {
-        rocket.active = false;
-        rocket.nextAt = now + rnd(12000, 22000);
-      }
-
-      const ufo = bgEvents.ufo;
-      if (!ufo.active && now > ufo.nextAt) {
-        ufo.active = true;
-        ufo.start = now;
-        ufo.duration = rnd(8500, 12000);
-        ufo.dir = Math.random() > 0.5 ? 1 : -1;
-        ufo.y = rnd(26, 72);
-        ufo.bob = rnd(0, Math.PI * 2);
-        if (ufo.dir === 1) {
-          ufo.fromX = -42;
-          ufo.toX = W + 42;
-        } else {
-          ufo.fromX = W + 42;
-          ufo.toX = -42;
-        }
-      }
-      if (ufo.active && now > ufo.start + ufo.duration) {
-        ufo.active = false;
-        ufo.nextAt = now + rnd(15000, 26000);
-      }
+      if (sig.active && now > sig.start + sig.duration) { sig.active=false; sig.nextAt = now + rnd(16000, 36000); }
     }
 
     function maybeGlitch(now){
       if (speech.active) return;
-      if (now > glitchAt) {
-        glitchUntil = now + rnd(70, 170);
-        glitchAt = now + rnd(9000, 18000);
+      const stormBoost = WorldBrain.weather.visual.storm * 3000;
+      if (now > glitchAt - stormBoost) {
+        glitchUntil = now + rnd(70, 170 + WorldBrain.weather.visual.storm * 150);
+        glitchAt = now + rnd(10000, 21000);
       }
-    }
-
-    function rect(x,y,w,h,color){
-      ctx.fillStyle = color;
-      ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
-    }
-
-    function poly(points, color){
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(Math.round(points[0][0]), Math.round(points[0][1]));
-      for (let i=1;i<points.length;i++) ctx.lineTo(Math.round(points[i][0]), Math.round(points[i][1]));
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    function path(color, commands){
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      for (const c of commands) {
-        if (c[0] === 'M') ctx.moveTo(c[1], c[2]);
-        if (c[0] === 'L') ctx.lineTo(c[1], c[2]);
-        if (c[0] === 'Q') ctx.quadraticCurveTo(c[1], c[2], c[3], c[4]);
-        if (c[0] === 'C') ctx.bezierCurveTo(c[1], c[2], c[3], c[4], c[5], c[6]);
-      }
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    function ellipse(x,y,rx,ry,color){
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.ellipse(Math.round(x), Math.round(y), rx, ry, 0, 0, Math.PI*2);
-      ctx.fill();
-    }
-
-    function line(x1,y1,x2,y2,width,color){
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.lineCap = 'butt';
-      ctx.lineJoin = 'miter';
-      ctx.beginPath();
-      ctx.moveTo(Math.round(x1),Math.round(y1));
-      ctx.lineTo(Math.round(x2),Math.round(y2));
-      ctx.stroke();
-    }
-
-    function roundedBubble(x, y, w, h, r, tailX, tailY){
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + 18, y + h);
-      ctx.lineTo(tailX, tailY);
-      ctx.lineTo(x + 32, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
-    }
-
-    function splitBubbleLines(text, maxLen=18){
-      const words = text.split(' ');
-      const lines = [];
-      let line = '';
-
-      for (const w of words) {
-        const test = line ? line + ' ' + w : w;
-        if (test.length > maxLen && line) {
-          lines.push(line);
-          line = w;
-        } else {
-          line = test;
-        }
-      }
-      if (line) lines.push(line);
-      return lines.slice(0, 3);
     }
 
     function drawBackground(now){
-      ctx.fillStyle = C.bg;
-      ctx.fillRect(0,0,W,H);
+      const light = WorldBrain.time.light;
+      const phase = WorldBrain.time.phaseName;
+      const wv = WorldBrain.weather.visual;
 
+      rect(0,0,W,H,C.bg);
+      const skyTint = phase === 'dawn' ? C.green0 : phase === 'dusk' ? C.magenta : phase.includes('night') ? C.cyan0 : C.cyan1;
+      ctx.globalAlpha = .08 + light * .06;
+      rect(0,0,W,H,skyTint);
+      ctx.globalAlpha = 1;
+
+      const starAlpha = clamp((1-light) * .65 + wv.clarity * .20, .06, .72);
       for (const s of stars) {
-        const tw = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(now * 0.0012 + s.phase));
-        ctx.globalAlpha = 0.16 + tw * 0.38;
+        const tw = .25 + .75 * (.5 + .5 * Math.sin(now*.0012 + s.phase));
+        ctx.globalAlpha = starAlpha * (.20 + tw*.58);
         rect(s.x, s.y, s.size, s.size, s.c);
       }
       ctx.globalAlpha = 1;
 
+      drawShips(now);
       drawShootingStar(now);
-      drawRocket(now);
-      drawUfo(now);
+      drawSignal(now);
+      drawWeather(now);
+    }
+
+    function drawShips(now){
+      for (const s of ShipBrain.ships) {
+        ctx.save();
+        ctx.globalAlpha = s.alpha * (WorldBrain.weather.visual.fog > .5 ? .72 : 1);
+        const bob = Math.sin(now*.002 + s.phase) * (s.behavior === 'hover' ? 2.6 : .7);
+        ctx.translate(Math.round(s.x), Math.round(s.y + bob));
+        if (s.dir < 0) ctx.scale(-1,1);
+        ctx.scale(s.scale, s.scale);
+        const cellSize = 2;
+        const offX = -s.gw * cellSize / 2, offY = -s.gh * cellSize / 2;
+        const wp = WardrobeBrain.current || { accent:C.green1, line:C.cyan4 };
+        const pal = [C.black, C.cyan1, C.cyan3, C.white, wp.accent, C.amber, C.magenta];
+        for (let y=0;y<s.gh;y++) {
+          for (let x=0;x<s.gw;x++) {
+            const v = s.grid[y][x];
+            if (!v) continue;
+            rect(offX + x*cellSize, offY + y*cellSize, cellSize, cellSize, pal[v] || C.cyan4);
+          }
+        }
+        if (s.depth > .55) {
+          ctx.globalAlpha *= .35;
+          rect(offX - 8, -1, 7, 1, C.cyan4);
+          rect(offX - 13, 0, 4, 1, C.magenta);
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
     }
 
     function drawShootingStar(now){
-      const e = bgEvents.star;
-      if (!e.active) return;
+      const e = bgEvents.star; if (!e.active) return;
+      const t = clamp((now-e.start)/e.duration,0,1);
+      const x = lerp(e.x0,e.x1,t), y=lerp(e.y0,e.y1,t), a=(1-t)*.9+.1;
+      ctx.globalAlpha = a*.9; rect(x,y,3,2,C.white); rect(x-4,y+2,3,2,C.cyan4); rect(x-8,y+4,3,2,C.cyan3); rect(x-12,y+6,2,1,C.cyan2); rect(x-15,y+8,2,1,C.magenta); ctx.globalAlpha=1;
+    }
 
-      const t = clamp((now - e.start) / e.duration, 0, 1);
-      const x = lerp(e.x0, e.x1, t);
-      const y = lerp(e.y0, e.y1, t);
-      const alpha = (1 - t) * 0.9 + 0.1;
-
-      ctx.globalAlpha = alpha * 0.9;
-      rect(x, y, 3, 2, C.white);
-      rect(x - 4, y + 2, 3, 2, C.cyan4);
-      rect(x - 8, y + 4, 3, 2, C.cyan3);
-      rect(x - 12, y + 6, 2, 1, C.cyan2);
-      rect(x - 15, y + 8, 2, 1, C.magenta);
+    function drawSignal(now){
+      const e = bgEvents.signal; if (!e.active) return;
+      const t = clamp((now-e.start)/e.duration,0,1);
+      const a = Math.sin(t*Math.PI);
+      ctx.globalAlpha = a*.32;
+      const r = 8 + t*26;
+      line(e.x-r,e.y,e.x-r/2,e.y,1,C.cyan4);
+      line(e.x+r/2,e.y,e.x+r,e.y,1,C.cyan4);
+      line(e.x,e.y-r,e.x,e.y-r/2,1,C.magenta);
+      line(e.x,e.y+r/2,e.x,e.y+r,1,C.magenta);
+      rect(e.x-1,e.y-1,2,2,C.white);
       ctx.globalAlpha = 1;
     }
 
-    function drawRocket(now){
-      const e = bgEvents.rocket;
-      if (!e.active) return;
-
-      const t = ease(clamp((now - e.start) / e.duration, 0, 1));
-      const x = lerp(e.fromX, e.toX, t);
-      const y = e.y + Math.sin(now * 0.012) * 1.2;
-      const dir = e.dir;
-
-      ctx.save();
-      ctx.translate(Math.round(x), Math.round(y));
-      if (dir < 0) ctx.scale(-1, 1);
-      ctx.globalAlpha = 0.8;
-
-      rect(-15, -1, 7, 2, C.cyan2);
-      rect(-10, -2, 6, 4, C.amber);
-      rect(-7, -3, 3, 6, C.red);
-      rect(-4, -3, 10, 6, C.white);
-      rect(6, -2, 4, 4, C.cyan3);
-      rect(10, -1, 2, 2, C.green2);
-      rect(12, -1, 4, 2, C.magenta);
-      rect(4, -4, 2, 1, C.white);
-      rect(4, 3, 2, 1, C.white);
-
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
-
-    function drawUfo(now){
-      const e = bgEvents.ufo;
-      if (!e.active) return;
-
-      const t = ease(clamp((now - e.start) / e.duration, 0, 1));
-      const x = lerp(e.fromX, e.toX, t);
-      const y = e.y + Math.sin(now * 0.003 + e.bob) * 3;
-      const dir = e.dir;
-
-      ctx.save();
-      ctx.translate(Math.round(x), Math.round(y));
-      if (dir < 0) ctx.scale(-1, 1);
-
-      ctx.globalAlpha = 0.7;
-      rect(-13, 5, 26, 1, C.cyan1);
-      rect(-9, 6, 18, 1, C.cyan0);
-
-      ctx.globalAlpha = 0.92;
-      rect(-8, -2, 16, 4, C.cyan2);
-      rect(-5, -5, 10, 3, C.white);
-      rect(-2, -7, 4, 2, C.green2);
-      rect(-11, 2, 22, 3, C.black);
-      rect(-9, 3, 4, 1, C.magenta);
-      rect(-3, 3, 4, 1, C.green1);
-      rect(3, 3, 4, 1, C.cyan4);
-
-      ctx.globalAlpha = 1;
-      ctx.restore();
+    function drawWeather(now){
+      const v = WorldBrain.weather.visual;
+      if (v.cloud > .18) {
+        ctx.globalAlpha = v.cloud * .10;
+        for (let i=0;i<5;i++) {
+          const y = 24 + i*24 + Math.sin(now*.0005 + i)*4;
+          rect(0,y,W,7, i%2 ? C.cyan0 : C.fog);
+        }
+        ctx.globalAlpha = 1;
+      }
+      if (v.rain > .03) {
+        ctx.globalAlpha = v.rain * .55;
+        for (const d of rainDrops) {
+          const x = (d.x + now*.032*v.wind*d.s) % W;
+          const y = (d.y + now*.085*d.s) % H;
+          line(x,y,x-3-v.wind*5,y+7,1,C.cyan4);
+        }
+        ctx.globalAlpha = 1;
+      }
+      if (v.snow > .03) {
+        ctx.globalAlpha = v.snow * .62;
+        for (const f of snowFlakes) {
+          const x = (f.x + Math.sin(now*.001+f.p)*8 + W) % W;
+          const y = (f.y + now*.018*f.s) % H;
+          rect(x,y,f.s>1.2?2:1,f.s>1.2?2:1,C.white);
+        }
+        ctx.globalAlpha = 1;
+      }
+      if (v.fog > .03) {
+        ctx.globalAlpha = v.fog * .17;
+        rect(0,38,W,42,C.fog);
+        rect(0,104,W,26,C.cyan4);
+        rect(0,182,W,34,C.fog);
+        ctx.globalAlpha = 1;
+      }
+      if (v.heat > .04) {
+        ctx.globalAlpha = v.heat * .09;
+        rect(0,0,W,H,C.amber);
+        ctx.globalAlpha = 1;
+      }
+      if (v.cold > .04) {
+        ctx.globalAlpha = v.cold * .08;
+        rect(0,0,W,H,C.cyan4);
+        ctx.globalAlpha = 1;
+      }
     }
 
     function drawHairBack(){
-      path(C.black, [
-        ['M',79,235],['C',75,182,82,123,96,78],['C',110,31,143,15,184,17],
-        ['C',244,20,282,63,286,132],['C',290,184,268,222,248,250],
-        ['L',78,250]
-      ]);
-      path(C.hair0, [
-        ['M',86,238],['C',87,181,89,124,104,76],['C',121,30,151,21,185,24],
-        ['C',236,28,271,66,275,130],['C',279,178,260,213,239,242],
-        ['L',86,242]
-      ]);
-      line(270,73,283,132,3,C.black);
-      line(96,104,84,169,4,C.black);
+      path(C.black,[['M',79,235],['C',75,182,82,123,96,78],['C',110,31,143,15,184,17],['C',244,20,282,63,286,132],['C',290,184,268,222,248,250],['L',78,250]]);
+      path(C.hair0,[['M',86,238],['C',87,181,89,124,104,76],['C',121,30,151,21,185,24],['C',236,28,271,66,275,130],['C',279,178,260,213,239,242],['L',86,242]]);
+      line(270,73,283,132,3,C.black); line(96,104,84,169,4,C.black);
     }
 
     function drawShouldersAndNeck(){
-      path(C.black, [
-        ['M',115,255],['C',126,214,137,198,152,191],['C',167,186,194,187,210,194],
-        ['C',230,202,244,219,254,255],['L',115,255]
-      ]);
-      path(C.cyan2, [
-        ['M',126,255],['C',135,219,146,203,159,198],['C',174,194,194,195,206,201],
-        ['C',223,209,235,226,244,255],['L',126,255]
-      ]);
-      path(C.cyan0, [
-        ['M',154,196],['C',166,207,181,211,199,201],['L',205,255],['L',148,255]
-      ]);
-      line(151,198,143,244,3,C.black);
-      line(210,201,226,246,3,C.black);
-      rect(162,206,29,5,C.black);
-      rect(166,205,23,3,C.cyan4);
+      const wp = WardrobeBrain.current || { base:C.cyan2, shade:C.cyan0, accent:C.green1, line:C.cyan4, outfit:'cloak' };
+      path(C.black,[['M',115,255],['C',126,214,137,198,152,191],['C',167,186,194,187,210,194],['C',230,202,244,219,254,255],['L',115,255]]);
+      path(wp.base,[['M',126,255],['C',135,219,146,203,159,198],['C',174,194,194,195,206,201],['C',223,209,235,226,244,255],['L',126,255]]);
+      path(wp.shade,[['M',154,196],['C',166,207,181,211,199,201],['L',205,255],['L',148,255]]);
+      line(151,198,143,244,3,C.black); line(210,201,226,246,3,C.black);
+      rect(162,206,29,5,C.black); rect(166,205,23,3,wp.line);
+      if (wp.outfit === 'armor') { rect(132,224,18,5,wp.line); rect(213,224,18,5,wp.line); rect(172,220,16,4,wp.accent); }
+      if (wp.outfit === 'nightdress') { ctx.globalAlpha=.7; rect(139,233,2,2,wp.accent); rect(203,228,1,1,wp.line); rect(188,244,2,2,wp.accent); ctx.globalAlpha=1; }
+      if (wp.outfit === 'ceremonial') { rect(159,218,6,20,wp.accent); rect(196,218,6,20,wp.accent); rect(176,211,9,3,wp.line); }
+      if (wp.outfit === 'raincoat') { ctx.globalAlpha=.55; line(139,211,130,248,1,wp.line); line(222,211,237,249,1,wp.line); ctx.globalAlpha=1; }
+      if (wp.outfit === 'storm-jacket') { rect(128,217,20,3,wp.accent); rect(213,217,22,3,wp.accent); }
     }
 
     function drawFaceBase(){
-      path(C.black, [
-        ['M',117,120],['C',115,72,141,39,183,38],['C',228,39,253,73,253,125],
-        ['C',253,178,221,207,181,209],['C',139,207,116,174,117,120]
-      ]);
-      path(C.cyan3, [
-        ['M',125,120],['C',123,78,145,47,184,47],['C',223,48,245,78,245,126],
-        ['C',244,172,217,199,181,201],['C',145,199,124,169,125,120]
-      ]);
-      path(C.cyan2, [
-        ['M',207,49],['C',238,66,249,97,244,135],['C',240,173,221,196,183,201],
-        ['C',222,166,223,101,207,49]
-      ]);
-      path(C.cyan1, [
-        ['M',216,68],['C',239,85,247,123,238,157],['C',231,178,217,192,195,199],
-        ['C',218,164,224,111,216,68]
-      ]);
-      rect(202,190,16,5,C.black);
-      rect(134,150,13,4,C.cyan4);
+      path(C.black,[['M',117,120],['C',115,72,141,39,183,38],['C',228,39,253,73,253,125],['C',253,178,221,207,181,209],['C',139,207,116,174,117,120]]);
+      path(C.cyan3,[['M',125,120],['C',123,78,145,47,184,47],['C',223,48,245,78,245,126],['C',244,172,217,199,181,201],['C',145,199,124,169,125,120]]);
+      path(C.cyan2,[['M',207,49],['C',238,66,249,97,244,135],['C',240,173,221,196,183,201],['C',222,166,223,101,207,49]]);
+      path(C.cyan1,[['M',216,68],['C',239,85,247,123,238,157],['C',231,178,217,192,195,199],['C',218,164,224,111,216,68]]);
+      rect(202,190,16,5,C.black); rect(134,150,13,4,C.cyan4);
     }
 
     function drawHairFront(){
-      path(C.black, [
-        ['M',89,230],['C',89,181,95,137,111,91],['C',124,54,139,29,170,18],
-        ['C',158,54,143,83,131,110],['C',120,139,116,179,122,224],['L',89,230]
-      ]);
-      path(C.white, [
-        ['M',96,230],['C',96,182,102,139,117,94],['C',130,58,143,37,164,27],
-        ['C',153,60,139,86,128,114],['C',119,140,116,177,122,220],['L',96,230]
-      ]);
-      path(C.white, [
-        ['M',120,47],['C',140,18,188,15,222,34],['C',194,35,169,46,151,71],['C',139,88,132,111,128,132],['C',116,98,111,68,120,47]
-      ]);
-      path(C.hair1, [
-        ['M',204,29],['C',239,36,264,68,268,113],['C',260,87,246,67,225,53],['C',231,79,230,97,222,117],['C',218,80,213,52,204,29]
-      ]);
-      line(108,72,101,134,3,C.black);
-      line(154,34,136,76,3,C.black);
-      line(228,55,236,106,3,C.black);
+      path(C.black,[['M',89,230],['C',89,181,95,137,111,91],['C',124,54,139,29,170,18],['C',158,54,143,83,131,110],['C',120,139,116,179,122,224],['L',89,230]]);
+      path(C.white,[['M',96,230],['C',96,182,102,139,117,94],['C',130,58,143,37,164,27],['C',153,60,139,86,128,114],['C',119,140,116,177,122,220],['L',96,230]]);
+      path(C.white,[['M',120,47],['C',140,18,188,15,222,34],['C',194,35,169,46,151,71],['C',139,88,132,111,128,132],['C',116,98,111,68,120,47]]);
+      path(C.hair1,[['M',204,29],['C',239,36,264,68,268,113],['C',260,87,246,67,225,53],['C',231,79,230,97,222,117],['C',218,80,213,52,204,29]]);
+      line(108,72,101,134,3,C.black); line(154,34,136,76,3,C.black); line(228,55,236,106,3,C.black);
     }
 
     function drawBrows(p){
-      const base = 82 - p.brow * 8;
-      const anger = p.anger;
-      const sad = p.sad;
-      const leftOuterY = base - anger * 5 + sad * 5;
-      const leftInnerY = base + anger * 11 - sad * 8;
-      const rightInnerY = base + anger * 11 - sad * 8;
-      const rightOuterY = base - anger * 5 + sad * 5;
-
-      line(122, leftOuterY, 163, leftInnerY, 5, C.black);
-      line(197, rightInnerY, 239, rightOuterY, 5, C.black);
+      const base=82-p.brow*8, anger=p.anger, sad=p.sad;
+      const leftOuterY=base-anger*5+sad*5, leftInnerY=base+anger*11-sad*8;
+      const rightInnerY=base+anger*11-sad*8, rightOuterY=base-anger*5+sad*5;
+      line(122,leftOuterY,163,leftInnerY,5,C.black);
+      line(197,rightInnerY,239,rightOuterY,5,C.black);
     }
 
-    function eyeShape(cx, cy, w, h, color){
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(cx - w/2, cy);
-      ctx.quadraticCurveTo(cx, cy - h, cx + w/2, cy);
-      ctx.quadraticCurveTo(cx, cy + h*.92, cx - w/2, cy);
-      ctx.fill();
+    function eyeShape(cx,cy,w,h,color){
+      ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(cx-w/2,cy); ctx.quadraticCurveTo(cx,cy-h,cx+w/2,cy); ctx.quadraticCurveTo(cx,cy+h*.92,cx-w/2,cy); ctx.fill();
     }
 
-    function drawEye(cx, cy, side, p){
-      const open = clamp(p.eye * (1 - blink.strength * .93), .06, 1.34);
-      const ew = 52 + p.brow * 2 + p.anger * -5;
-      const eh = 16 * open;
-      const irisX = cx + gaze.x * 4.8;
-      const irisY = cy + gaze.y * 3.2;
-
-      eyeShape(cx, cy, ew + 8, eh + 5, C.black);
-      eyeShape(cx, cy, ew, eh, open < .11 ? C.black : C.white);
-
-      if (open >= .11) {
-        ellipse(irisX, irisY, 8.4, 8.8 * clamp(open, .35, 1.1), C.green1);
-        ellipse(irisX + side * .5, irisY + .6, 4.1, 4.7 * clamp(open, .35, 1.0), C.black);
-        rect(irisX - 3 + side, irisY - 5, 2, 2, C.green2);
-        rect(irisX + 2 + side, irisY - 2, 2, 1, C.white);
-      }
-
-      if (open < .35) {
-        line(cx - ew/2 + 4, cy, cx + ew/2 - 4, cy + (p.smile > .4 ? 2 : 0), 3, C.black);
-      }
+    function drawEye(cx,cy,side,p){
+      const open=clamp(p.eye*(1-blink.strength*.93),.06,1.34);
+      const ew=52+p.brow*2+p.anger*-5;
+      const eh=16*open;
+      const irisX=cx+gaze.x*4.8, irisY=cy+gaze.y*3.2;
+      eyeShape(cx,cy,ew+8,eh+5,C.black);
+      eyeShape(cx,cy,ew,eh,open<.11?C.black:C.white);
+      if(open>=.11){ ellipse(irisX,irisY,8.4,8.8*clamp(open,.35,1.1),C.green1); ellipse(irisX+side*.5,irisY+.6,4.1,4.7*clamp(open,.35,1),C.black); rect(irisX-3+side,irisY-5,2,2,C.green2); rect(irisX+2+side,irisY-2,2,1,C.white); }
+      if(open<.35) line(cx-ew/2+4,cy,cx+ew/2-4,cy+(p.smile>.4?2:0),3,C.black);
     }
 
     function drawNose(){
-      path(C.black, [
-        ['M',180,124],['C',176,140,171,149,164,155],['L',181,158],['L',192,151],['C',185,143,184,134,180,124]
-      ]);
-      path(C.white, [
-        ['M',181,127],['C',178,140,174,148,169,153],['L',180,154],['L',187,149],['C',184,142,184,135,181,127]
-      ]);
+      path(C.black,[['M',180,124],['C',176,140,171,149,164,155],['L',181,158],['L',192,151],['C',185,143,184,134,180,124]]);
+      path(C.white,[['M',181,127],['C',178,140,174,148,169,153],['L',180,154],['L',187,149],['C',184,142,184,135,181,127]]);
     }
 
     function drawMouth(p, now){
-      const cx = 180;
-      const y = 171;
-      const smile = p.smile;
-      const openBase = p.open;
-      const talk = speakOpen(now);
-      const open = Math.max(openBase, talk);
-
-      const w = 27 + Math.abs(smile) * 11 + open * 8;
-      const h = Math.min(3 + open * 15, 17);
-      const corner = -smile * 5 + Math.max(0, -smile) * 7;
-
-      if (open > .18) {
-        const bottomY = Math.min(y + h + 2 + Math.max(0, smile), 190);
-
-        path(C.black, [
-          ['M',cx-w/2,y + corner*.16],
-          ['Q',cx,y-6-smile*2,cx+w/2,y + corner*.16],
-          ['Q',cx+w*.34,y+h,cx,bottomY],
-          ['Q',cx-w*.34,y+h,cx-w/2,y + corner*.16]
-        ]);
-
-        if (open > .38) {
-          path(C.white, [
-            ['M',cx-w*.28,y-1],
-            ['Q',cx,y+2,cx+w*.29,y-1],
-            ['L',cx+w*.20,y+4],
-            ['Q',cx,y+6,cx-w*.22,y+4]
-          ]);
-        } else {
-          line(cx-w*.30,y,cx+w*.26,y+1,2,C.white);
-        }
-
-        const tongueW = 8 + Math.max(0, smile) * 9 + open * 5;
-        const tongueH = 2.5 + Math.max(0, smile) * 1.8 + open * 1.6;
-        const tongueY = Math.min(bottomY - 4, y + h * .68);
-
-        if (open > .34 || smile > .45) {
-          path(C.magenta, [
-            ['M', cx - tongueW / 2, tongueY],
-            ['Q', cx, tongueY + tongueH, cx + tongueW / 2, tongueY],
-            ['Q', cx, tongueY - tongueH * .55, cx - tongueW / 2, tongueY]
-          ]);
-
-          ctx.globalAlpha = .42;
-          line(cx - tongueW * .24, tongueY - 1, cx + tongueW * .22, tongueY - 1, 1, C.magentaSoft);
-          ctx.globalAlpha = 1;
+      const cx=180, y=171, smile=p.smile;
+      const open=Math.max(p.open, speakOpen(now));
+      const w=27+Math.abs(smile)*11+open*8;
+      const h=Math.min(3+open*15,17);
+      const corner=-smile*5+Math.max(0,-smile)*7;
+      if(open>.18){
+        const bottomY=Math.min(y+h+2+Math.max(0,smile),190);
+        path(C.black,[['M',cx-w/2,y+corner*.16],['Q',cx,y-6-smile*2,cx+w/2,y+corner*.16],['Q',cx+w*.34,y+h,cx,bottomY],['Q',cx-w*.34,y+h,cx-w/2,y+corner*.16]]);
+        if(open>.38){ path(C.white,[['M',cx-w*.28,y-1],['Q',cx,y+2,cx+w*.29,y-1],['L',cx+w*.20,y+4],['Q',cx,y+6,cx-w*.22,y+4]]); }
+        else line(cx-w*.30,y,cx+w*.26,y+1,2,C.white);
+        const tongueW=8+Math.max(0,smile)*9+open*5;
+        const tongueH=2.5+Math.max(0,smile)*1.8+open*1.6;
+        const tongueY=Math.min(bottomY-4,y+h*.68);
+        if(open>.34 || smile>.45){
+          path(C.magenta,[['M',cx-tongueW/2,tongueY],['Q',cx,tongueY+tongueH,cx+tongueW/2,tongueY],['Q',cx,tongueY-tongueH*.55,cx-tongueW/2,tongueY]]);
+          ctx.globalAlpha=.42; line(cx-tongueW*.24,tongueY-1,cx+tongueW*.22,tongueY-1,1,C.magentaSoft); ctx.globalAlpha=1;
         }
       } else {
-        const leftY = y + Math.max(0, -smile) * 6 - Math.max(0, smile) * 4;
-        const midY  = y + Math.max(0, -smile) * 2 + Math.max(0, smile) * 4;
-        const rightY = y + Math.max(0, -smile) * 6 - Math.max(0, smile) * 4;
-
-        ctx.strokeStyle = C.black;
-        ctx.lineWidth = p.anger > .35 ? 4 : 3;
-        ctx.beginPath();
-        ctx.moveTo(cx-w/2, leftY);
-        ctx.quadraticCurveTo(cx, midY, cx+w/2, rightY);
-        ctx.stroke();
+        const leftY=y+Math.max(0,-smile)*6-Math.max(0,smile)*4;
+        const midY=y+Math.max(0,-smile)*2+Math.max(0,smile)*4;
+        const rightY=y+Math.max(0,-smile)*6-Math.max(0,smile)*4;
+        ctx.strokeStyle=C.black; ctx.lineWidth=p.anger>.35?4:3; ctx.beginPath(); ctx.moveTo(cx-w/2,leftY); ctx.quadraticCurveTo(cx,midY,cx+w/2,rightY); ctx.stroke();
       }
-
-      rect(cx - 24, y - 9, 8, 3, C.cyan4);
+      rect(cx-24,y-9,8,3,C.cyan4);
     }
 
     function drawEffects(p, now){
-      if (p.blush > .05) {
-        const a = p.blush * .18;
-        ctx.globalAlpha = a;
-        rect(128, 150, 16, 6, C.magenta);
-        rect(214, 148, 16, 6, C.magenta);
-        ctx.globalAlpha = 1;
-      }
+      if(p.blush>.05){ ctx.globalAlpha=p.blush*.18; rect(128,150,16,6,C.magenta); rect(214,148,16,6,C.magenta); ctx.globalAlpha=1; }
+      if(p.tear>.05){ const a=p.tear*(.65+.35*Math.sin(now*.009)); ctx.globalAlpha=a; rect(138,126,3,7,C.white); rect(139,133,4,8,C.cyan4); rect(140,142,3,5,C.green2); rect(142,149,2,2,C.white); ctx.globalAlpha=1; }
+      if(p.accent>.12){ ctx.globalAlpha=p.accent*.22; line(247,88,259,153,2,C.cyan4); line(107,93,96,160,1,C.magenta); ctx.globalAlpha=1; }
+    }
 
-      if (p.tear > .05) {
-        const a = p.tear * (.65 + .35 * Math.sin(now * .009));
-        ctx.globalAlpha = a;
-        rect(138,126,3,7,C.white);
-        rect(139,133,4,8,C.cyan4);
-        rect(140,142,3,5,C.green2);
-        rect(142,149,2,2,C.white);
-        ctx.globalAlpha = 1;
-      }
+    function roundedBubble(x,y,w,h,r,tailX,tailY){
+      ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+18,y+h); ctx.lineTo(tailX,tailY); ctx.lineTo(x+32,y+h); ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+    }
 
-      if (p.accent > .12) {
-        ctx.globalAlpha = p.accent * .22;
-        line(247,88,259,153,2,C.cyan4);
-        line(107,93,96,160,1,C.magenta);
-        ctx.globalAlpha = 1;
-      }
+    function splitBubbleLines(text,maxLen=18){
+      const words=text.split(' '), lines=[]; let line='';
+      for(const w of words){ const test=line?line+' '+w:w; if(test.length>maxLen && line){ lines.push(line); line=w; } else line=test; }
+      if(line) lines.push(line); return lines.slice(0,3);
     }
 
     function drawSpeechBubble(now){
-      const a = speechAlpha(now);
-      if (a <= 0.001) return;
-
-      const lines = splitBubbleLines(speech.text, speech.meaningful ? 16 : 20);
-      const fontSize = speech.meaningful ? 10 : 9;
-      const padX = 8;
-      const padY = 7;
-      const lineH = 12;
-      const maxLine = Math.max(...lines.map(s => s.length), 8);
-      const bubbleW = Math.min(150, 16 + maxLine * 6.2);
-      const bubbleH = padY * 2 + lines.length * lineH;
-
-      const x = 210 + Math.sin(now * 0.0013 + speech.phase) * 1.2;
-      const y = 24 + Math.sin(now * 0.002 + speech.phase) * 1.5;
-
-      ctx.save();
-      ctx.globalAlpha = a * 0.94;
-
-      roundedBubble(x, y, bubbleW, bubbleH, 8, 206, 88);
-
-      ctx.fillStyle = C.bubbleFill;
-      ctx.fill();
-
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = C.bubble;
-      ctx.stroke();
-
-      ctx.fillStyle = C.bubble;
-      ctx.font = fontSize + 'px monospace';
-      ctx.textBaseline = 'top';
-
-      for (let i=0;i<lines.length;i++) {
-        ctx.fillText(lines[i], x + padX, y + padY + i * lineH);
-      }
-
+      const a=speechAlpha(now); if(a<=.001) return;
+      const lines=splitBubbleLines(speech.text, speech.meaningful?16:20);
+      const fontSize=speech.meaningful?10:9, padX=8, padY=7, lineH=12;
+      const maxLine=Math.max(...lines.map(s=>s.length),8);
+      const bubbleW=Math.min(150,16+maxLine*6.2), bubbleH=padY*2+lines.length*lineH;
+      const x=210+Math.sin(now*.0013+speech.phase)*1.2, y=24+Math.sin(now*.002+speech.phase)*1.5;
+      ctx.save(); ctx.globalAlpha=a*.94;
+      roundedBubble(x,y,bubbleW,bubbleH,8,206,88);
+      ctx.fillStyle=C.bubbleFill; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
+      ctx.fillStyle=C.bubble; ctx.font=fontSize+'px monospace'; ctx.textBaseline='top';
+      for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],x+padX,y+padY+i*lineH);
       ctx.restore();
     }
 
     function drawEntity(now){
-      const t = now * 0.001;
-      const p = expr;
-
-      const breath = 1 + Math.sin(t * 1.12) * .003;
-      const driftX = motion.x + Math.sin(t * .37) * 0.55 + Math.sin(t * .19 + 1.2) * 0.35;
-      const driftY = motion.y + Math.sin(t * .43 + .8) * 0.45;
-      const tilt = motion.tilt + Math.sin(t * .31) * 0.004;
-
+      const t=now*.001, p=expr;
+      const breath=1+Math.sin(t*1.12)*.003;
+      const driftX=motion.x+Math.sin(t*.37)*.55+Math.sin(t*.19+1.2)*.35;
+      const driftY=motion.y+Math.sin(t*.43+.8)*.45;
+      const tilt=motion.tilt+Math.sin(t*.31)*.004;
       ctx.save();
-      ctx.translate(W/2 + driftX, H/2 + driftY);
+      ctx.translate(W/2+driftX,H/2+driftY);
       ctx.rotate(tilt);
-      ctx.scale(breath, 1 + (breath - 1) * .25);
-      ctx.translate(-W/2, -H/2);
-
-      drawHairBack();
-      drawShouldersAndNeck();
-      drawFaceBase();
-      drawHairFront();
-      drawBrows(p);
-      drawEye(146, 107, -1, p);
-      drawEye(207, 107, 1, p);
-      drawNose();
-      drawMouth(p, now);
-      drawEffects(p, now);
-
-      rect(242,118,3,17,C.black);
-      rect(151,196,37,3,C.black);
-
+      ctx.scale(breath,1+(breath-1)*.25);
+      ctx.translate(-W/2,-H/2);
+      drawHairBack(); drawShouldersAndNeck(); drawFaceBase(); drawHairFront(); drawBrows(p);
+      drawEye(146,107,-1,p); drawEye(207,107,1,p); drawNose(); drawMouth(p,now); drawEffects(p,now);
+      rect(242,118,3,17,C.black); rect(151,196,37,3,C.black);
       ctx.restore();
-
       drawSpeechBubble(now);
     }
 
     function applyGlitch(now){
-      if (now > glitchUntil) return;
-
-      const intensity = clamp((glitchUntil - now) / 200, .15, 1);
-      const src = ctx.getImageData(0,0,W,H);
-
-      for (let i=0; i<6; i++) {
-        const y = Math.floor(hash(now * .01 + i * 20) * H);
-        const h = 1 + Math.floor(hash(now * .03 + i * 8) * 5);
-        const shift = Math.floor((hash(now * .02 + i * 99) - .5) * 14 * intensity);
-        ctx.putImageData(src, shift, 0, 0, y, W, h);
+      if(now>glitchUntil) return;
+      const intensity=clamp((glitchUntil-now)/200,.15,1);
+      const src=ctx.getImageData(0,0,W,H);
+      for(let i=0;i<6;i++){
+        const y=Math.floor(hash(now*.01+i*20)*H);
+        const h=1+Math.floor(hash(now*.03+i*8)*5);
+        const shift=Math.floor((hash(now*.02+i*99)-.5)*14*intensity);
+        ctx.putImageData(src,shift,0,0,y,W,h);
       }
-
-      ctx.globalAlpha = .35 * intensity;
-      rect(73 + hash(now)*200, 73 + hash(now*.2)*92, 30, 2, C.green1);
-      rect(82 + hash(now*.4)*190, 100 + hash(now*.6)*72, 18, 1, C.magenta);
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha=.35*intensity; rect(73+hash(now)*200,73+hash(now*.2)*92,30,2,C.green1); rect(82+hash(now*.4)*190,100+hash(now*.6)*72,18,1,C.magenta); ctx.globalAlpha=1;
     }
 
     function update(now){
-      const dt = Math.min(0.05, (now - lastNow) / 1000);
-      lastNow = now;
-
-      updateEmotion(now, dt);
+      const dt=Math.min(.05,(now-lastNow)/1000 || .016);
+      lastNow=now;
+      updateTimeBrain(now);
+      updateWeatherBrain(now,dt);
+      fetchNewsKeywords(false);
+      updateEmotion(now,dt);
+      updateMemory(dt);
+      updateWardrobe(now,dt);
       updateBlink(now);
-      updateGaze(now, dt);
-      updateMotion(now, dt);
+      updateGaze(now,dt);
+      updateMotion(now,dt);
       updateSpeech(now);
+      updateShips(now,dt);
       updateBackgroundEvents(now);
       maybeGlitch(now);
     }
@@ -1223,19 +1067,15 @@
       drawBackground(now);
       drawEntity(now);
       applyGlitch(now);
-
-      if (!STATIC_PREVIEW) requestAnimationFrame(render);
+      if(!STATIC_PREVIEW) requestAnimationFrame(render);
     }
 
+    initWardrobe();
     fetchNewsKeywords(true);
     setInterval(() => fetchNewsKeywords(false), 1000 * 60 * 5);
 
-    if (STATIC_PREVIEW) {
-      render(performance.now() + 1600);
-    } else {
-      requestAnimationFrame(render);
-    }
-
+    if (STATIC_PREVIEW) render(performance.now() + 1600);
+    else requestAnimationFrame(render);
   })();
   </script>
 </body>
