@@ -45,14 +45,11 @@
     #stage::before{
       content:"";
       position:absolute;
-      inset:-20%;
+      inset:-12%;
       pointer-events:none;
       background:
-        linear-gradient(rgba(255,255,255,.020) 50%, rgba(0,0,0,.035) 50%),
-        radial-gradient(circle at 50% 45%, transparent 0 42%, rgba(0,0,0,.42) 79%);
-      background-size:100% 4px, 100% 100%;
-      mix-blend-mode:screen;
-      opacity:.62;
+        radial-gradient(circle at 50% 45%, transparent 0 48%, rgba(0,0,0,.36) 82%);
+      opacity:.8;
     }
     #stage::after{
       content:"";
@@ -132,13 +129,29 @@
     let glitchUntil = 0;
     let glitchAt = performance.now() + rnd(3600, 11000);
 
-    const dust = [];
+    const bgEvents = {
+      star: {
+        active:false, start:0, duration:0, nextAt:performance.now() + rnd(1800, 5200),
+        x0:0, y0:0, x1:0, y1:0
+      },
+      rocket: {
+        active:false, start:0, duration:0, nextAt:performance.now() + rnd(7000, 14000),
+        y:0, fromX:0, toX:0, dir:1
+      },
+      ufo: {
+        active:false, start:0, duration:0, nextAt:performance.now() + rnd(11000, 22000),
+        y:0, fromX:0, toX:0, dir:-1, bob:0
+      }
+    };
 
     function rnd(min, max){ return min + Math.random() * (max - min); }
     function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t){ return a + (b - a) * t; }
     function ease(t){ return t*t*(3-2*t); }
-    function hash(n){ return (Math.sin(n * 127.1 + 311.7) * 43758.5453) % 1 < 0 ? ((Math.sin(n * 127.1 + 311.7) * 43758.5453) % 1) + 1 : (Math.sin(n * 127.1 + 311.7) * 43758.5453) % 1; }
+    function hash(n){
+      const v = (Math.sin(n * 127.1 + 311.7) * 43758.5453) % 1;
+      return v < 0 ? v + 1 : v;
+    }
 
     function mixMood(a, b, k){
       const o = { name: b.name };
@@ -183,6 +196,64 @@
       if (now > glitchAt) {
         glitchUntil = now + rnd(75, 210);
         glitchAt = now + rnd(4200, 14500);
+      }
+    }
+
+    function updateBackgroundEvents(now){
+      const star = bgEvents.star;
+      if (!star.active && now > star.nextAt) {
+        star.active = true;
+        star.start = now;
+        star.duration = rnd(650, 1200);
+        star.x0 = rnd(W * 0.66, W - 20);
+        star.y0 = rnd(14, 70);
+        star.x1 = star.x0 - rnd(90, 150);
+        star.y1 = star.y0 + rnd(34, 64);
+      }
+      if (star.active && now > star.start + star.duration) {
+        star.active = false;
+        star.nextAt = now + rnd(5500, 12000);
+      }
+
+      const rocket = bgEvents.rocket;
+      if (!rocket.active && now > rocket.nextAt) {
+        rocket.active = true;
+        rocket.start = now;
+        rocket.duration = rnd(1700, 2800);
+        rocket.dir = Math.random() > 0.5 ? 1 : -1;
+        rocket.y = rnd(42, 104);
+        if (rocket.dir === 1) {
+          rocket.fromX = -30;
+          rocket.toX = W + 30;
+        } else {
+          rocket.fromX = W + 30;
+          rocket.toX = -30;
+        }
+      }
+      if (rocket.active && now > rocket.start + rocket.duration) {
+        rocket.active = false;
+        rocket.nextAt = now + rnd(12000, 22000);
+      }
+
+      const ufo = bgEvents.ufo;
+      if (!ufo.active && now > ufo.nextAt) {
+        ufo.active = true;
+        ufo.start = now;
+        ufo.duration = rnd(8500, 12000);
+        ufo.dir = Math.random() > 0.5 ? 1 : -1;
+        ufo.y = rnd(26, 72);
+        ufo.bob = rnd(0, Math.PI * 2);
+        if (ufo.dir === 1) {
+          ufo.fromX = -42;
+          ufo.toX = W + 42;
+        } else {
+          ufo.fromX = W + 42;
+          ufo.toX = -42;
+        }
+      }
+      if (ufo.active && now > ufo.start + ufo.duration) {
+        ufo.active = false;
+        ufo.nextAt = now + rnd(15000, 26000);
       }
     }
 
@@ -231,31 +302,109 @@
       ctx.stroke();
     }
 
-    function dither(x,y,w,h,color,step=4,density=.48,phase=0){
-      ctx.fillStyle = color;
-      for (let yy=Math.round(y); yy<y+h; yy+=step) {
-        for (let xx=Math.round(x); xx<x+w; xx+=step) {
-          const n = hash(xx * 2.77 + yy * 8.13 + phase);
-          if (((xx+yy)/step | 0) % 2 === 0 && n < density) ctx.fillRect(xx, yy, Math.max(1, step-2), Math.max(1, step-2));
-        }
-      }
-    }
-
     function drawBackground(now){
       ctx.fillStyle = C.bg;
       ctx.fillRect(0,0,W,H);
 
-      const t = now * .001;
-      for (let y=0;y<H;y+=7) {
-        if (hash(y + Math.floor(t * 2)) > .86) {
-          ctx.globalAlpha = .035;
-          rect(0, y, W, 1, C.cyan4);
-          ctx.globalAlpha = 1;
-        }
-      }
+      ctx.globalAlpha = 0.3;
+      rect(32, 28, 1, 1, C.cyan4);
+      rect(74, 56, 1, 1, C.white);
+      rect(312, 44, 1, 1, C.cyan4);
+      rect(287, 76, 1, 1, C.white);
+      rect(46, 96, 1, 1, C.cyan4);
+      rect(332, 112, 1, 1, C.white);
+      rect(18, 168, 1, 1, C.cyan4);
+      rect(340, 188, 1, 1, C.white);
+      ctx.globalAlpha = 1;
+
+      drawBackgroundEvents(now);
     }
 
-    function drawHairBack(t){
+    function drawBackgroundEvents(now){
+      drawShootingStar(now);
+      drawRocket(now);
+      drawUfo(now);
+    }
+
+    function drawShootingStar(now){
+      const e = bgEvents.star;
+      if (!e.active) return;
+
+      const t = clamp((now - e.start) / e.duration, 0, 1);
+      const x = lerp(e.x0, e.x1, t);
+      const y = lerp(e.y0, e.y1, t);
+      const alpha = (1 - t) * 0.9 + 0.1;
+
+      ctx.globalAlpha = alpha * 0.9;
+      rect(x, y, 3, 2, C.white);
+      rect(x - 4, y + 2, 3, 2, C.cyan4);
+      rect(x - 8, y + 4, 3, 2, C.cyan3);
+      rect(x - 12, y + 6, 2, 1, C.cyan2);
+      rect(x - 15, y + 8, 2, 1, C.magenta);
+      ctx.globalAlpha = 1;
+    }
+
+    function drawRocket(now){
+      const e = bgEvents.rocket;
+      if (!e.active) return;
+
+      const t = ease(clamp((now - e.start) / e.duration, 0, 1));
+      const x = lerp(e.fromX, e.toX, t);
+      const y = e.y + Math.sin(now * 0.012) * 1.2;
+      const dir = e.dir;
+      const alpha = 0.8;
+
+      ctx.save();
+      ctx.translate(Math.round(x), Math.round(y));
+      if (dir < 0) ctx.scale(-1, 1);
+      ctx.globalAlpha = alpha;
+
+      rect(-15, -1, 7, 2, C.cyan2);
+      rect(-10, -2, 6, 4, C.amber);
+      rect(-7, -3, 3, 6, C.red);
+
+      rect(-4, -3, 10, 6, C.white);
+      rect(6, -2, 4, 4, C.cyan3);
+      rect(10, -1, 2, 2, C.green2);
+      rect(12, -1, 4, 2, C.magenta);
+      rect(4, -4, 2, 1, C.white);
+      rect(4, 3, 2, 1, C.white);
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    function drawUfo(now){
+      const e = bgEvents.ufo;
+      if (!e.active) return;
+
+      const t = ease(clamp((now - e.start) / e.duration, 0, 1));
+      const x = lerp(e.fromX, e.toX, t);
+      const y = e.y + Math.sin(now * 0.003 + e.bob) * 3;
+      const dir = e.dir;
+
+      ctx.save();
+      ctx.translate(Math.round(x), Math.round(y));
+      if (dir < 0) ctx.scale(-1, 1);
+
+      ctx.globalAlpha = 0.7;
+      rect(-13, 5, 26, 1, C.cyan1);
+      rect(-9, 6, 18, 1, C.cyan0);
+
+      ctx.globalAlpha = 0.92;
+      rect(-8, -2, 16, 4, C.cyan2);
+      rect(-5, -5, 10, 3, C.white);
+      rect(-2, -7, 4, 2, C.green2);
+      rect(-11, 2, 22, 3, C.black);
+      rect(-9, 3, 4, 1, C.magenta);
+      rect(-3, 3, 4, 1, C.green1);
+      rect(3, 3, 4, 1, C.cyan4);
+      ctx.globalAlpha = 1;
+
+      ctx.restore();
+    }
+
+    function drawHairBack(){
       path(C.black, [
         ['M',79,235],['C',75,182,82,123,96,78],['C',110,31,143,15,184,17],
         ['C',244,20,282,63,286,132],['C',290,184,268,222,248,250],
@@ -270,7 +419,7 @@
       line(96,104,84,169,4,C.black);
     }
 
-    function drawShouldersAndNeck(p, t){
+    function drawShouldersAndNeck(){
       path(C.black, [
         ['M',115,255],['C',126,214,137,198,152,191],['C',167,186,194,187,210,194],
         ['C',230,202,244,219,254,255],['L',115,255]
@@ -288,7 +437,7 @@
       rect(166,205,23,3,C.cyan4);
     }
 
-    function drawFaceBase(p, t){
+    function drawFaceBase(){
       path(C.black, [
         ['M',117,120],['C',115,72,141,39,183,38],['C',228,39,253,73,253,125],
         ['C',253,178,221,207,181,209],['C',139,207,116,174,117,120]
@@ -309,7 +458,7 @@
       rect(134,150,13,4,C.cyan4);
     }
 
-    function drawHairFront(p, t){
+    function drawHairFront(){
       path(C.black, [
         ['M',89,230],['C',89,181,95,137,111,91],['C',124,54,139,29,170,18],
         ['C',158,54,143,83,131,110],['C',120,139,116,179,122,224],['L',89,230]
@@ -355,7 +504,7 @@
       ctx.fill();
     }
 
-    function drawEye(cx, cy, side, p, t){
+    function drawEye(cx, cy, side, p){
       const open = clamp(p.eye * (1 - blinkStrength * .93), .06, 1.34);
       const ew = 52 + p.brow * 2 + p.anger * -5;
       const eh = 16 * open;
@@ -377,7 +526,7 @@
       }
     }
 
-    function drawNose(p){
+    function drawNose(){
       path(C.black, [
         ['M',180,124],['C',176,140,171,149,164,155],['L',181,158],['L',192,151],['C',185,143,184,134,180,124]
       ]);
@@ -386,7 +535,7 @@
       ]);
     }
 
-    function drawMouth(p, t){
+    function drawMouth(p){
       const cx = 180;
       const y = 177;
       const smile = p.smile;
@@ -425,14 +574,9 @@
       }
 
       rect(cx - 25, y - 10, 9, 3, C.cyan4);
-      rect(cx + 15, y - 8, 10, 3, C.cyan1);
     }
 
     function drawEffects(p, t){
-      if (p.blush > .05) {
-        ctx.globalAlpha = p.blush * .58;
-        ctx.globalAlpha = 1;
-      }
       if (p.tear > .05) {
         const a = p.tear * (.65 + .35*Math.sin(t*.009));
         ctx.globalAlpha = a;
@@ -465,15 +609,15 @@
       ctx.scale(breath, 1 + (breath-1)*.35);
       ctx.translate(-W/2, -H/2);
 
-      drawHairBack(t);
-      drawShouldersAndNeck(p, t);
-      drawFaceBase(p, t);
-      drawHairFront(p, t);
+      drawHairBack();
+      drawShouldersAndNeck();
+      drawFaceBase();
+      drawHairFront();
       drawBrows(p);
-      drawEye(146, 107, -1, p, t);
-      drawEye(207, 107, 1, p, t);
-      drawNose(p);
-      drawMouth(p, t);
+      drawEye(146, 107, -1, p);
+      drawEye(207, 107, 1, p);
+      drawNose();
+      drawMouth(p);
       drawEffects(p, t);
 
       rect(242,118,3,17,C.black);
@@ -500,6 +644,7 @@
 
     function draw(now){
       updateAutonomy(now);
+      updateBackgroundEvents(now);
       drawBackground(now);
       drawEntity(now);
       applyGlitch(now);
