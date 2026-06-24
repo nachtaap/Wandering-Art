@@ -2,17 +2,20 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Wandering Art — ASCII Oracle</title>
   <style>
     :root{
       --bg:#02030a;
     }
 
-    *{ box-sizing:border-box; }
+    *{
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+    }
 
     html,body{
-      margin:0;
       width:100%;
       height:100%;
       overflow:hidden;
@@ -27,7 +30,8 @@
       display:block;
       width:100vw;
       height:100vh;
-      background: radial-gradient(circle at center, #070912 0%, #03040a 55%, #010208 100%);
+      background:
+        radial-gradient(circle at 50% 42%, #0a0d19 0%, #04060e 45%, #02030a 100%);
     }
   </style>
 </head>
@@ -41,103 +45,56 @@
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
     const CONFIG = {
-      fontSize: 14,
-      lineHeight: 1.08,
-      faceCenterX: 0.5,
-      faceCenterY: 0.49,
-
-      // Kleuren: links warm rood/oranje, midden magenta, rechts blauw
-      leftColor:  [255, 96, 64],
-      midColor:   [255, 78, 190],
-      rightColor: [72, 108, 255],
-
-      backgroundColor: [2, 3, 10],
-
-      // Een vrij bruikbare ramp voor “dense” ASCII shading
-      ramp: " .,:;'`^\"~_-+=|/\\\\(){}[]1itfrxczvunomwqpdbkhao*#MW&8%B@$",
-
-      // Floating losse tekens in de achtergrond
-      ambientChars: "01[]{}()/\\\\|+-.:;",
-
-      eyeSadness: 0.72,
-      ambientDensity: 0.0027,
-      glitchEveryMin: 4.0,
-      glitchEveryMax: 9.0
+      ramp: " .,:;'`^\"~-_+<>i!lI?/|(){}[]1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+      ambientRamp: ".:+|01[]{}",
+      bg: [2, 3, 10],
+      left: [255, 85, 60],
+      mid: [255, 70, 190],
+      right: [60, 110, 255]
     };
 
-    let width = 0;
-    let height = 0;
-    let cols = 0;
-    let rows = 0;
-    let cellW = 0;
-    let cellH = 0;
-    let grid = [];
+    let W = 0, H = 0;
+    let cols = 0, rows = 0;
+    let fontSize = 0, cellW = 0, cellH = 0;
+    let currentIdx = null;
+    let blinkNext = 4 + Math.random() * 5;
+    let blinkStart = -999;
+    let blinkDuration = 0.18;
 
-    let glitch = {
-      active: false,
-      row: 0,
-      height: 2,
-      shift: 0,
-      end: 0,
-      next: 0
-    };
-
-    let blink = {
-      start: -999,
-      next: 5 + Math.random() * 7,
-      duration: 0.22
-    };
-
-    function clamp(v, a = 0, b = 1){
-      return v < a ? a : v > b ? b : v;
+    function clamp(v, a=0, b=1){
+      return v < a ? a : (v > b ? b : v);
     }
 
-    function mix(a, b, t){
-      return a + (b - a) * t;
+    function mix(a,b,t){
+      return a + (b-a)*t;
     }
 
-    function mixColor(c1, c2, t){
-      return [
-        mix(c1[0], c2[0], t),
-        mix(c1[1], c2[1], t),
-        mix(c1[2], c2[2], t)
-      ];
-    }
-
-    function triColor(t){
-      t = clamp(t, 0, 1);
-      if (t < 0.5){
-        return mixColor(CONFIG.leftColor, CONFIG.midColor, t / 0.5);
-      }
-      return mixColor(CONFIG.midColor, CONFIG.rightColor, (t - 0.5) / 0.5);
-    }
-
-    function smoothstep(a, b, x){
-      const t = clamp((x - a) / (b - a), 0, 1);
-      return t * t * (3 - 2 * t);
+    function smoothstep(a,b,x){
+      const t = clamp((x-a)/(b-a),0,1);
+      return t*t*(3-2*t);
     }
 
     function fract(x){
       return x - Math.floor(x);
     }
 
-    function hash(x, y){
-      return fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453123);
+    function hash(x,y){
+      return fract(Math.sin(x*127.1 + y*311.7) * 43758.5453123);
     }
 
-    function noise(x, y){
+    function noise(x,y){
       const xi = Math.floor(x);
       const yi = Math.floor(y);
       const xf = x - xi;
       const yf = y - yi;
 
-      const u = xf * xf * (3 - 2 * xf);
-      const v = yf * yf * (3 - 2 * yf);
+      const u = xf*xf*(3-2*xf);
+      const v = yf*yf*(3-2*yf);
 
       const n00 = hash(xi, yi);
-      const n10 = hash(xi + 1, yi);
-      const n01 = hash(xi, yi + 1);
-      const n11 = hash(xi + 1, yi + 1);
+      const n10 = hash(xi+1, yi);
+      const n01 = hash(xi, yi+1);
+      const n11 = hash(xi+1, yi+1);
 
       return mix(
         mix(n00, n10, u),
@@ -146,341 +103,311 @@
       );
     }
 
-    function softEllipse(u, v, cx, cy, rx, ry, edge0 = 0.78, edge1 = 1.0){
-      const dx = (u - cx) / rx;
-      const dy = (v - cy) / ry;
-      const d = Math.sqrt(dx * dx + dy * dy);
-      return 1 - smoothstep(edge0, edge1, d);
+    function mixColor(a,b,t){
+      return [
+        mix(a[0],b[0],t),
+        mix(a[1],b[1],t),
+        mix(a[2],b[2],t)
+      ];
     }
 
-    function segGlow(px, py, ax, ay, bx, by, width){
+    function triColor(t){
+      t = clamp(t,0,1);
+      if (t < 0.5){
+        return mixColor(CONFIG.left, CONFIG.mid, t / 0.5);
+      }
+      return mixColor(CONFIG.mid, CONFIG.right, (t - 0.5) / 0.5);
+    }
+
+    function ellipse(u,v,cx,cy,rx,ry,soft=0.18){
+      const dx = (u-cx)/rx;
+      const dy = (v-cy)/ry;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      return 1 - smoothstep(1-soft, 1, d);
+    }
+
+    function segmentGlow(px,py,ax,ay,bx,by,width){
       const abx = bx - ax;
       const aby = by - ay;
       const apx = px - ax;
       const apy = py - ay;
-      const denom = abx * abx + aby * aby || 1e-6;
-      const h = clamp((apx * abx + apy * aby) / denom, 0, 1);
-      const dx = apx - abx * h;
-      const dy = apy - aby * h;
-      return Math.exp(-(dx * dx + dy * dy) / (width * width));
+      const denom = abx*abx + aby*aby || 1e-6;
+      const h = clamp((apx*abx + apy*aby) / denom, 0, 1);
+      const dx = apx - abx*h;
+      const dy = apy - aby*h;
+      return Math.exp(-(dx*dx + dy*dy)/(width*width));
     }
 
-    function getBlinkAmount(t){
-      if (t > blink.next){
-        blink.start = t;
-        blink.next = t + 7 + Math.random() * 12;
+    function getBlink(t){
+      if (t > blinkNext){
+        blinkStart = t;
+        blinkNext = t + 6 + Math.random() * 8;
       }
-      const p = (t - blink.start) / blink.duration;
+      const p = (t - blinkStart) / blinkDuration;
       if (p < 0 || p > 1) return 0;
       return Math.sin(p * Math.PI);
     }
 
-    function scheduleGlitch(t){
-      glitch.next = t + CONFIG.glitchEveryMin + Math.random() * (CONFIG.glitchEveryMax - CONFIG.glitchEveryMin);
-    }
-
-    function updateGlitch(t){
-      if (!glitch.next) scheduleGlitch(t);
-
-      if (!glitch.active && t > glitch.next){
-        glitch.active = true;
-        glitch.row = Math.floor(Math.random() * rows);
-        glitch.height = 1 + Math.floor(Math.random() * 3);
-        glitch.shift = (Math.random() * 2 - 1) * cellW * (2 + Math.random() * 4);
-        glitch.end = t + 0.04 + Math.random() * 0.08;
-      }
-
-      if (glitch.active && t > glitch.end){
-        glitch.active = false;
-        scheduleGlitch(t);
-      }
-    }
-
     function resize(){
-      width = window.innerWidth;
-      height = window.innerHeight;
+      W = window.innerWidth;
+      H = window.innerHeight;
 
-      canvas.width = Math.floor(width * DPR);
-      canvas.height = Math.floor(height * DPR);
-      canvas.style.width = width + "px";
-      canvas.style.height = height + "px";
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width = W + "px";
+      canvas.style.height = H + "px";
 
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-      ctx.font = `${CONFIG.fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace`;
-      ctx.textBaseline = "top";
-      ctx.textAlign = "left";
+      fontSize = W < 700 ? 8.2 : 12;
+      cellH = fontSize * 1.06;
 
+      ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace`;
       cellW = ctx.measureText("M").width;
-      cellH = CONFIG.fontSize * CONFIG.lineHeight;
 
-      cols = Math.floor(width / cellW);
-      rows = Math.floor(height / cellH);
+      cols = Math.floor(W / cellW);
+      rows = Math.floor(H / cellH);
 
-      grid = new Array(rows);
-      for (let r = 0; r < rows; r++){
-        grid[r] = new Array(cols);
-        for (let c = 0; c < cols; c++){
-          grid[r][c] = {
-            ch: " ",
-            color: [0,0,0],
-            alpha: 0
-          };
-        }
-      }
+      currentIdx = new Int16Array(cols * rows);
     }
 
-    function getCellData(c, r, t){
-      const u = (c + 0.5) / cols;
-      const v = (r + 0.5) / rows;
+    function sampleFace(u,v,t,blink){
+      const breath = 0.97 + 0.03 * Math.sin(t * 1.2);
 
-      const breath = 0.93 + 0.07 * Math.sin(t * 1.2);
-      const blinkAmt = getBlinkAmount(t);
+      // Hoofdvorm
+      const skull = ellipse(u,v,0.5,0.46,0.14,0.215,0.20);
+      const faceCore = ellipse(u,v,0.5,0.51,0.11,0.17,0.22) * 0.52;
+      const forehead = ellipse(u,v,0.5,0.34,0.09,0.07,0.22) * 0.14;
+      const cheekL = ellipse(u,v,0.432,0.565,0.05,0.07,0.26) * 0.17;
+      const cheekR = ellipse(u,v,0.568,0.565,0.05,0.07,0.26) * 0.17;
+      const chin = ellipse(u,v,0.5,0.705,0.045,0.045,0.30) * 0.16;
 
-      // ---------- Basis face volumes ----------
-      const faceMask = softEllipse(u, v, 0.5, 0.49, 0.145, 0.255, 0.80, 1.0);
+      // Kaaklijn subtiel
+      const jawL = segmentGlow(u,v,0.405,0.57,0.468,0.725,0.014) * 0.11;
+      const jawR = segmentGlow(u,v,0.595,0.57,0.532,0.725,0.014) * 0.11;
 
-      // Grotere schaal voor haarmassa
-      let hairShell = softEllipse(u, v, 0.5, 0.505, 0.23, 0.395, 0.82, 1.0);
+      // Haarmassa tot hals
+      let hairShell = ellipse(u,v,0.5,0.505,0.215,0.35,0.18);
+      const hairNoise = noise(u*20 + 9.1, v*18 - t*0.25);
+      let hair = Math.max(0, hairShell - skull * 0.92);
+      hair *= 0.82 + 0.22 * hairNoise;
 
-      // Haar tot hals: begrens onderkant subtiel, niet te lang
-      const neckCut = 1 - smoothstep(0.84, 0.96, v);
-      hairShell *= (0.72 + 0.28 * neckCut);
+      // Nek
+      const neck = ellipse(u,v,0.5,0.81,0.055,0.075,0.35) * 0.16;
 
-      const hairNoise = noise(c * 0.11, r * 0.08 - t * 0.18);
-      let hairMask = Math.max(0, hairShell - faceMask * 0.92);
-      hairMask *= 0.84 + 0.30 * hairNoise;
+      // Ogen — droeviger en algemener
+      const eyeY = 0.465;
+      const eyeH = mix(0.0105, 0.0018, blink);
+      const sadness = 0.010;
 
-      // Schouders / nek heel subtiel
-      const neck = softEllipse(u, v, 0.5, 0.79, 0.06, 0.08, 0.55, 1.0) * 0.25;
-      const shoulderL = softEllipse(u, v, 0.42, 0.89, 0.10, 0.07, 0.5, 1.0) * 0.12;
-      const shoulderR = softEllipse(u, v, 0.58, 0.89, 0.10, 0.07, 0.5, 1.0) * 0.12;
+      const upperL = segmentGlow(u,v,0.372,eyeY+sadness,0.447,eyeY-0.004,0.0052);
+      const upperR = segmentGlow(u,v,0.553,eyeY-0.004,0.628,eyeY+sadness,0.0052);
+      const lowerL = segmentGlow(u,v,0.381,eyeY+0.016,0.445,eyeY+0.011,0.0046);
+      const lowerR = segmentGlow(u,v,0.555,eyeY+0.011,0.619,eyeY+0.016,0.0046);
 
-      // ---------- Gezichtsshading ----------
-      const faceCore   = softEllipse(u, v, 0.5, 0.51, 0.11, 0.18, 0.0, 1.0) * 0.44;
-      const forehead   = softEllipse(u, v, 0.5, 0.33, 0.10, 0.08, 0.0, 1.0) * 0.20;
-      const cheeks     = (
-        softEllipse(u, v, 0.43, 0.57, 0.055, 0.07, 0.0, 1.0) +
-        softEllipse(u, v, 0.57, 0.57, 0.055, 0.07, 0.0, 1.0)
-      ) * 0.18;
-      const chin       = softEllipse(u, v, 0.5, 0.72, 0.05, 0.05, 0.0, 1.0) * 0.16;
-      const jawShadow  = softEllipse(u, v, 0.5, 0.67, 0.13, 0.10, 0.0, 1.0) * 0.08;
+      const eyeWhiteL = ellipse(u,v,0.41,eyeY,0.028,eyeH,0.30) * (1 - blink*0.97);
+      const eyeWhiteR = ellipse(u,v,0.59,eyeY,0.028,eyeH,0.30) * (1 - blink*0.97);
+      const irisL = ellipse(u,v,0.41,eyeY+0.001,0.010,0.010,0.35) * (1 - blink*0.98);
+      const irisR = ellipse(u,v,0.59,eyeY+0.001,0.010,0.010,0.35) * (1 - blink*0.98);
 
-      // ---------- Ogen ----------
-      const eyeHeight = mix(0.009, 0.0018, blinkAmt);
-      const eyeY = 0.455;
+      const underEyeL = ellipse(u,v,0.41,0.492,0.045,0.020,0.40) * 0.08;
+      const underEyeR = ellipse(u,v,0.59,0.492,0.045,0.020,0.40) * 0.08;
 
-      // Sadness: buitenste hoeken iets lager / zwaarder
-      const leftUpperLid  = segGlow(u, v, 0.372, eyeY + 0.006 + CONFIG.eyeSadness * 0.004, 0.446, eyeY - 0.002, 0.0048);
-      const rightUpperLid = segGlow(u, v, 0.554, eyeY - 0.002, 0.628, eyeY + 0.006 + CONFIG.eyeSadness * 0.004, 0.0048);
+      // Wenkbrauwen
+      const browL = segmentGlow(u,v,0.368,0.418,0.452,0.406,0.0072) * 0.42;
+      const browR = segmentGlow(u,v,0.548,0.406,0.632,0.418,0.0072) * 0.42;
 
-      const leftLowerLid  = segGlow(u, v, 0.380, 0.472, 0.444, 0.468, 0.004);
-      const rightLowerLid = segGlow(u, v, 0.556, 0.468, 0.620, 0.472, 0.004);
+      // Neus
+      const noseBridge = segmentGlow(u,v,0.5,0.41,0.5,0.593,0.007) * 0.28;
+      const nosePlane = ellipse(u,v,0.5,0.565,0.026,0.055,0.35) * 0.09;
+      const noseTip = ellipse(u,v,0.5,0.602,0.018,0.013,0.35) * 0.14;
+      const nostrilL = ellipse(u,v,0.486,0.607,0.007,0.005,0.35) * 0.12;
+      const nostrilR = ellipse(u,v,0.514,0.607,0.007,0.005,0.35) * 0.12;
 
-      const leftEyeWhite  = softEllipse(u, v, 0.41, eyeY, 0.030, eyeHeight, 0.6, 1.0) * (1 - blinkAmt * 0.92);
-      const rightEyeWhite = softEllipse(u, v, 0.59, eyeY, 0.030, eyeHeight, 0.6, 1.0) * (1 - blinkAmt * 0.92);
+      // Mond — licht melancholisch
+      const philtrum = segmentGlow(u,v,0.5,0.622,0.5,0.646,0.0048) * 0.07;
+      const upperLipL = segmentGlow(u,v,0.456,0.666,0.500,0.655,0.0048) * 0.16;
+      const upperLipR = segmentGlow(u,v,0.500,0.655,0.544,0.666,0.0048) * 0.16;
+      const lowerLip = segmentGlow(u,v,0.470,0.684,0.530,0.684,0.0056) * 0.14;
+      const mouthShadow = ellipse(u,v,0.5,0.676,0.042,0.018,0.40) * 0.08;
 
-      const leftIris  = softEllipse(u, v, 0.41, eyeY + 0.001, 0.011, 0.011, 0.0, 1.0) * (1 - blinkAmt * 0.95);
-      const rightIris = softEllipse(u, v, 0.59, eyeY + 0.001, 0.011, 0.011, 0.0, 1.0) * (1 - blinkAmt * 0.95);
-
-      const eyeShadow = (
-        softEllipse(u, v, 0.41, 0.448, 0.055, 0.030, 0.0, 1.0) +
-        softEllipse(u, v, 0.59, 0.448, 0.055, 0.030, 0.0, 1.0)
-      ) * 0.18;
-
-      // ---------- Wenkbrauwen ----------
-      const leftBrow  = segGlow(u, v, 0.365, 0.415, 0.452, 0.402, 0.0065);
-      const rightBrow = segGlow(u, v, 0.548, 0.402, 0.635, 0.415, 0.0065);
-
-      // ---------- Neus ----------
-      const noseBridge = segGlow(u, v, 0.5, 0.42, 0.5, 0.59, 0.006) * 0.42;
-      const noseTip = softEllipse(u, v, 0.5, 0.60, 0.020, 0.016, 0.0, 1.0) * 0.20;
-      const nostrilL = softEllipse(u, v, 0.486, 0.605, 0.008, 0.005, 0.0, 1.0) * 0.17;
-      const nostrilR = softEllipse(u, v, 0.514, 0.605, 0.008, 0.005, 0.0, 1.0) * 0.17;
-
-      // ---------- Mond ----------
-      const mouthUpperL = segGlow(u, v, 0.456, 0.664, 0.500, 0.654, 0.0045);
-      const mouthUpperR = segGlow(u, v, 0.500, 0.654, 0.544, 0.664, 0.0045);
-      const mouthLower  = segGlow(u, v, 0.470, 0.680, 0.530, 0.680, 0.0048) * 0.72;
-      const philtrum    = segGlow(u, v, 0.5, 0.620, 0.5, 0.645, 0.004) * 0.10;
-
-      // ---------- Dichtheid opbouwen ----------
       let density = 0;
-
-      density += faceMask * 0.10;
+      density += skull * 0.08;
       density += faceCore;
       density += forehead;
-      density += cheeks;
+      density += cheekL + cheekR;
       density += chin;
-      density += jawShadow;
-
-      density += hairMask * 0.33;
+      density += jawL + jawR;
+      density += hair * 0.26;
       density += neck;
-      density += shoulderL + shoulderR;
 
-      density += eyeShadow;
-      density += (leftUpperLid + rightUpperLid) * 0.44;
-      density += (leftLowerLid + rightLowerLid) * 0.22;
-      density += (leftBrow + rightBrow) * 0.42;
+      density += browL + browR;
+      density += (upperL + upperR) * 0.34;
+      density += (lowerL + lowerR) * 0.16;
+      density += (eyeWhiteL + eyeWhiteR) * 0.18;
+      density += (irisL + irisR) * 0.34;
+      density += underEyeL + underEyeR;
 
-      density += (leftEyeWhite + rightEyeWhite) * 0.24;
-      density += (leftIris + rightIris) * 0.46;
-
-      density += noseBridge + noseTip + nostrilL + nostrilR;
-      density += (mouthUpperL + mouthUpperR) * 0.25;
-      density += mouthLower * 0.18;
+      density += noseBridge + nosePlane + noseTip + nostrilL + nostrilR;
       density += philtrum;
+      density += upperLipL + upperLipR + lowerLip + mouthShadow;
 
-      // subtiele levende variatie
+      // subtiele extra contour
+      density += ellipse(u,v,0.455,0.39,0.03,0.03,0.40) * 0.04;
+      density += ellipse(u,v,0.545,0.39,0.03,0.03,0.40) * 0.04;
+
+      // fijne textuur, maar veel rustiger
+      density += (noise(u*38 + 1.7, v*42 + 3.1) - 0.5) * 0.035;
+      density += (noise(u*15 - t*0.05, v*20 + t*0.03) - 0.5) * 0.02;
+
       density *= breath;
-      density *= 0.94 + 0.06 * Math.sin(r * 0.62 + t * 18);
-
-      const grain = noise(c * 0.19 + t * 0.30, r * 0.17 - t * 0.08) - 0.5;
-      density += grain * 0.06;
-
       density = clamp(density, 0, 1);
 
-      // ---------- Achtergrond ambient ----------
-      let ambient = 0;
-      if (density < 0.05){
-        const n = noise(c * 0.18 + 70.1, r * 0.21 + 31.7 + t * 0.08);
-        if (n > 1 - CONFIG.ambientDensity * 10){
-          ambient = (n - (1 - CONFIG.ambientDensity * 10)) * 12;
-          ambient = clamp(ambient * 0.45, 0, 0.18);
-        }
-      }
-
-      const finalDensity = Math.max(density, ambient);
-
-      // ---------- Kleur ----------
       let color = triColor(u);
 
-      // ietsepietsje helderder in gezicht en ogen
-      const glowBoost = clamp(
-        finalDensity * 0.95 +
-        (leftIris + rightIris) * 0.65 +
-        (leftEyeWhite + rightEyeWhite) * 0.18,
-        0, 1.6
-      );
-
-      // Eyes net iets kouder/lichter
-      if ((leftIris + rightIris) > 0.04){
-        color = mixColor(color, [180, 170, 255], 0.28);
+      // ogen iets koeler
+      const eyeBoost = irisL + irisR + eyeWhiteL + eyeWhiteR;
+      if (eyeBoost > 0.08){
+        color = mixColor(color, [190, 180, 255], 0.24);
       }
 
-      // Haar iets donkerder / zachter
-      if (hairMask > faceMask){
-        color = mixColor(color, [38, 36, 72], 0.18);
+      // haar wat dieper en donkerder
+      if (hair > skull){
+        color = mixColor(color, [30, 28, 70], 0.18);
       }
 
-      const brightness = clamp(0.10 + glowBoost, 0, 1.35);
+      const bright = clamp(0.12 + density * 1.18 + eyeBoost * 0.22, 0, 1.35);
       color = [
-        clamp(color[0] * brightness, 0, 255),
-        clamp(color[1] * brightness, 0, 255),
-        clamp(color[2] * brightness, 0, 255)
+        clamp(color[0] * bright, 0, 255),
+        clamp(color[1] * bright, 0, 255),
+        clamp(color[2] * bright, 0, 255)
       ];
 
-      // ---------- ASCII teken kiezen ----------
-      let ch = " ";
-      let alpha = 0;
-
-      if (finalDensity > 0.02){
-        const ramp = CONFIG.ramp;
-        let idx = Math.floor(finalDensity * (ramp.length - 1));
-
-        // kleine tekenjitter
-        idx += Math.floor((noise(c * 0.41 + 17.3, r * 0.39 + t * 0.55) - 0.5) * 2);
-
-        idx = Math.max(0, Math.min(ramp.length - 1, idx));
-        ch = ramp[idx];
-        alpha = clamp(0.20 + finalDensity * 1.10, 0, 1);
-      }
-
-      // ambient losse tekens in de background
-      if (density < 0.02 && ambient > 0.01){
-        const chars = CONFIG.ambientChars;
-        const idx = Math.floor(noise(c * 0.72, r * 0.49 + t * 0.4) * chars.length) % chars.length;
-        ch = chars[idx];
-        alpha = clamp(ambient * 1.5, 0.05, 0.22);
-      }
-
-      return { ch, color, alpha };
+      return {
+        density,
+        color
+      };
     }
 
-    function buildFrame(t){
-      updateGlitch(t);
+    function render(ts){
+      const t = ts * 0.001;
+      const blink = getBlink(t);
 
-      for (let r = 0; r < rows; r++){
-        for (let c = 0; c < cols; c++){
-          grid[r][c] = getCellData(c, r, t);
-        }
-      }
-    }
+      ctx.fillStyle = `rgb(${CONFIG.bg[0]}, ${CONFIG.bg[1]}, ${CONFIG.bg[2]})`;
+      ctx.fillRect(0, 0, W, H);
 
-    function renderFrame(t){
-      ctx.fillStyle = `rgb(${CONFIG.backgroundColor[0]}, ${CONFIG.backgroundColor[1]}, ${CONFIG.backgroundColor[2]})`;
-      ctx.fillRect(0, 0, width, height);
-
-      ctx.font = `${CONFIG.fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace`;
+      ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace`;
       ctx.textBaseline = "top";
       ctx.textAlign = "left";
 
       for (let r = 0; r < rows; r++){
         const y = r * cellH;
 
-        let rowShift = 0;
-        if (glitch.active && r >= glitch.row && r < glitch.row + glitch.height){
-          rowShift = glitch.shift;
-        }
-
         for (let c = 0; c < cols; c++){
-          const cell = grid[r][c];
-          if (cell.ch === " " || cell.alpha <= 0) continue;
+          const x = c * cellW;
+          const u = (c + 0.5) / cols;
+          const v = (r + 0.5) / rows;
+          const id = r * cols + c;
 
-          const x = c * cellW + rowShift;
+          const s = sampleFace(u, v, t, blink);
 
-          ctx.fillStyle = `rgba(${cell.color[0]}, ${cell.color[1]}, ${cell.color[2]}, ${cell.alpha})`;
-          ctx.fillText(cell.ch, x, y);
+          let density = s.density;
+          let color = s.color;
+
+          // weinig ambient noise, zodat het portret de hoofdrol krijgt
+          let ambient = 0;
+          if (density < 0.03){
+            const a = noise(u*55 + 20.1, v*55 - t*0.08);
+            if (a > 0.989){
+              ambient = (a - 0.989) * 8;
+              density = Math.max(density, ambient * 0.06);
+              color = mixColor(triColor(u), [120, 90, 180], 0.35);
+            }
+          }
+
+          const target = Math.floor(clamp(density, 0, 1) * (CONFIG.ramp.length - 1));
+          let cur = currentIdx[id];
+
+          // stabielere updates: niet elk frame overal wisselen
+          if (cur < target){
+            if (Math.random() < 0.20) cur += 1;
+            if (target - cur > 6) cur += 1;
+          } else if (cur > target){
+            if (Math.random() < 0.18) cur -= 1;
+            if (cur - target > 6) cur -= 1;
+          }
+
+          // heel zeldzame shimmer
+          if (density > 0.08 && Math.random() < 0.0015){
+            cur += Math.random() < 0.5 ? -1 : 1;
+          }
+
+          cur = clamp(cur, 0, CONFIG.ramp.length - 1);
+          currentIdx[id] = cur;
+
+          if (density > 0.018){
+            const ch = CONFIG.ramp[cur];
+            const alpha = clamp(0.16 + density * 1.02, 0, 1);
+
+            ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
+            ctx.fillText(ch, x, y);
+          } else if (ambient > 0.01) {
+            const idx = Math.floor(noise(u*80, v*80 + t*0.1) * CONFIG.ambientRamp.length) % CONFIG.ambientRamp.length;
+            const ch = CONFIG.ambientRamp[idx];
+            const alpha = clamp(ambient * 0.25, 0.04, 0.12);
+            ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
+            ctx.fillText(ch, x, y);
+          }
         }
       }
 
       // scanlines
-      ctx.fillStyle = "rgba(0, 0, 0, 0.13)";
-      for (let y = 0; y < height; y += 4){
-        ctx.fillRect(0, y, width, 1);
+      ctx.fillStyle = "rgba(0,0,0,0.11)";
+      for (let y = 0; y < H; y += 4){
+        ctx.fillRect(0, y, W, 1);
       }
 
-      // heel subtiele vignette
-      const grad = ctx.createRadialGradient(
-        width * 0.5, height * 0.48, Math.min(width, height) * 0.12,
-        width * 0.5, height * 0.5, Math.max(width, height) * 0.58
+      // zachte glow in het midden
+      const glow = ctx.createRadialGradient(
+        W * 0.5, H * 0.48, 10,
+        W * 0.5, H * 0.5, Math.max(W, H) * 0.42
       );
-      grad.addColorStop(0, "rgba(0,0,0,0)");
-      grad.addColorStop(1, "rgba(0,0,0,0.42)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, width, height);
+      glow.addColorStop(0, "rgba(255,100,220,0.03)");
+      glow.addColorStop(0.45, "rgba(80,80,255,0.02)");
+      glow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+
+      // vignette
+      const vignette = ctx.createRadialGradient(
+        W * 0.5, H * 0.5, Math.min(W, H) * 0.15,
+        W * 0.5, H * 0.5, Math.max(W, H) * 0.7
+      );
+      vignette.addColorStop(0, "rgba(0,0,0,0)");
+      vignette.addColorStop(1, "rgba(0,0,0,0.38)");
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, W, H);
+
+      requestAnimationFrame(render);
     }
-
-    function animate(now){
-      const t = now * 0.001;
-      buildFrame(t);
-      renderFrame(t);
-      requestAnimationFrame(animate);
-    }
-
-    // Handig voor debug / “echte data” export
-    window.exportAsciiFrame = function(){
-      return grid.map(row => row.map(cell => cell.ch).join("")).join("\n");
-    };
-
-    window.exportAsciiData = function(){
-      return grid;
-    };
 
     window.addEventListener("resize", resize);
 
+    // handig voor debug
+    window.exportAsciiFrame = function(){
+      let lines = [];
+      for (let r = 0; r < rows; r++){
+        let line = "";
+        for (let c = 0; c < cols; c++){
+          line += CONFIG.ramp[currentIdx[r * cols + c]] || " ";
+        }
+        lines.push(line);
+      }
+      return lines.join("\n");
+    };
+
     resize();
-    requestAnimationFrame(animate);
+    requestAnimationFrame(render);
   </script>
 </body>
 </html>
