@@ -81,6 +81,7 @@
   - behoudt de ASCII/gezicht/haar/partikel-DNA
   - verwijdert handmatige controls
   - voegt autonome drift, droomfasen, presence-events en micro-expressies toe
+  - veil neck pass + subtiel verfijnde, vrouwelijkere contouren
   - gebruikt meerdere tekstlagen met eigen rastergrootte
   - laat soms een tweede schaduw-entiteit door het beeld trekken
 */
@@ -105,8 +106,8 @@ function interp(pts,y){
 
 function faceHalfWidth(y){
   const pts=[
-    [0.10,0.105],[0.17,0.168],[0.27,0.218],[0.40,0.252],
-    [0.52,0.248],[0.64,0.210],[0.73,0.148],[0.81,0.072],[0.86,0.018]
+    [0.10,0.102],[0.17,0.162],[0.27,0.214],[0.40,0.248],
+    [0.52,0.243],[0.64,0.198],[0.73,0.132],[0.80,0.058],[0.86,0.012]
   ];
   if(y<=pts[0][0])return pts[0][1]*smoothstep(0.04,0.11,y);
   if(y>=pts[pts.length-1][0])return 0;
@@ -274,27 +275,50 @@ function staticPart(x,y){
     b=0.35*edge + 0.055*edge*Math.cos(clamp(t,0,1)*Math.PI*0.5);
   }
 
-  // vaporous neck: the entity dissolves into an energy field instead of a hard torso block
-  if(y>0.735){
-    const verticalFade = smoothstep(0.735,0.82,y) * smoothstep(1.08,0.82,y);
-    const neckWidth = 0.043 + 0.018*smoothstep(0.74,0.92,y);
-    const neck = 0.085 * smoothstep(neckWidth, neckWidth*0.20, dx) * verticalFade;
+  // Veiled neck: slimmer, softer and more diffuse. The face should feel like it manifests
+  // from mist rather than sitting on a dark rectangular torso.
+  if(y>0.73){
+    const neckAxis = 0.5 + 0.010*Math.sin(y*15.0);
+    const ndx = Math.abs(x-neckAxis);
 
-    const mist =
-      0.055*g2(x,y,0.50,0.835,0.090,0.050) +
-      0.040*g2(x,y,0.50,0.910,0.155,0.085) +
-      0.026*g2(x,y,0.50,1.000,0.230,0.130);
+    const neckWidth =
+      0.050 +
+      0.018*smoothstep(0.74,0.84,y) -
+      0.028*smoothstep(0.84,1.02,y);
+
+    const verticalFade =
+      smoothstep(0.73,0.80,y) *
+      smoothstep(1.06,0.80,y);
+
+    const neck =
+      0.078 *
+      smoothstep(neckWidth, neckWidth*0.14, ndx) *
+      verticalFade;
+
+    const throatGlow =
+      0.030*g2(x,y,0.50,0.815,0.072,0.040) +
+      0.018*g2(x,y,0.50,0.855,0.095,0.050);
+
+    const veil =
+      0.038*g2(x,y,0.50,0.885,0.120,0.070) +
+      0.028*g2(x,y,0.50,0.955,0.185,0.105) +
+      0.018*g2(x,y,0.50,1.020,0.245,0.145);
 
     const shoulderHaze =
-      0.026*g2(x,y,0.34,0.955,0.160,0.085) +
-      0.026*g2(x,y,0.66,0.955,0.160,0.085);
+      0.016*g2(x,y,0.35,0.965,0.175,0.090) +
+      0.016*g2(x,y,0.65,0.965,0.175,0.090);
 
-    b = Math.max(b, neck + mist);
-    b += shoulderHaze * smoothstep(0.78,0.96,y);
+    b = Math.max(b, neck + throatGlow + veil);
+    b += shoulderHaze * smoothstep(0.80,0.98,y);
 
-    // hollow out the old rectangular core and let the lower part fall apart
-    b -= 0.060*g2(x,y,0.50,0.850,0.105,0.050);
-    b -= 0.045*g2(x,y,0.50,0.965,0.180,0.130);
+    // Break up the old "block" impression and dissolve the lower form into atmosphere.
+    b -= 0.070*g2(x,y,0.50,0.855,0.110,0.050);
+    b -= 0.050*g2(x,y,0.50,0.950,0.175,0.115);
+    b -= 0.028*g2(x,y,0.50,1.030,0.235,0.155);
+
+    // Subtle textural hollowing so the neck fades rather than ends sharply.
+    const dissolve = smoothstep(0.79,1.02,y) * (0.5 + 0.5*Math.sin(x*92 + y*138));
+    b -= 0.018 * dissolve;
   }
 
   b+=0.24*g2(x,y,cx,0.285,0.120,0.070);
@@ -319,6 +343,14 @@ function staticPart(x,y){
   b-=0.14*g2(x,y,0.468,0.602,0.013,0.011);
   b-=0.14*g2(x,y,0.532,0.602,0.013,0.011);
   b-=0.05*g2(x,y,cx,0.672,0.010,0.008);
+
+  // contour refinements: softer jaw corners, a slightly longer/lighter chin,
+  // and a more refined lower face silhouette
+  b-=0.040*g2(x,y,0.315,0.682,0.060,0.052);
+  b-=0.040*g2(x,y,0.685,0.682,0.060,0.052);
+  b+=0.020*g2(x,y,cx,0.786,0.038,0.028);
+  b+=0.012*g2(x,y,0.355,0.590,0.040,0.026);
+  b+=0.012*g2(x,y,0.645,0.590,0.040,0.026);
 
   return b;
 }
