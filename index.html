@@ -1,821 +1,486 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Wandering Art — Autonomous Cyber Oracle</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wandering Art — ASCII Oracle</title>
+  <style>
+    :root{
+      --bg:#02030a;
+    }
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *{ box-sizing:border-box; }
 
-  html, body {
-    width: 100%;
-    height: 100%;
-    background: #030208;
-    overflow: hidden;
-  }
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:var(--bg);
+    }
 
-  body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: "Share Tech Mono", monospace;
-  }
+    body{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
 
-  #stage {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background:
-      radial-gradient(ellipse 80% 72% at 50% 44%, rgba(20, 10, 42, 0.9), rgba(3, 2, 8, 1) 72%),
-      #030208;
-  }
-
-  canvas {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%,-50%);
-  }
-
-  #bg { z-index: 1; }
-  #face { z-index: 2; }
-
-  #stage::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 3;
-    pointer-events: none;
-    background:
-      radial-gradient(ellipse 66% 64% at 48% 47%,
-        transparent 45%,
-        rgba(3,2,8,0.46) 82%,
-        rgba(2,1,5,0.96) 100%),
-      repeating-linear-gradient(
-        0deg,
-        rgba(255,255,255,0.018) 0px,
-        rgba(255,255,255,0.018) 1px,
-        transparent 1px,
-        transparent 4px
-      );
-    opacity: 0.9;
-  }
-</style>
+    canvas{
+      display:block;
+      width:100vw;
+      height:100vh;
+      background: radial-gradient(circle at center, #070912 0%, #03040a 55%, #010208 100%);
+    }
+  </style>
 </head>
 <body>
-<div id="stage">
-  <canvas id="bg"></canvas>
-  <canvas id="face"></canvas>
-</div>
+  <canvas id="ascii"></canvas>
 
-<script>
-/*
-  Effulgence — Autonomous Cyber Oracle
-  Wandering Art — Autonomous Cyber Oracle
-  - behoudt de ASCII/gezicht/haar/partikel-DNA
-  - verwijdert handmatige controls
-  - voegt autonome drift, droomfasen, presence-events en micro-expressies toe
-  - veil neck pass + subtiel verfijnde, vrouwelijkere contouren
-  - gebruikt meerdere tekstlagen met eigen rastergrootte
-  - laat soms een tweede schaduw-entiteit door het beeld trekken
-*/
+  <script>
+    const canvas = document.getElementById("ascii");
+    const ctx = canvas.getContext("2d", { alpha: false });
 
-function clamp(v,a,b){return v<a?a:v>b?b:v;}
-function lerp(a,b,t){return a+(b-a)*t;}
-function smoothstep(e0,e1,x){let t=clamp((x-e0)/(e1-e0),0,1);return t*t*(3-2*t);}
-function g2(x,y,cx,cy,sx,sy){const dx=(x-cx)/sx,dy=(y-cy)/sy;return Math.exp(-0.5*(dx*dx+dy*dy));}
-function gx(d,s){const t=d/s;return Math.exp(-0.5*t*t);}
-function noise(x){
-  return 0.52*Math.sin(x) + 0.28*Math.sin(x*2.137+1.7) + 0.14*Math.sin(x*4.813+4.1);
-}
-function interp(pts,y){
-  if(y<=pts[0][0])return pts[0][1];
-  if(y>=pts[pts.length-1][0])return pts[pts.length-1][1];
-  for(let i=0;i<pts.length-1;i++){
-    const[y0,w0]=pts[i], [y1,w1]=pts[i+1];
-    if(y>=y0&&y<=y1){const t=smoothstep(y0,y1,y);return w0+(w1-w0)*t;}
-  }
-  return 0;
-}
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
-function faceHalfWidth(y){
-  const pts=[
-    [0.10,0.102],[0.17,0.162],[0.27,0.214],[0.40,0.248],
-    [0.52,0.243],[0.64,0.198],[0.73,0.132],[0.80,0.058],[0.86,0.012]
-  ];
-  if(y<=pts[0][0])return pts[0][1]*smoothstep(0.04,0.11,y);
-  if(y>=pts[pts.length-1][0])return 0;
-  return interp(pts,y);
-}
+    const CONFIG = {
+      fontSize: 14,
+      lineHeight: 1.08,
+      faceCenterX: 0.5,
+      faceCenterY: 0.49,
 
-/* ===================== ORACLE AUTONOMY ===================== */
+      // Kleuren: links warm rood/oranje, midden magenta, rechts blauw
+      leftColor:  [255, 96, 64],
+      midColor:   [255, 78, 190],
+      rightColor: [72, 108, 255],
 
-const Oracle = {
-  age: 0,
-  mode: 0,
-  modeAge: 0,
-  nextMode: 28,
+      backgroundColor: [2, 3, 10],
 
-  calm: 0.55,
-  attention: 0.50,
-  anxiety: 0.25,
-  wonder: 0.60,
-  dreaming: 0.10,
-  presence: 0.50,
-  instability: 0.14,
+      // Een vrij bruikbare ramp voor “dense” ASCII shading
+      ramp: " .,:;'`^\"~_-+=|/\\\\(){}[]1itfrxczvunomwqpdbkhao*#MW&8%B@$",
 
-  gazeX: 0,
-  gazeY: 0,
-  blink: 1,
-  blinkStart: -1,
-  nextBlink: 2.2,
+      // Floating losse tekens in de achtergrond
+      ambientChars: "01[]{}()/\\\\|+-.:;",
 
-  event: 0,
-  eventAge: 999,
-  eventLength: 3.8,
+      eyeSadness: 0.72,
+      ambientDensity: 0.0027,
+      glitchEveryMin: 4.0,
+      glitchEveryMax: 9.0
+    };
 
-  shadowActive: 0,
-  shadowAge: 999,
-  shadowNext: 42,
-  shadowLength: 7,
-  shadowPresence: 0,
-  shadowX: 0.54,
-  shadowY: 0.47,
+    let width = 0;
+    let height = 0;
+    let cols = 0;
+    let rows = 0;
+    let cellW = 0;
+    let cellH = 0;
+    let grid = [];
 
-  expr: {
-    browRaise: 0,
-    browInner: 0,
-    eyeOpen: 1,
-    eyeOpenEff: 1,
-    lowerLid: 0,
-    mouthCurve: 0.06,
-    mouthOpen: 0,
-    mouthWidth: 1,
-    cheek: 0,
-    teeth: 0
-  }
-};
+    let glitch = {
+      active: false,
+      row: 0,
+      height: 2,
+      shift: 0,
+      end: 0,
+      next: 0
+    };
 
-function evolveOracle(dt, reduce){
-  if(reduce){ dt = Math.min(dt, 0.016); }
+    let blink = {
+      start: -999,
+      next: 5 + Math.random() * 7,
+      duration: 0.22
+    };
 
-  Oracle.age += dt;
-  Oracle.modeAge += dt;
-  Oracle.eventAge += dt;
-
-  if(Oracle.modeAge > Oracle.nextMode){
-    Oracle.mode = (Oracle.mode + 1 + ((Math.random()*3)|0)) % 6;
-    Oracle.modeAge = 0;
-    Oracle.nextMode = 24 + Math.random()*72;
-  }
-
-  if(Oracle.eventAge > 9 && Math.random() < dt * 0.028){
-    Oracle.event = 1;
-    Oracle.eventAge = 0;
-    Oracle.eventLength = 2.8 + Math.random()*5.5;
-  }
-  if(Oracle.eventAge > Oracle.eventLength) Oracle.event = 0;
-
-  if(!Oracle.shadowActive && Oracle.shadowAge > Oracle.shadowNext){
-    Oracle.shadowActive = 1;
-    Oracle.shadowAge = 0;
-    Oracle.shadowLength = 5.5 + Math.random()*8.5;
-    Oracle.shadowNext = 35 + Math.random()*115;
-    Oracle.shadowX = 0.50 + (Math.random() < 0.5 ? -1 : 1) * (0.045 + Math.random()*0.045);
-    Oracle.shadowY = 0.43 + Math.random()*0.08;
-  }
-
-  if(Oracle.shadowActive){
-    Oracle.shadowAge += dt;
-    const sp = clamp(Oracle.shadowAge / Oracle.shadowLength, 0, 1);
-    Oracle.shadowPresence = Math.pow(Math.sin(sp*Math.PI), 1.7) * (0.30 + Oracle.dreaming*0.55);
-    if(sp >= 1){
-      Oracle.shadowActive = 0;
-      Oracle.shadowPresence = 0;
-      Oracle.shadowAge = 0;
+    function clamp(v, a = 0, b = 1){
+      return v < a ? a : v > b ? b : v;
     }
-  } else {
-    Oracle.shadowAge += dt;
-    Oracle.shadowPresence = lerp(Oracle.shadowPresence, 0, dt*1.4);
-  }
 
-  const t = Oracle.age;
-  const m = Oracle.mode;
+    function mix(a, b, t){
+      return a + (b - a) * t;
+    }
 
-  const calmT      = clamp(0.56 + 0.22*noise(t*0.060 + m*13), 0.15, 0.92);
-  const anxietyT   = clamp(0.29 + 0.24*noise(t*0.083 + m*17), 0.02, 0.76);
-  const wonderT    = clamp(0.63 + 0.31*noise(t*0.046 + m*23), 0.12, 0.98);
-  const attentionT = clamp(0.48 + 0.34*noise(t*0.092 + m*7), 0.08, 0.95);
-  const dreamingT  = clamp((m===2||m===4?0.58:0.16) + 0.18*noise(t*0.035+m*31), 0.0, 0.92);
-  const instT      = clamp(Math.abs(0.15 + 0.48*noise(t*0.039 + m*11)), 0.02, 0.82);
+    function mixColor(c1, c2, t){
+      return [
+        mix(c1[0], c2[0], t),
+        mix(c1[1], c2[1], t),
+        mix(c1[2], c2[2], t)
+      ];
+    }
 
-  Oracle.calm       = lerp(Oracle.calm, calmT, dt*0.30);
-  Oracle.anxiety    = lerp(Oracle.anxiety, anxietyT, dt*0.25);
-  Oracle.wonder     = lerp(Oracle.wonder, wonderT, dt*0.22);
-  Oracle.attention  = lerp(Oracle.attention, attentionT, dt*0.30);
-  Oracle.dreaming   = lerp(Oracle.dreaming, dreamingT, dt*0.18);
-  Oracle.instability= lerp(Oracle.instability, instT, dt*0.18);
+    function triColor(t){
+      t = clamp(t, 0, 1);
+      if (t < 0.5){
+        return mixColor(CONFIG.leftColor, CONFIG.midColor, t / 0.5);
+      }
+      return mixColor(CONFIG.midColor, CONFIG.rightColor, (t - 0.5) / 0.5);
+    }
 
-  const presencePulse = Oracle.event ? Math.sin(clamp(Oracle.eventAge/Oracle.eventLength,0,1)*Math.PI) : 0;
-  Oracle.presence = clamp(0.44 + 0.30*Oracle.attention + 0.34*presencePulse - 0.12*Oracle.dreaming, 0, 1);
+    function smoothstep(a, b, x){
+      const t = clamp((x - a) / (b - a), 0, 1);
+      return t * t * (3 - 2 * t);
+    }
 
-  Oracle.gazeX = 0.030*noise(t*0.42+m*5) + 0.014*noise(t*0.11);
-  Oracle.gazeY = 0.020*noise(t*0.31+m*9) - 0.010*Oracle.presence;
+    function fract(x){
+      return x - Math.floor(x);
+    }
 
-  if(!reduce){
-    if(Oracle.blinkStart<0 && t >= Oracle.nextBlink) Oracle.blinkStart = t;
+    function hash(x, y){
+      return fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453123);
+    }
 
-    if(Oracle.blinkStart>=0){
-      const dur = 0.13 + 0.10*Oracle.dreaming + 0.06*Oracle.anxiety;
-      const p = (t - Oracle.blinkStart) / dur;
-      if(p >= 1){
-        Oracle.blink = 1;
-        Oracle.blinkStart = -1;
-        Oracle.nextBlink = t + 1.5 + Math.random()*5.4 - Oracle.anxiety*0.6 + Oracle.dreaming*1.4;
-      } else {
-        Oracle.blink = p < 0.5 ? lerp(1,0.05,p*2) : lerp(0.05,1,(p-0.5)*2);
+    function noise(x, y){
+      const xi = Math.floor(x);
+      const yi = Math.floor(y);
+      const xf = x - xi;
+      const yf = y - yi;
+
+      const u = xf * xf * (3 - 2 * xf);
+      const v = yf * yf * (3 - 2 * yf);
+
+      const n00 = hash(xi, yi);
+      const n10 = hash(xi + 1, yi);
+      const n01 = hash(xi, yi + 1);
+      const n11 = hash(xi + 1, yi + 1);
+
+      return mix(
+        mix(n00, n10, u),
+        mix(n01, n11, u),
+        v
+      );
+    }
+
+    function softEllipse(u, v, cx, cy, rx, ry, edge0 = 0.78, edge1 = 1.0){
+      const dx = (u - cx) / rx;
+      const dy = (v - cy) / ry;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      return 1 - smoothstep(edge0, edge1, d);
+    }
+
+    function segGlow(px, py, ax, ay, bx, by, width){
+      const abx = bx - ax;
+      const aby = by - ay;
+      const apx = px - ax;
+      const apy = py - ay;
+      const denom = abx * abx + aby * aby || 1e-6;
+      const h = clamp((apx * abx + apy * aby) / denom, 0, 1);
+      const dx = apx - abx * h;
+      const dy = apy - aby * h;
+      return Math.exp(-(dx * dx + dy * dy) / (width * width));
+    }
+
+    function getBlinkAmount(t){
+      if (t > blink.next){
+        blink.start = t;
+        blink.next = t + 7 + Math.random() * 12;
+      }
+      const p = (t - blink.start) / blink.duration;
+      if (p < 0 || p > 1) return 0;
+      return Math.sin(p * Math.PI);
+    }
+
+    function scheduleGlitch(t){
+      glitch.next = t + CONFIG.glitchEveryMin + Math.random() * (CONFIG.glitchEveryMax - CONFIG.glitchEveryMin);
+    }
+
+    function updateGlitch(t){
+      if (!glitch.next) scheduleGlitch(t);
+
+      if (!glitch.active && t > glitch.next){
+        glitch.active = true;
+        glitch.row = Math.floor(Math.random() * rows);
+        glitch.height = 1 + Math.floor(Math.random() * 3);
+        glitch.shift = (Math.random() * 2 - 1) * cellW * (2 + Math.random() * 4);
+        glitch.end = t + 0.04 + Math.random() * 0.08;
+      }
+
+      if (glitch.active && t > glitch.end){
+        glitch.active = false;
+        scheduleGlitch(t);
       }
     }
-  } else {
-    Oracle.blink = 1;
-  }
 
-  const E = Oracle.expr;
-  const smile = (Oracle.calm - Oracle.anxiety)*0.58 + 0.07*noise(t*0.20);
-  const awe = Oracle.wonder*0.75 + Oracle.presence*0.42;
+    function resize(){
+      width = window.innerWidth;
+      height = window.innerHeight;
 
-  E.browRaise  = clamp((Oracle.wonder - Oracle.anxiety)*0.75 + Oracle.presence*0.28, -0.35, 1.0);
-  E.browInner  = clamp(Oracle.anxiety*0.92 - Oracle.calm*0.20 + Oracle.dreaming*0.16, -0.25, 1.0);
-  E.eyeOpen    = clamp(0.88 + Oracle.attention*0.30 + Oracle.presence*0.24 - Oracle.dreaming*0.30 - Oracle.anxiety*0.12, 0.25, 1.45);
-  E.eyeOpenEff = E.eyeOpen * Oracle.blink;
-  E.lowerLid   = clamp(Oracle.anxiety*0.45 + Oracle.calm*0.18 + Oracle.dreaming*0.32, 0, 0.72);
-  E.mouthCurve = clamp(smile, -0.62, 0.74);
-  E.mouthOpen  = clamp((Oracle.presence*0.28 + Oracle.instability*0.20 + awe*0.08 - 0.20), 0, 0.72);
-  E.mouthWidth = clamp(0.96 + Oracle.wonder*0.18 - Oracle.anxiety*0.06, 0.80, 1.22);
-  E.cheek      = clamp(Oracle.calm*0.45 + Oracle.presence*0.25, 0, 1);
-  E.teeth      = E.mouthOpen > 0.22 && E.mouthCurve > 0.14 ? clamp(E.mouthOpen*1.5,0,1) : 0;
-}
+      canvas.width = Math.floor(width * DPR);
+      canvas.height = Math.floor(height * DPR);
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
 
-/* ===================== FACE FIELD ===================== */
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-function staticPart(x,y){
-  const cx=0.5, dx=Math.abs(x-cx);
-  let b=0;
+      ctx.font = `${CONFIG.fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace`;
+      ctx.textBaseline = "top";
+      ctx.textAlign = "left";
 
-  const hw=faceHalfWidth(y);
-  if(hw>1e-4){
-    const t=dx/hw;
-    const edge=smoothstep(1.02,0.80,t);
-    b=0.35*edge + 0.055*edge*Math.cos(clamp(t,0,1)*Math.PI*0.5);
-  }
+      cellW = ctx.measureText("M").width;
+      cellH = CONFIG.fontSize * CONFIG.lineHeight;
 
-  // Veiled neck: slimmer, softer and more diffuse. The face should feel like it manifests
-  // from mist rather than sitting on a dark rectangular torso.
-  if(y>0.73){
-    const neckAxis = 0.5 + 0.010*Math.sin(y*15.0);
-    const ndx = Math.abs(x-neckAxis);
+      cols = Math.floor(width / cellW);
+      rows = Math.floor(height / cellH);
 
-    const neckWidth =
-      0.050 +
-      0.018*smoothstep(0.74,0.84,y) -
-      0.028*smoothstep(0.84,1.02,y);
-
-    const verticalFade =
-      smoothstep(0.73,0.80,y) *
-      smoothstep(1.06,0.80,y);
-
-    const neck =
-      0.078 *
-      smoothstep(neckWidth, neckWidth*0.14, ndx) *
-      verticalFade;
-
-    const throatGlow =
-      0.030*g2(x,y,0.50,0.815,0.072,0.040) +
-      0.018*g2(x,y,0.50,0.855,0.095,0.050);
-
-    const veil =
-      0.038*g2(x,y,0.50,0.885,0.120,0.070) +
-      0.028*g2(x,y,0.50,0.955,0.185,0.105) +
-      0.018*g2(x,y,0.50,1.020,0.245,0.145);
-
-    const shoulderHaze =
-      0.016*g2(x,y,0.35,0.965,0.175,0.090) +
-      0.016*g2(x,y,0.65,0.965,0.175,0.090);
-
-    b = Math.max(b, neck + throatGlow + veil);
-    b += shoulderHaze * smoothstep(0.80,0.98,y);
-
-    // Break up the old "block" impression and dissolve the lower form into atmosphere.
-    b -= 0.070*g2(x,y,0.50,0.855,0.110,0.050);
-    b -= 0.050*g2(x,y,0.50,0.950,0.175,0.115);
-    b -= 0.028*g2(x,y,0.50,1.030,0.235,0.155);
-
-    // Subtle textural hollowing so the neck fades rather than ends sharply.
-    const dissolve = smoothstep(0.79,1.02,y) * (0.5 + 0.5*Math.sin(x*92 + y*138));
-    b -= 0.018 * dissolve;
-  }
-
-  b+=0.24*g2(x,y,cx,0.285,0.120,0.070);
-  b+=0.22*g2(x,y,cx,0.400,0.085,0.045);
-  b+=0.15*g2(x,y,cx,0.500,0.024,0.070);
-  b+=0.24*g2(x,y,cx,0.585,0.040,0.028);
-  b+=0.26*g2(x,y,0.305,0.552,0.078,0.046);
-  b+=0.26*g2(x,y,0.695,0.552,0.078,0.046);
-  b+=0.24*g2(x,y,cx,0.785,0.090,0.045);
-
-  b-=0.30*g2(x,y,0.385,0.455,0.078,0.050);
-  b-=0.30*g2(x,y,0.615,0.455,0.078,0.050);
-  b-=0.18*g2(x,y,0.452,0.510,0.018,0.085);
-  b-=0.18*g2(x,y,0.548,0.510,0.018,0.085);
-  b-=0.16*g2(x,y,cx,0.628,0.070,0.028);
-  b-=0.14*g2(x,y,cx,0.730,0.080,0.022);
-  b-=0.20*g2(x,y,0.255,0.620,0.090,0.065);
-  b-=0.20*g2(x,y,0.745,0.620,0.090,0.065);
-  b-=0.16*g2(x,y,0.255,0.310,0.065,0.085);
-  b-=0.16*g2(x,y,0.745,0.310,0.065,0.085);
-  b-=0.18*g2(x,y,cx,0.845,0.140,0.040);
-  b-=0.14*g2(x,y,0.468,0.602,0.013,0.011);
-  b-=0.14*g2(x,y,0.532,0.602,0.013,0.011);
-  b-=0.05*g2(x,y,cx,0.672,0.010,0.008);
-
-  // contour refinements: softer jaw corners, a slightly longer/lighter chin,
-  // and a more refined lower face silhouette
-  b-=0.040*g2(x,y,0.315,0.682,0.060,0.052);
-  b-=0.040*g2(x,y,0.685,0.682,0.060,0.052);
-  b+=0.020*g2(x,y,cx,0.786,0.038,0.028);
-  b+=0.012*g2(x,y,0.355,0.590,0.040,0.026);
-  b+=0.012*g2(x,y,0.645,0.590,0.040,0.026);
-
-  return b;
-}
-
-function featurePart(x,y,E){
-  let b=0;
-  const gazeX=Oracle.gazeX, gazeY=Oracle.gazeY;
-  const exL=0.382+gazeX, exR=0.618+gazeX, eyeY=0.456+gazeY;
-
-  function brow(bx){
-    const toC=(0.5-bx)>=0?1:-1;
-    const tIn=clamp((x-bx)*toC/0.082,-1,1);
-    const arch=0.014*Math.cos((x-bx)/0.082*Math.PI*0.5);
-    const innerUp=E.browInner*0.024*clamp(tIn,0,1);
-    const by=0.388-0.030*E.browRaise+arch-innerUp;
-    return g2(x,y,bx,by,0.082,0.011);
-  }
-  b-=0.34*brow(0.382); b-=0.34*brow(0.618);
-
-  function eye(ex){
-    const open=clamp(E.eyeOpenEff,0,1.5);
-    const apH=0.026*open, lower=E.lowerLid*0.012;
-    let sc=g2(x,y,ex,eyeY+lower*0.5,0.060,Math.max(0.004,apH*0.7));
-    sc=Math.pow(clamp(sc,0,1),0.7)*smoothstep(0.04,0.18,open);
-    let e=0.30*sc;
-    const irisVis=smoothstep(0.12,0.35,open);
-    e-=0.30*g2(x,y,ex,eyeY,0.022,Math.min(0.020,apH*0.8))*irisVis;
-    e-=0.58*g2(x,y,ex,eyeY,0.013,Math.min(0.012,apH*0.6))*irisVis;
-    e+=0.85*g2(x,y,ex-0.007,eyeY-0.007,0.005,0.005)*irisVis;
-    const lashTopY=0.438-(apH-0.026)+gazeY;
-    e-=0.48*g2(x,y,ex,lashTopY,0.072,0.0085);
-    e-=0.16*g2(x,y,ex,0.476-lower+gazeY,0.060,0.007);
-    const cs=(ex>0.5?+0.060:-0.060);
-    e-=0.20*g2(x,y,ex+cs,eyeY,0.012,0.012);
-    const closed=1-smoothstep(0.04,0.16,open);
-    e-=0.42*closed*g2(x,y,ex,0.452+gazeY,0.070,0.006);
-    return e;
-  }
-  b+=eye(exL)+eye(exR);
-
-  const mw=0.080*E.mouthWidth, u=(x-0.5)/mw;
-  if(Math.abs(u)<1.4){
-    const fhw=faceHalfWidth(y);
-    const contain=smoothstep(fhw, fhw*0.70, Math.abs(x-0.5));
-    if(contain>0){
-      const curveLift=E.mouthCurve*0.055;
-      const lineY=0.694 - curveLift*(u*u) - E.mouthCurve*0.004;
-      const dy=y-lineY, af=gx(u,0.80);
-      let m=0;
-      m-=0.30*af*gx(dy,0.0058);
-      m-=0.09*gx(y-(lineY-0.010),0.011)*af;
-      m+=0.15*gx(y-(lineY+0.024+E.mouthOpen*0.014),0.014)*gx(u,0.82);
-      if(E.mouthOpen>0){
-        const op=E.mouthOpen;
-        if(E.teeth>0){
-          const tCy=lineY+0.011, tSig=0.0118;
-          const bandV=gx(y-tCy,tSig);
-          const inBand=bandV*gx(u,0.78)*smoothstep(0,0.08,op);
-          m+=0.80*inBand*E.teeth;
-          const sep=Math.pow(0.5+0.5*Math.cos(u*Math.PI/0.20),6);
-          m-=0.22*sep*bandV*gx(u,0.80)*E.teeth;
+      grid = new Array(rows);
+      for (let r = 0; r < rows; r++){
+        grid[r] = new Array(cols);
+        for (let c = 0; c < cols; c++){
+          grid[r][c] = {
+            ch: " ",
+            color: [0,0,0],
+            alpha: 0
+          };
         }
-        const dCy=lineY+0.030+op*0.014, dSig=0.006+op*0.010;
-        m-=(0.16+0.20*op)*gx(y-dCy,dSig)*gx(u,0.70);
       }
-      const cornerY=0.694 - curveLift - E.mouthCurve*0.004;
-      m-=0.14*(g2(x,y,0.5-mw,cornerY,0.0085,0.0085)+g2(x,y,0.5+mw,cornerY,0.0085,0.0085));
-      b+=m*contain;
-    }
-  }
-
-  if(E.cheek>0) b+=0.10*E.cheek*(g2(x,y,0.33,0.560,0.060,0.040)+g2(x,y,0.67,0.560,0.060,0.040));
-  return b;
-}
-
-function eyeColMask(x,y){
-  const eyeY=0.456+Oracle.gazeY, exL=0.382+Oracle.gazeX, exR=0.618+Oracle.gazeX;
-  return clamp(1.2*(g2(x,y,exL,eyeY,0.052,0.034)+g2(x,y,exR,eyeY,0.052,0.034)),0,1);
-}
-function eyeGlowRing(x,y){
-  const eyeY=0.456+Oracle.gazeY, exL=0.382+Oracle.gazeX, exR=0.618+Oracle.gazeX;
-  const wide=g2(x,y,exL,eyeY,0.050,0.032)+g2(x,y,exR,eyeY,0.050,0.032);
-  const pup=g2(x,y,exL,eyeY,0.013,0.012)+g2(x,y,exR,eyeY,0.013,0.012);
-  return clamp(wide-1.5*pup,0,1);
-}
-
-/* ===================== HAIR ===================== */
-
-function hairOuter(y,side,t){
-  const pts=[[0.02,0.075],[0.10,0.185],[0.20,0.290],[0.33,0.345],[0.50,0.375],
-             [0.66,0.400],[0.82,0.402],[0.95,0.372],[1.05,0.305],[1.12,0.200]];
-  let base=interp(pts,y); if(base<=0)return 0;
-  const growth=smoothstep(0.12,0.92,y);
-  const dreamWarp=Oracle.dreaming*0.018*Math.sin(y*15.0 + t*0.00027 + side);
-  const wave=0.034*growth*Math.sin(y*5.0 - t*0.00060 + (side>0?0.0:1.3));
-  const curl=0.020*growth*Math.sin(y*11.0 + (side>0?0.5:2.0) + t*0.00040);
-  return base+wave+curl+dreamWarp;
-}
-function hairInner(y){
-  const fhw=faceHalfWidth(y);
-  if(y<0.31){const open=smoothstep(0.12,0.30,y);return fhw*open;}
-  if(fhw>1e-4)return fhw*0.97+0.010;
-  return 0.105;
-}
-function hairLum(x,y,t){
-  const side=(x>=0.5)?1:-1, dxc=Math.abs(x-0.5);
-  const out=hairOuter(y,side,t); if(out<=1e-4)return 0;
-  const inn=hairInner(y);
-  if(dxc<=inn||dxc>=out+0.025)return 0;
-  const span=Math.max(out-inn,1e-3), tin=(dxc-inn)/span;
-  let edge=smoothstep(1.06,0.80,tin)*smoothstep(-0.08,0.14,tin);
-  edge*=smoothstep(0.00,0.06,y)*smoothstep(1.16,0.96,y);
-  if(edge<=0)return 0;
-  const growth=smoothstep(0.06,0.85,y), phase=side*0.9;
-  const lat=(0.040*Math.sin(y*5.0 + t*0.00060*side + phase)
-            +0.020*Math.sin(y*10.5 + 1.7*phase + t*0.00035)
-            +0.012*growth*Math.sin(y*19.0 + phase))*growth;
-  const v=dxc-lat, F=24.0 + Oracle.dreaming*5.0;
-  let strand=Math.pow(0.5+0.5*Math.cos(v*F*Math.PI),1.15);
-  const lenShade=0.62+0.34*smoothstep(0.10,0.45,y)-0.22*smoothstep(0.86,1.14,y);
-  let b=edge*(0.32+0.40*strand)*lenShade;
-  const sheen=Math.pow(0.5+0.5*Math.cos(v*F*0.5*Math.PI + y*4.0 + phase),7.0);
-  b+=edge*0.26*sheen*smoothstep(0.18,0.5,y)*lenShade;
-  b+=edge*Oracle.presence*0.06;
-  return clamp(b,0,1);
-}
-
-function warmthAt(x,y){const axis=x+0.13*(y-0.5);return smoothstep(0.66,0.30,axis);}
-
-function hsv2rgb(h,s,v){
-  h=((h%360)+360)%360;const c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c;
-  let r=0,g=0,b=0;
-  if(h<60){r=c;g=x;}else if(h<120){r=x;g=c;}else if(h<180){g=c;b=x;}
-  else if(h<240){g=x;b=c;}else if(h<300){r=x;b=c;}else{r=c;b=x;}
-  return [(r+m)*255,(g+m)*255,(b+m)*255];
-}
-
-const CHARS=" .'`^\",:;Il!i~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@";
-const RUNE="∴∵⌁⌬⌖⌗⌑◇◆◈◌◍◎◉◦✶✧✦✹✺✷";
-const NC=CHARS.length;
-
-const faceCanvas=document.getElementById('face');
-const fctx=faceCanvas.getContext('2d');
-const bgCanvas=document.getElementById('bg');
-const bgctx=bgCanvas.getContext('2d');
-
-let DPR=1,SIZE=0,cellW=0,cellH=0,cols=0,rows=0,fontPx=0;
-let staticLum=null,dirArr=null,hueArr=null,teethArr=null,cellPx=null;
-let bgGlyphs=[],stars=[],particles=[];
-let lastT=performance.now();
-
-function hash(i,j){let h=(i*374761393+j*668265263)>>>0;h=(h^(h>>>13))*1274126177>>>0;return (h>>>0)/4294967295;}
-
-function setup(){
-  DPR=Math.min(window.devicePixelRatio||1,2);
-  const vw=window.innerWidth, vh=window.innerHeight;
-  SIZE=Math.min(vw*0.96, vh*0.96, 820);
-
-  // Small upward bias on phones with browser chrome; keeps face visually centered.
-  const topBias = vh > vw ? -Math.min(vh*0.03, 28) : 0;
-
-  fontPx=Math.max(7,Math.round(SIZE/92));
-  fctx.font=`${fontPx}px "Share Tech Mono", monospace`;
-  const charW=fctx.measureText('M').width||fontPx*0.6;
-  cellW=charW; cellH=fontPx;
-  cols=Math.ceil(SIZE/cellW); rows=Math.ceil(SIZE/cellH);
-
-  for(const canvas of [faceCanvas,bgCanvas]){
-    canvas.width=Math.round(SIZE*DPR);
-    canvas.height=Math.round(SIZE*DPR);
-    canvas.style.width=SIZE+'px';
-    canvas.style.height=SIZE+'px';
-    canvas.style.transform=`translate(-50%, calc(-50% + ${topBias}px))`;
-  }
-
-  fctx.setTransform(DPR,0,0,DPR,0,0);
-  bgctx.setTransform(DPR,0,0,DPR,0,0);
-  fctx.textBaseline='top';
-  bgctx.textBaseline='top';
-  fctx.font=`${fontPx}px "Share Tech Mono", monospace`;
-  bgctx.font=`${fontPx}px "Share Tech Mono", monospace`;
-
-  const NN=cols*rows;
-  staticLum=new Float32Array(NN);
-  dirArr=new Float32Array(NN);
-  hueArr=new Float32Array(NN);
-  teethArr=new Float32Array(NN);
-  cellPx=new Array(NN);
-
-  for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
-    const idx=j*cols+i, px=i*cellW, py=j*cellH;
-    const fx=(px+cellW*0.5)/SIZE, fy=(py+cellH*0.5)/SIZE;
-    staticLum[idx]=(staticPart(fx,fy)+staticPart(fx,(py+cellH*0.25)/SIZE)+staticPart(fx,(py+cellH*0.75)/SIZE))/3;
-    dirArr[idx]=0.82+0.18*smoothstep(0.92,0.16,fx+0.12*(fy-0.5));
-    hueArr[idx]=28-146*(1-warmthAt(fx,fy));
-    teethArr[idx]=clamp(g2(fx,fy,0.500,0.700,0.100,0.034)*1.9,0,1);
-    cellPx[idx]={px,py,fx,fy};
-  }
-
-  bgGlyphs=[];
-  const target=Math.min(900,Math.round(cols*rows*0.050));
-  let tries=0;
-  while(bgGlyphs.length<target && tries<target*8){
-    tries++;
-    const gxr=Math.random(), gyr=Math.random();
-    const dxc=(gxr-0.48), dyc=(gyr-0.5);
-    const near=Math.exp(-((dxc*dxc)/0.10 + (dyc*dyc)/0.18));
-    if(Math.random()>near*0.96+0.05) continue;
-    const source = Math.random()<0.16 ? RUNE : CHARS;
-    bgGlyphs.push({
-      x:gxr,y:gyr,
-      ch:source[(Math.random()*source.length)|0],
-      lum:0.10+Math.random()*0.15+near*0.05,
-      hue:28-146*(1-warmthAt(gxr,gyr)),
-      sp:Math.random()*1.4+0.3,
-      ph:Math.random()*6.28
-    });
-  }
-
-  stars=[];
-  for(let i=0;i<115;i++){
-    stars.push({x:Math.random(),y:Math.random(),r:Math.random()*1.1+0.2,base:Math.random()*0.4+0.1,sp:Math.random()*1.6+0.4,ph:Math.random()*6.28});
-  }
-
-  particles=[];
-}
-
-function drawBG(t){
-  const W=SIZE,H=SIZE;
-  bgctx.clearRect(0,0,W,H);
-
-  let g=bgctx.createRadialGradient(W*0.5,H*0.46,0,W*0.5,H*0.5,W*0.62);
-  g.addColorStop(0,`rgb(${10+(Oracle.presence*10)|0},${7+(Oracle.dreaming*8)|0},${22+(Oracle.wonder*12)|0})`);
-  g.addColorStop(1,'#030208');
-  bgctx.fillStyle=g;
-  bgctx.fillRect(0,0,W,H);
-
-  const pulse=0.5+0.5*Math.sin(t*0.0007);
-  const eventPulse=Oracle.event?Math.sin(clamp(Oracle.eventAge/Oracle.eventLength,0,1)*Math.PI):0;
-
-  bgctx.globalCompositeOperation='lighter';
-
-  let warmG=bgctx.createRadialGradient(W*0.36,H*0.42,0,W*0.40,H*0.46,W*0.34);
-  warmG.addColorStop(0,`rgba(220,90,40,${0.11+0.05*pulse+0.10*eventPulse})`);
-  warmG.addColorStop(1,'rgba(20,8,6,0)');
-  bgctx.fillStyle=warmG;
-  bgctx.fillRect(0,0,W,H);
-
-  let coolG=bgctx.createRadialGradient(W*0.62,H*0.5,0,W*0.60,H*0.5,W*0.36);
-  coolG.addColorStop(0,`rgba(70,70,210,${0.10+0.05*pulse+0.08*Oracle.dreaming})`);
-  coolG.addColorStop(1,'rgba(8,8,30,0)');
-  bgctx.fillStyle=coolG;
-  bgctx.fillRect(0,0,W,H);
-
-  for(const s of stars){
-    const a=s.base*(0.4+0.6*Math.sin(t*0.001*s.sp+s.ph));
-    bgctx.fillStyle=`rgba(200,210,255,${Math.max(0,a)})`;
-    bgctx.fillRect(s.x*W,s.y*H,s.r,s.r);
-  }
-
-  bgctx.globalCompositeOperation='source-over';
-
-  for(const gl of bgGlyphs){
-    const tw=0.6+0.4*Math.sin(t*0.001*gl.sp+gl.ph);
-    const v=gl.lum*tw*(0.9+Oracle.presence*0.55);
-    if(v<0.03) continue;
-    const hue=gl.hue + Oracle.dreaming*70*Math.sin(gl.ph+t*0.0002);
-    const rgb=hsv2rgb(hue,0.8,Math.pow(v,0.9));
-    bgctx.fillStyle=`rgb(${rgb[0]|0},${rgb[1]|0},${rgb[2]|0})`;
-    bgctx.fillText(gl.ch, gl.x*W, gl.y*H);
-  }
-}
-
-function spawnParticles(){
-  if(particles.length>96) return;
-  const count = Oracle.event ? 5 : (Math.random()<0.42+Oracle.presence*0.25 ? 2 : 1);
-  for(let k=0;k<count;k++){
-    const ang=Math.random()*6.283, rad=0.28+Math.random()*0.08;
-    const fx=0.5+Math.cos(ang)*rad*0.95, fy=0.5+Math.sin(ang)*rad*1.05;
-    if(fy<0.05||fy>1.08) continue;
-    particles.push({
-      x:fx,y:fy,
-      vx:Math.cos(ang)*0.00020+(Math.random()-0.5)*0.00010,
-      vy:Math.sin(ang)*0.00016-0.00024,
-      hue:28-146*(1-warmthAt(fx,fy))+Oracle.dreaming*45,
-      life:0,
-      max:1500+Math.random()*1700,
-      ch: Math.random()<0.20 ? RUNE[(Math.random()*RUNE.length)|0] : CHARS[8+((Math.random()*(NC-10))|0)]
-    });
-  }
-}
-
-function shadowField(x,y,t){
-  const s = Oracle.shadowPresence;
-  if(s <= 0.003) return 0;
-
-  const sx = Oracle.shadowX + 0.018*noise(Oracle.age*0.21);
-  const sy = Oracle.shadowY + 0.012*noise(Oracle.age*0.17 + 4);
-  const drift = 0.008*Math.sin(t*0.0007 + y*8);
-  const xx = x - drift;
-
-  const skull = 0.050*g2(xx,y,sx,sy+0.08,0.145,0.235);
-  const eyeL = 0.34*g2(xx,y,sx-0.055,sy,0.022,0.018);
-  const eyeR = 0.26*g2(xx,y,sx+0.055,sy+0.004,0.024,0.018);
-  const seam = 0.12*g2(xx,y,sx,sy+0.125,0.075,0.012);
-  const brow = 0.10*g2(xx,y,sx,sy-0.040,0.105,0.014);
-
-  return s * clamp(skull + eyeL + eyeR + seam + brow, 0, 0.62);
-}
-
-function drawDreamLayer(t, reduce){
-  const strength = clamp(Oracle.dreaming*0.85 + Oracle.event*0.25 + Oracle.shadowPresence*0.45 - 0.18, 0, 1);
-  if(strength <= 0.01) return;
-
-  const coarse = fontPx * (1.78 + Oracle.dreaming*0.70);
-  const rowH = coarse * 1.06;
-  const colW = coarse * 0.82;
-  const offX = reduce ? 0 : Math.sin(t*0.00019 + Oracle.mode)*colW*1.8;
-  const offY = reduce ? 0 : Math.cos(t*0.00015 + Oracle.mode*2)*rowH*1.1;
-
-  fctx.save();
-  fctx.globalCompositeOperation = 'lighter';
-  fctx.font = `${coarse}px "Share Tech Mono", monospace`;
-  fctx.textBaseline = 'top';
-
-  for(let y=-rowH; y<SIZE+rowH; y+=rowH){
-    for(let x=-colW; x<SIZE+colW; x+=colW){
-      const fx=(x+offX)/SIZE, fy=(y+offY)/SIZE;
-      const cx=fx-0.5, cy=fy-0.50;
-      const field=Math.exp(-((cx*cx)/0.16 + (cy*cy)/0.22));
-      const wave=0.5+0.5*Math.sin(t*0.00075 + fx*17.0 - fy*11.0 + Oracle.mode*1.7);
-      const gate=hash((x/colW)|0, (y/rowH)|0);
-      const a=strength*field*(0.05+0.20*wave);
-      if(a < 0.035 || gate < 0.58) continue;
-
-      const set = gate > 0.86 ? RUNE : CHARS;
-      const ch = set[((wave*(set.length-1))|0) % set.length];
-      const hue = 204 + 92*Math.sin(t*0.0002 + fx*3 + fy*5);
-      fctx.fillStyle = `hsla(${hue}, 92%, 72%, ${a})`;
-      fctx.fillText(ch, x+offX, y+offY);
-    }
-  }
-
-  fctx.restore();
-}
-
-function render(t){
-  const W=SIZE,H=SIZE;
-  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const dt=Math.min(0.05,(t-lastT)/1000);
-  lastT=t;
-
-  evolveOracle(dt, reduce);
-
-  const tt=reduce?0:t;
-  drawBG(tt);
-
-  const lx=0.46+0.16*Math.cos(tt*0.0006)+Oracle.gazeX*0.6;
-  const ly=0.45+0.12*Math.sin(tt*0.00078)+Oracle.gazeY*0.4;
-  const breathe=0.94+0.045*Math.sin(tt*0.0011)+Oracle.presence*0.035;
-  const E=Oracle.expr;
-  const eyeOpenNow=clamp(E.eyeOpenEff,0,1.5);
-  const eyeFade=smoothstep(0.06,0.34,eyeOpenNow);
-  const eventPulse=Oracle.event?Math.sin(clamp(Oracle.eventAge/Oracle.eventLength,0,1)*Math.PI):0;
-
-  fctx.clearRect(0,0,W,H);
-  fctx.textBaseline='top';
-  fctx.font=`${fontPx}px "Share Tech Mono", monospace`;
-
-  for(let idx=0;idx<staticLum.length;idx++){
-    const cp=cellPx[idx];
-
-    let feat=0;
-    if(cp.fx>=0.25&&cp.fx<=0.75&&cp.fy>=0.32&&cp.fy<=0.79) feat=featurePart(cp.fx,cp.fy,E);
-
-    let faceB=clamp((staticLum[idx]+feat)*dirArr[idx],0,1);
-    const hairB=hairLum(cp.fx,cp.fy,tt)*0.93;
-    const shadowB = shadowField(cp.fx, cp.fy, tt);
-    let baseB=faceB>hairB?faceB:hairB;
-    baseB = Math.max(baseB, shadowB);
-
-    const eMask=eyeColMask(cp.fx,cp.fy);
-    if(baseB<0.055 && eMask<0.05) continue;
-
-    const dxl=(cp.fx-lx)/0.20, dyl=(cp.fy-ly)/0.20;
-    const sweep=0.16*Math.exp(-0.5*(dxl*dxl+dyl*dyl));
-    const i=idx%cols, j=(idx/cols)|0;
-
-    const micro = reduce?0:(baseB*0.09*Math.sin(tt*0.004 + hash(i,j)*6.283));
-    const dream = Oracle.dreaming*0.035*Math.sin(tt*0.0016 + cp.fx*18 + cp.fy*31);
-    const rupture = eventPulse*0.10*Math.sin(tt*0.016 + j*0.37);
-
-    let lum=clamp(baseB*breathe+sweep+micro+dream+rupture,0,1);
-    const eMaskEff=eMask*eyeFade;
-
-    if(lum<0.05 && eMaskEff<0.05) continue;
-
-    const V=Math.pow(lum,0.85);
-    let sat=0.90-0.55*smoothstep(0.62,1.0,lum);
-    sat*=smoothstep(0.02,0.14,lum);
-
-    let hue=hueArr[idx] + Oracle.dreaming*38*Math.sin(cp.fy*5 + tt*0.0003);
-    const tCol=hsv2rgb(hue,sat,V);
-    let r=tCol[0],g=tCol[1],bl=tCol[2];
-
-    if(shadowB > 0.018){
-      const shCol=hsv2rgb(255+Oracle.dreaming*25,0.76,Math.pow(clamp(shadowB*2.0,0,1),0.72));
-      const shBlend=clamp(shadowB*2.6,0,0.55);
-      r+=(shCol[0]-r)*shBlend; g+=(shCol[1]-g)*shBlend; bl+=(shCol[2]-bl)*shBlend;
     }
 
-    if(eMaskEff>0.02){
-      const ring=eyeGlowRing(cp.fx,cp.fy);
-      const iceLum=clamp(lum+0.30*ring+0.18*Oracle.presence,0,1);
-      let iceSat=clamp(0.62-0.5*smoothstep(0.72,1.0,iceLum),0,0.7);
-      const iCol=hsv2rgb(199+Oracle.dreaming*28,iceSat,Math.pow(iceLum,0.78));
-      r+=(iCol[0]-r)*eMaskEff; g+=(iCol[1]-g)*eMaskEff; bl+=(iCol[2]-bl)*eMaskEff;
+    function getCellData(c, r, t){
+      const u = (c + 0.5) / cols;
+      const v = (r + 0.5) / rows;
+
+      const breath = 0.93 + 0.07 * Math.sin(t * 1.2);
+      const blinkAmt = getBlinkAmount(t);
+
+      // ---------- Basis face volumes ----------
+      const faceMask = softEllipse(u, v, 0.5, 0.49, 0.145, 0.255, 0.80, 1.0);
+
+      // Grotere schaal voor haarmassa
+      let hairShell = softEllipse(u, v, 0.5, 0.505, 0.23, 0.395, 0.82, 1.0);
+
+      // Haar tot hals: begrens onderkant subtiel, niet te lang
+      const neckCut = 1 - smoothstep(0.84, 0.96, v);
+      hairShell *= (0.72 + 0.28 * neckCut);
+
+      const hairNoise = noise(c * 0.11, r * 0.08 - t * 0.18);
+      let hairMask = Math.max(0, hairShell - faceMask * 0.92);
+      hairMask *= 0.84 + 0.30 * hairNoise;
+
+      // Schouders / nek heel subtiel
+      const neck = softEllipse(u, v, 0.5, 0.79, 0.06, 0.08, 0.55, 1.0) * 0.25;
+      const shoulderL = softEllipse(u, v, 0.42, 0.89, 0.10, 0.07, 0.5, 1.0) * 0.12;
+      const shoulderR = softEllipse(u, v, 0.58, 0.89, 0.10, 0.07, 0.5, 1.0) * 0.12;
+
+      // ---------- Gezichtsshading ----------
+      const faceCore   = softEllipse(u, v, 0.5, 0.51, 0.11, 0.18, 0.0, 1.0) * 0.44;
+      const forehead   = softEllipse(u, v, 0.5, 0.33, 0.10, 0.08, 0.0, 1.0) * 0.20;
+      const cheeks     = (
+        softEllipse(u, v, 0.43, 0.57, 0.055, 0.07, 0.0, 1.0) +
+        softEllipse(u, v, 0.57, 0.57, 0.055, 0.07, 0.0, 1.0)
+      ) * 0.18;
+      const chin       = softEllipse(u, v, 0.5, 0.72, 0.05, 0.05, 0.0, 1.0) * 0.16;
+      const jawShadow  = softEllipse(u, v, 0.5, 0.67, 0.13, 0.10, 0.0, 1.0) * 0.08;
+
+      // ---------- Ogen ----------
+      const eyeHeight = mix(0.009, 0.0018, blinkAmt);
+      const eyeY = 0.455;
+
+      // Sadness: buitenste hoeken iets lager / zwaarder
+      const leftUpperLid  = segGlow(u, v, 0.372, eyeY + 0.006 + CONFIG.eyeSadness * 0.004, 0.446, eyeY - 0.002, 0.0048);
+      const rightUpperLid = segGlow(u, v, 0.554, eyeY - 0.002, 0.628, eyeY + 0.006 + CONFIG.eyeSadness * 0.004, 0.0048);
+
+      const leftLowerLid  = segGlow(u, v, 0.380, 0.472, 0.444, 0.468, 0.004);
+      const rightLowerLid = segGlow(u, v, 0.556, 0.468, 0.620, 0.472, 0.004);
+
+      const leftEyeWhite  = softEllipse(u, v, 0.41, eyeY, 0.030, eyeHeight, 0.6, 1.0) * (1 - blinkAmt * 0.92);
+      const rightEyeWhite = softEllipse(u, v, 0.59, eyeY, 0.030, eyeHeight, 0.6, 1.0) * (1 - blinkAmt * 0.92);
+
+      const leftIris  = softEllipse(u, v, 0.41, eyeY + 0.001, 0.011, 0.011, 0.0, 1.0) * (1 - blinkAmt * 0.95);
+      const rightIris = softEllipse(u, v, 0.59, eyeY + 0.001, 0.011, 0.011, 0.0, 1.0) * (1 - blinkAmt * 0.95);
+
+      const eyeShadow = (
+        softEllipse(u, v, 0.41, 0.448, 0.055, 0.030, 0.0, 1.0) +
+        softEllipse(u, v, 0.59, 0.448, 0.055, 0.030, 0.0, 1.0)
+      ) * 0.18;
+
+      // ---------- Wenkbrauwen ----------
+      const leftBrow  = segGlow(u, v, 0.365, 0.415, 0.452, 0.402, 0.0065);
+      const rightBrow = segGlow(u, v, 0.548, 0.402, 0.635, 0.415, 0.0065);
+
+      // ---------- Neus ----------
+      const noseBridge = segGlow(u, v, 0.5, 0.42, 0.5, 0.59, 0.006) * 0.42;
+      const noseTip = softEllipse(u, v, 0.5, 0.60, 0.020, 0.016, 0.0, 1.0) * 0.20;
+      const nostrilL = softEllipse(u, v, 0.486, 0.605, 0.008, 0.005, 0.0, 1.0) * 0.17;
+      const nostrilR = softEllipse(u, v, 0.514, 0.605, 0.008, 0.005, 0.0, 1.0) * 0.17;
+
+      // ---------- Mond ----------
+      const mouthUpperL = segGlow(u, v, 0.456, 0.664, 0.500, 0.654, 0.0045);
+      const mouthUpperR = segGlow(u, v, 0.500, 0.654, 0.544, 0.664, 0.0045);
+      const mouthLower  = segGlow(u, v, 0.470, 0.680, 0.530, 0.680, 0.0048) * 0.72;
+      const philtrum    = segGlow(u, v, 0.5, 0.620, 0.5, 0.645, 0.004) * 0.10;
+
+      // ---------- Dichtheid opbouwen ----------
+      let density = 0;
+
+      density += faceMask * 0.10;
+      density += faceCore;
+      density += forehead;
+      density += cheeks;
+      density += chin;
+      density += jawShadow;
+
+      density += hairMask * 0.33;
+      density += neck;
+      density += shoulderL + shoulderR;
+
+      density += eyeShadow;
+      density += (leftUpperLid + rightUpperLid) * 0.44;
+      density += (leftLowerLid + rightLowerLid) * 0.22;
+      density += (leftBrow + rightBrow) * 0.42;
+
+      density += (leftEyeWhite + rightEyeWhite) * 0.24;
+      density += (leftIris + rightIris) * 0.46;
+
+      density += noseBridge + noseTip + nostrilL + nostrilR;
+      density += (mouthUpperL + mouthUpperR) * 0.25;
+      density += mouthLower * 0.18;
+      density += philtrum;
+
+      // subtiele levende variatie
+      density *= breath;
+      density *= 0.94 + 0.06 * Math.sin(r * 0.62 + t * 18);
+
+      const grain = noise(c * 0.19 + t * 0.30, r * 0.17 - t * 0.08) - 0.5;
+      density += grain * 0.06;
+
+      density = clamp(density, 0, 1);
+
+      // ---------- Achtergrond ambient ----------
+      let ambient = 0;
+      if (density < 0.05){
+        const n = noise(c * 0.18 + 70.1, r * 0.21 + 31.7 + t * 0.08);
+        if (n > 1 - CONFIG.ambientDensity * 10){
+          ambient = (n - (1 - CONFIG.ambientDensity * 10)) * 12;
+          ambient = clamp(ambient * 0.45, 0, 0.18);
+        }
+      }
+
+      const finalDensity = Math.max(density, ambient);
+
+      // ---------- Kleur ----------
+      let color = triColor(u);
+
+      // ietsepietsje helderder in gezicht en ogen
+      const glowBoost = clamp(
+        finalDensity * 0.95 +
+        (leftIris + rightIris) * 0.65 +
+        (leftEyeWhite + rightEyeWhite) * 0.18,
+        0, 1.6
+      );
+
+      // Eyes net iets kouder/lichter
+      if ((leftIris + rightIris) > 0.04){
+        color = mixColor(color, [180, 170, 255], 0.28);
+      }
+
+      // Haar iets donkerder / zachter
+      if (hairMask > faceMask){
+        color = mixColor(color, [38, 36, 72], 0.18);
+      }
+
+      const brightness = clamp(0.10 + glowBoost, 0, 1.35);
+      color = [
+        clamp(color[0] * brightness, 0, 255),
+        clamp(color[1] * brightness, 0, 255),
+        clamp(color[2] * brightness, 0, 255)
+      ];
+
+      // ---------- ASCII teken kiezen ----------
+      let ch = " ";
+      let alpha = 0;
+
+      if (finalDensity > 0.02){
+        const ramp = CONFIG.ramp;
+        let idx = Math.floor(finalDensity * (ramp.length - 1));
+
+        // kleine tekenjitter
+        idx += Math.floor((noise(c * 0.41 + 17.3, r * 0.39 + t * 0.55) - 0.5) * 2);
+
+        idx = Math.max(0, Math.min(ramp.length - 1, idx));
+        ch = ramp[idx];
+        alpha = clamp(0.20 + finalDensity * 1.10, 0, 1);
+      }
+
+      // ambient losse tekens in de background
+      if (density < 0.02 && ambient > 0.01){
+        const chars = CONFIG.ambientChars;
+        const idx = Math.floor(noise(c * 0.72, r * 0.49 + t * 0.4) * chars.length) % chars.length;
+        ch = chars[idx];
+        alpha = clamp(ambient * 1.5, 0.05, 0.22);
+      }
+
+      return { ch, color, alpha };
     }
 
-    const tMask=teethArr[idx];
-    if(tMask>0.04 && E.teeth>0 && lum>0.43){
-      const tBlend=tMask*E.teeth*smoothstep(0.43,0.65,lum);
-      const tcCol=hsv2rgb(45,0.05,Math.min(1,Math.pow(lum,0.7)+0.10));
-      r+=(tcCol[0]-r)*tBlend; g+=(tcCol[1]-g)*tBlend; bl+=(tcCol[2]-bl)*tBlend;
+    function buildFrame(t){
+      updateGlitch(t);
+
+      for (let r = 0; r < rows; r++){
+        for (let c = 0; c < cols; c++){
+          grid[r][c] = getCellData(c, r, t);
+        }
+      }
     }
 
-    const useLum=Math.max(lum, eMaskEff*clamp(lum+0.30*eyeGlowRing(cp.fx,cp.fy),0,1));
-    const chSet = (Oracle.dreaming>0.60 && hash(i,j+17)>0.91) ? RUNE : CHARS;
-    const ch=chSet[clamp((useLum*(chSet.length-1))|0,0,chSet.length-1)];
+    function renderFrame(t){
+      ctx.fillStyle = `rgb(${CONFIG.backgroundColor[0]}, ${CONFIG.backgroundColor[1]}, ${CONFIG.backgroundColor[2]})`;
+      ctx.fillRect(0, 0, width, height);
 
-    fctx.fillStyle=`rgb(${r|0},${g|0},${bl|0})`;
-    fctx.fillText(ch,cp.px,cp.py);
-  }
+      ctx.font = `${CONFIG.fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace`;
+      ctx.textBaseline = "top";
+      ctx.textAlign = "left";
 
-  drawDreamLayer(tt, reduce);
+      for (let r = 0; r < rows; r++){
+        const y = r * cellH;
 
-  if(!reduce){
-    spawnParticles();
-    for(let p of particles){
-      p.life+=16;
-      p.x+=p.vx*16;
-      p.y+=p.vy*16;
-      p.vy+=0.0000009*16;
+        let rowShift = 0;
+        if (glitch.active && r >= glitch.row && r < glitch.row + glitch.height){
+          rowShift = glitch.shift;
+        }
+
+        for (let c = 0; c < cols; c++){
+          const cell = grid[r][c];
+          if (cell.ch === " " || cell.alpha <= 0) continue;
+
+          const x = c * cellW + rowShift;
+
+          ctx.fillStyle = `rgba(${cell.color[0]}, ${cell.color[1]}, ${cell.color[2]}, ${cell.alpha})`;
+          ctx.fillText(cell.ch, x, y);
+        }
+      }
+
+      // scanlines
+      ctx.fillStyle = "rgba(0, 0, 0, 0.13)";
+      for (let y = 0; y < height; y += 4){
+        ctx.fillRect(0, y, width, 1);
+      }
+
+      // heel subtiele vignette
+      const grad = ctx.createRadialGradient(
+        width * 0.5, height * 0.48, Math.min(width, height) * 0.12,
+        width * 0.5, height * 0.5, Math.max(width, height) * 0.58
+      );
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(1, "rgba(0,0,0,0.42)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
     }
-    particles=particles.filter(p=>p.life<p.max&&p.y>0.02&&p.y<1.10);
-    for(const p of particles){
-      const lifeT=p.life/p.max, a=Math.sin((1-lifeT)*Math.PI)*0.85;
-      if(a<=0.02) continue;
-      const lum=0.55*a+0.25;
-      let sat=0.85-0.5*smoothstep(0.7,1.0,lum);
-      const rgb=hsv2rgb(p.hue,sat,Math.pow(lum,0.85));
-      const ch=p.ch || CHARS[clamp((lum*(NC-1))|0,0,NC-1)];
-      fctx.globalAlpha=a;
-      fctx.fillStyle=`rgb(${rgb[0]|0},${rgb[1]|0},${rgb[2]|0})`;
-      fctx.fillText(ch,p.x*SIZE,p.y*SIZE);
+
+    function animate(now){
+      const t = now * 0.001;
+      buildFrame(t);
+      renderFrame(t);
+      requestAnimationFrame(animate);
     }
-    fctx.globalAlpha=1;
-  }
 
-  requestAnimationFrame(render);
-}
+    // Handig voor debug / “echte data” export
+    window.exportAsciiFrame = function(){
+      return grid.map(row => row.map(cell => cell.ch).join("")).join("\n");
+    };
 
-window.addEventListener('resize',setup,{passive:true});
-setup();
-requestAnimationFrame(render);
-</script>
+    window.exportAsciiData = function(){
+      return grid;
+    };
+
+    window.addEventListener("resize", resize);
+
+    resize();
+    requestAnimationFrame(animate);
+  </script>
 </body>
 </html>
