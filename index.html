@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Effulgence — Autonomous Cyber Oracle</title>
+<title>Wandering Art — Autonomous Cyber Oracle</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -77,9 +77,12 @@
 <script>
 /*
   Effulgence — Autonomous Cyber Oracle
-  - behoudt de ASCII/gezicht/haar/partikel-DNA van de eerdere versie
+  Wandering Art — Autonomous Cyber Oracle
+  - behoudt de ASCII/gezicht/haar/partikel-DNA
   - verwijdert handmatige controls
   - voegt autonome drift, droomfasen, presence-events en micro-expressies toe
+  - gebruikt meerdere tekstlagen met eigen rastergrootte
+  - laat soms een tweede schaduw-entiteit door het beeld trekken
 */
 
 function clamp(v,a,b){return v<a?a:v>b?b:v;}
@@ -136,6 +139,14 @@ const Oracle = {
   eventAge: 999,
   eventLength: 3.8,
 
+  shadowActive: 0,
+  shadowAge: 999,
+  shadowNext: 42,
+  shadowLength: 7,
+  shadowPresence: 0,
+  shadowX: 0.54,
+  shadowY: 0.47,
+
   expr: {
     browRaise: 0,
     browInner: 0,
@@ -169,6 +180,29 @@ function evolveOracle(dt, reduce){
     Oracle.eventLength = 2.8 + Math.random()*5.5;
   }
   if(Oracle.eventAge > Oracle.eventLength) Oracle.event = 0;
+
+  if(!Oracle.shadowActive && Oracle.shadowAge > Oracle.shadowNext){
+    Oracle.shadowActive = 1;
+    Oracle.shadowAge = 0;
+    Oracle.shadowLength = 5.5 + Math.random()*8.5;
+    Oracle.shadowNext = 35 + Math.random()*115;
+    Oracle.shadowX = 0.50 + (Math.random() < 0.5 ? -1 : 1) * (0.045 + Math.random()*0.045);
+    Oracle.shadowY = 0.43 + Math.random()*0.08;
+  }
+
+  if(Oracle.shadowActive){
+    Oracle.shadowAge += dt;
+    const sp = clamp(Oracle.shadowAge / Oracle.shadowLength, 0, 1);
+    Oracle.shadowPresence = Math.pow(Math.sin(sp*Math.PI), 1.7) * (0.30 + Oracle.dreaming*0.55);
+    if(sp >= 1){
+      Oracle.shadowActive = 0;
+      Oracle.shadowPresence = 0;
+      Oracle.shadowAge = 0;
+    }
+  } else {
+    Oracle.shadowAge += dt;
+    Oracle.shadowPresence = lerp(Oracle.shadowPresence, 0, dt*1.4);
+  }
 
   const t = Oracle.age;
   const m = Oracle.mode;
@@ -240,15 +274,27 @@ function staticPart(x,y){
     b=0.35*edge + 0.055*edge*Math.cos(clamp(t,0,1)*Math.PI*0.5);
   }
 
-  // organic neck and shoulders
-  if(y>0.76){
-    const neckWidth = 0.075 + 0.050*smoothstep(0.76,1.00,y);
-    const neck = 0.24*smoothstep(neckWidth, neckWidth*0.72, dx)*smoothstep(0.76,0.84,y);
-    b=Math.max(b,neck);
-    b=Math.max(b,0.16*g2(x,y,0.34,0.95,0.14,0.08));
-    b=Math.max(b,0.16*g2(x,y,0.66,0.95,0.14,0.08));
-    b+=0.075*g2(x,y,0.50,1.02,0.24,0.12);
-    b-=0.10*g2(x,y,0.50,0.80,0.09,0.025);
+  // vaporous neck: the entity dissolves into an energy field instead of a hard torso block
+  if(y>0.735){
+    const verticalFade = smoothstep(0.735,0.82,y) * smoothstep(1.08,0.82,y);
+    const neckWidth = 0.043 + 0.018*smoothstep(0.74,0.92,y);
+    const neck = 0.085 * smoothstep(neckWidth, neckWidth*0.20, dx) * verticalFade;
+
+    const mist =
+      0.055*g2(x,y,0.50,0.835,0.090,0.050) +
+      0.040*g2(x,y,0.50,0.910,0.155,0.085) +
+      0.026*g2(x,y,0.50,1.000,0.230,0.130);
+
+    const shoulderHaze =
+      0.026*g2(x,y,0.34,0.955,0.160,0.085) +
+      0.026*g2(x,y,0.66,0.955,0.160,0.085);
+
+    b = Math.max(b, neck + mist);
+    b += shoulderHaze * smoothstep(0.78,0.96,y);
+
+    // hollow out the old rectangular core and let the lower part fall apart
+    b -= 0.060*g2(x,y,0.50,0.850,0.105,0.050);
+    b -= 0.045*g2(x,y,0.50,0.965,0.180,0.130);
   }
 
   b+=0.24*g2(x,y,cx,0.285,0.120,0.070);
@@ -565,6 +611,60 @@ function spawnParticles(){
   }
 }
 
+function shadowField(x,y,t){
+  const s = Oracle.shadowPresence;
+  if(s <= 0.003) return 0;
+
+  const sx = Oracle.shadowX + 0.018*noise(Oracle.age*0.21);
+  const sy = Oracle.shadowY + 0.012*noise(Oracle.age*0.17 + 4);
+  const drift = 0.008*Math.sin(t*0.0007 + y*8);
+  const xx = x - drift;
+
+  const skull = 0.050*g2(xx,y,sx,sy+0.08,0.145,0.235);
+  const eyeL = 0.34*g2(xx,y,sx-0.055,sy,0.022,0.018);
+  const eyeR = 0.26*g2(xx,y,sx+0.055,sy+0.004,0.024,0.018);
+  const seam = 0.12*g2(xx,y,sx,sy+0.125,0.075,0.012);
+  const brow = 0.10*g2(xx,y,sx,sy-0.040,0.105,0.014);
+
+  return s * clamp(skull + eyeL + eyeR + seam + brow, 0, 0.62);
+}
+
+function drawDreamLayer(t, reduce){
+  const strength = clamp(Oracle.dreaming*0.85 + Oracle.event*0.25 + Oracle.shadowPresence*0.45 - 0.18, 0, 1);
+  if(strength <= 0.01) return;
+
+  const coarse = fontPx * (1.78 + Oracle.dreaming*0.70);
+  const rowH = coarse * 1.06;
+  const colW = coarse * 0.82;
+  const offX = reduce ? 0 : Math.sin(t*0.00019 + Oracle.mode)*colW*1.8;
+  const offY = reduce ? 0 : Math.cos(t*0.00015 + Oracle.mode*2)*rowH*1.1;
+
+  fctx.save();
+  fctx.globalCompositeOperation = 'lighter';
+  fctx.font = `${coarse}px "Share Tech Mono", monospace`;
+  fctx.textBaseline = 'top';
+
+  for(let y=-rowH; y<SIZE+rowH; y+=rowH){
+    for(let x=-colW; x<SIZE+colW; x+=colW){
+      const fx=(x+offX)/SIZE, fy=(y+offY)/SIZE;
+      const cx=fx-0.5, cy=fy-0.50;
+      const field=Math.exp(-((cx*cx)/0.16 + (cy*cy)/0.22));
+      const wave=0.5+0.5*Math.sin(t*0.00075 + fx*17.0 - fy*11.0 + Oracle.mode*1.7);
+      const gate=hash((x/colW)|0, (y/rowH)|0);
+      const a=strength*field*(0.05+0.20*wave);
+      if(a < 0.035 || gate < 0.58) continue;
+
+      const set = gate > 0.86 ? RUNE : CHARS;
+      const ch = set[((wave*(set.length-1))|0) % set.length];
+      const hue = 204 + 92*Math.sin(t*0.0002 + fx*3 + fy*5);
+      fctx.fillStyle = `hsla(${hue}, 92%, 72%, ${a})`;
+      fctx.fillText(ch, x+offX, y+offY);
+    }
+  }
+
+  fctx.restore();
+}
+
 function render(t){
   const W=SIZE,H=SIZE;
   const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -596,7 +696,9 @@ function render(t){
 
     let faceB=clamp((staticLum[idx]+feat)*dirArr[idx],0,1);
     const hairB=hairLum(cp.fx,cp.fy,tt)*0.93;
+    const shadowB = shadowField(cp.fx, cp.fy, tt);
     let baseB=faceB>hairB?faceB:hairB;
+    baseB = Math.max(baseB, shadowB);
 
     const eMask=eyeColMask(cp.fx,cp.fy);
     if(baseB<0.055 && eMask<0.05) continue;
@@ -622,6 +724,12 @@ function render(t){
     const tCol=hsv2rgb(hue,sat,V);
     let r=tCol[0],g=tCol[1],bl=tCol[2];
 
+    if(shadowB > 0.018){
+      const shCol=hsv2rgb(255+Oracle.dreaming*25,0.76,Math.pow(clamp(shadowB*2.0,0,1),0.72));
+      const shBlend=clamp(shadowB*2.6,0,0.55);
+      r+=(shCol[0]-r)*shBlend; g+=(shCol[1]-g)*shBlend; bl+=(shCol[2]-bl)*shBlend;
+    }
+
     if(eMaskEff>0.02){
       const ring=eyeGlowRing(cp.fx,cp.fy);
       const iceLum=clamp(lum+0.30*ring+0.18*Oracle.presence,0,1);
@@ -644,6 +752,8 @@ function render(t){
     fctx.fillStyle=`rgb(${r|0},${g|0},${bl|0})`;
     fctx.fillText(ch,cp.px,cp.py);
   }
+
+  drawDreamLayer(tt, reduce);
 
   if(!reduce){
     spawnParticles();
