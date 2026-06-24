@@ -536,45 +536,60 @@
     }
 
     function drawMouth(p){
-      const cx = 180;
-      const y = 177;
-      const smile = p.smile;
-      const open = p.open;
-      const w = 29 + Math.abs(smile) * 13 + open * 13;
-      const h = 4 + open * 24;
-      const corner = -smile * 7 + Math.max(0, -smile) * 9;
+  const cx = 180;
+  const y = 171;
+  const smile = p.smile;
+  const open = p.open;
 
-      if (open > .18) {
-        path(C.black, [
-          ['M',cx-w/2,y + corner*.18],
-          ['Q',cx,y-8-smile*2,cx+w/2,y + corner*.18],
-          ['Q',cx+w*.36,y+h,cx,y+h+3+Math.max(0,smile)*2],
-          ['Q',cx-w*.36,y+h,cx-w/2,y + corner*.18]
-        ]);
-        if (open > .38) {
-          path(C.white, [
-            ['M',cx-w*.30,y-1],['Q',cx,y+3,cx+w*.31,y-1],['L',cx+w*.23,y+5],['Q',cx,y+7,cx-w*.25,y+5]
-          ]);
-        } else {
-          line(cx-w*.32,y,cx+w*.28,y+1,2,C.white);
-        }
-        if (smile < -.2) line(cx-w*.38,y+2,cx+w*.38,y+2,2,C.magenta);
-        else rect(cx - 10, y + h - 2, 20, 3, C.magenta);
-      } else {
-        const leftY = y + Math.max(0, -smile) * 7 - Math.max(0, smile) * 4;
-        const midY = y + Math.max(0, -smile) * 2 + Math.max(0, smile) * 4;
-        const rightY = y + Math.max(0, -smile) * 7 - Math.max(0, smile) * 4;
-        ctx.strokeStyle = C.black;
-        ctx.lineWidth = p.anger > .35 ? 4 : 3;
-        ctx.beginPath();
-        ctx.moveTo(cx-w/2, leftY);
-        ctx.quadraticCurveTo(cx, midY, cx+w/2, rightY);
-        ctx.stroke();
-        if (p.anger > .4) line(cx-w/2+4,leftY+3,cx+w/2-3,rightY+3,1,C.red);
-      }
+  const w = 27 + Math.abs(smile) * 11 + open * 8;
+  const h = Math.min(3 + open * 15, 17);
+  const corner = -smile * 5 + Math.max(0, -smile) * 7;
 
-      rect(cx - 25, y - 10, 9, 3, C.cyan4);
+  if (open > .18) {
+    const bottomY = Math.min(y + h + 2 + Math.max(0, smile), 190);
+
+    path(C.black, [
+      ['M',cx-w/2,y + corner*.16],
+      ['Q',cx,y-6-smile*2,cx+w/2,y + corner*.16],
+      ['Q',cx+w*.34,y+h,cx,bottomY],
+      ['Q',cx-w*.34,y+h,cx-w/2,y + corner*.16]
+    ]);
+
+    if (open > .38) {
+      path(C.white, [
+        ['M',cx-w*.28,y-1],
+        ['Q',cx,y+2,cx+w*.29,y-1],
+        ['L',cx+w*.20,y+4],
+        ['Q',cx,y+6,cx-w*.22,y+4]
+      ]);
+    } else {
+      line(cx-w*.30,y,cx+w*.26,y+1,2,C.white);
     }
+
+    if (smile < -.2) {
+      line(cx-w*.34,y+2,cx+w*.34,y+2,2,C.magenta);
+    } else {
+      rect(cx - 9, Math.min(y + h - 2, 186), 18, 3, C.magenta);
+    }
+  } else {
+    const leftY = y + Math.max(0, -smile) * 6 - Math.max(0, smile) * 4;
+    const midY = y + Math.max(0, -smile) * 2 + Math.max(0, smile) * 4;
+    const rightY = y + Math.max(0, -smile) * 6 - Math.max(0, smile) * 4;
+
+    ctx.strokeStyle = C.black;
+    ctx.lineWidth = p.anger > .35 ? 4 : 3;
+    ctx.beginPath();
+    ctx.moveTo(cx-w/2, leftY);
+    ctx.quadraticCurveTo(cx, midY, cx+w/2, rightY);
+    ctx.stroke();
+
+    if (p.anger > .4) {
+      line(cx-w/2+4,leftY+3,cx+w/2-3,rightY+3,1,C.red);
+    }
+  }
+
+  rect(cx - 24, y - 9, 8, 3, C.cyan4);
+}
 
     function drawEffects(p, t){
       if (p.tear > .05) {
