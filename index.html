@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — Pixel Entity</title>
+  <title>Wandering Art — Organic Pixel Entity</title>
   <style>
     :root{
       --bg:#020207;
@@ -89,7 +89,6 @@
     const C = {
       bg: '#020207',
       black: '#000006',
-      ink: '#01020a',
       cyan0: '#063941',
       cyan1: '#087f89',
       cyan2: '#0bb8bd',
@@ -102,29 +101,45 @@
       green1: '#22e64f',
       green2: '#a2ff75',
       magenta: '#ff2bd6',
+      magentaSoft: '#ff7bea',
       red: '#ff3159',
-      amber: '#ffd35d'
+      amber: '#ffd35d',
+      bubble: '#d9fff9'
     };
 
-    const moods = [
-      { name:'neutral',     dwell:[5200, 9200], eye:0.84, smile:0.05, open:0.04, brow:0.05, anger:0.00, sad:0.00, blush:0.00, tear:0.00, gazeX:0.00, gazeY:0.00, tilt:0.00, accent:0.00 },
-      { name:'interested',  dwell:[4200, 7600], eye:0.92, smile:0.12, open:0.06, brow:0.32, anger:0.00, sad:0.00, blush:0.05, tear:0.00, gazeX:0.55, gazeY:-0.15, tilt:-0.045, accent:0.05 },
-      { name:'surprised',   dwell:[2100, 3900], eye:1.24, smile:0.00, open:0.73, brow:0.68, anger:0.00, sad:0.02, blush:0.00, tear:0.00, gazeX:0.00, gazeY:-0.10, tilt:0.018, accent:0.20 },
-      { name:'happy',       dwell:[3600, 7000], eye:0.76, smile:0.67, open:0.14, brow:0.12, anger:0.00, sad:0.00, blush:0.28, tear:0.00, gazeX:-0.12, gazeY:0.00, tilt:0.030, accent:0.14 },
-      { name:'laugh',       dwell:[2400, 4900], eye:0.56, smile:0.94, open:0.86, brow:0.18, anger:0.00, sad:0.00, blush:0.44, tear:0.00, gazeX:0.08, gazeY:-0.10, tilt:0.045, accent:0.18 },
-      { name:'cry',         dwell:[3000, 6200], eye:0.64, smile:-0.56, open:0.27, brow:0.20, anger:0.00, sad:0.82, blush:0.18, tear:1.00, gazeX:-0.30, gazeY:0.44, tilt:-0.025, accent:0.00 },
-      { name:'angry',       dwell:[2400, 5200], eye:0.62, smile:-0.22, open:0.05, brow:-0.08, anger:0.98, sad:0.00, blush:0.00, tear:0.00, gazeX:0.00, gazeY:-0.18, tilt:0.015, accent:0.78 },
-      { name:'shy',         dwell:[3500, 7200], eye:0.59, smile:0.20, open:0.05, brow:0.14, anger:0.00, sad:0.15, blush:0.92, tear:0.00, gazeX:-0.78, gazeY:0.62, tilt:-0.060, accent:0.08 }
-    ];
+    const PROTO = {
+      neutral:    { eye:0.84, smile:0.05, open:0.04, brow:0.05, anger:0.00, sad:0.00, blush:0.00, tear:0.00, gazeX:0.00, gazeY:0.00, accent:0.00 },
+      interested: { eye:0.92, smile:0.12, open:0.06, brow:0.32, anger:0.00, sad:0.00, blush:0.04, tear:0.00, gazeX:0.45, gazeY:-0.10, accent:0.05 },
+      surprised:  { eye:1.24, smile:0.00, open:0.73, brow:0.68, anger:0.00, sad:0.02, blush:0.00, tear:0.00, gazeX:0.00, gazeY:-0.10, accent:0.16 },
+      happy:      { eye:0.76, smile:0.67, open:0.14, brow:0.12, anger:0.00, sad:0.00, blush:0.22, tear:0.00, gazeX:-0.12, gazeY:0.00, accent:0.08 },
+      laugh:      { eye:0.54, smile:0.96, open:0.88, brow:0.18, anger:0.00, sad:0.00, blush:0.36, tear:0.00, gazeX:0.08, gazeY:-0.10, accent:0.12 },
+      cry:        { eye:0.62, smile:-0.58, open:0.25, brow:0.18, anger:0.00, sad:0.88, blush:0.10, tear:1.00, gazeX:-0.28, gazeY:0.42, accent:0.00 },
+      angry:      { eye:0.62, smile:-0.22, open:0.06, brow:-0.08, anger:1.00, sad:0.00, blush:0.00, tear:0.00, gazeX:0.00, gazeY:-0.12, accent:0.40 },
+      shy:        { eye:0.60, smile:0.20, open:0.05, brow:0.14, anger:0.00, sad:0.14, blush:0.88, tear:0.00, gazeX:-0.76, gazeY:0.58, accent:0.04 }
+    };
 
-    let current = moods[0];
-    let previous = moods[0];
-    let target = moods[1];
-    let transitionStart = performance.now();
-    let transitionMs = 1700;
-    let nextMoodAt = performance.now() + 5200;
+    const FEATURE_KEYS = ['eye','smile','open','brow','anger','sad','blush','tear','gazeX','gazeY','accent'];
 
-    let blinkAt = performance.now() + rnd(1200, 4200);
+    const emotion = {
+      valence: 0.06,
+      arousal: 0.36,
+      tension: 0.14,
+      curiosity: 0.52,
+      sadness: 0.08,
+      shyness: 0.10,
+
+      impulseKind: 'neutral',
+      impulseStrength: 0,
+      impulseDecay: 0.985,
+      nextImpulseAt: performance.now() + rnd(8000, 16000)
+    };
+
+    let expr = {...PROTO.neutral};
+    let weights = {
+      neutral:1, interested:0, surprised:0, happy:0, laugh:0, cry:0, angry:0, shy:0
+    };
+
+    let blinkAt = performance.now() + rnd(1800, 5200);
     let blinkUntil = 0;
     let blinkStrength = 0;
 
@@ -132,7 +147,17 @@
     let nextGazeAt = performance.now() + 1200;
 
     let glitchUntil = 0;
-    let glitchAt = performance.now() + rnd(3600, 11000);
+    let glitchAt = performance.now() + rnd(6000, 14000);
+
+    let lastNow = performance.now();
+
+    const stars = Array.from({length: 18}, (_, i) => ({
+      x: Math.floor(hash(i * 91.1) * (W - 12)) + 6,
+      y: Math.floor(hash(i * 41.7) * 170) + 10,
+      phase: hash(i * 17.4) * Math.PI * 2,
+      size: hash(i * 7.3) > 0.72 ? 2 : 1,
+      c: hash(i * 5.1) > 0.5 ? C.white : C.cyan4
+    }));
 
     const bgEvents = {
       star: {
@@ -140,68 +165,369 @@
         x0:0, y0:0, x1:0, y1:0
       },
       rocket: {
-        active:false, start:0, duration:0, nextAt:performance.now() + rnd(7000, 14000),
+        active:false, start:0, duration:0, nextAt:performance.now() + rnd(8000, 15000),
         y:0, fromX:0, toX:0, dir:1
       },
       ufo: {
-        active:false, start:0, duration:0, nextAt:performance.now() + rnd(11000, 22000),
-        y:0, fromX:0, toX:0, dir:-1, bob:0
+        active:false, start:0, duration:0, nextAt:performance.now() + rnd(13000, 23000),
+        y:0, fromX:0, toX:0, dir:1, bob:0
       }
+    };
+
+    const speech = {
+      active:false,
+      start:0,
+      duration:0,
+      nextAt:performance.now() + rnd(4000, 9000),
+      text:'',
+      mood:'neutral',
+      phase:rnd(0, 999),
+      meaningful:false
     };
 
     function rnd(min, max){ return min + Math.random() * (max - min); }
     function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t){ return a + (b - a) * t; }
-    function ease(t){ return t*t*(3-2*t); }
+    function ease(t){ return t * t * (3 - 2 * t); }
+    function damp(current, target, lambda, dt){
+      return lerp(current, target, 1 - Math.exp(-lambda * dt));
+    }
+    function pick(arr){
+      return arr[(Math.random() * arr.length) | 0];
+    }
     function hash(n){
       const v = (Math.sin(n * 127.1 + 311.7) * 43758.5453) % 1;
       return v < 0 ? v + 1 : v;
     }
+    function softstep(x){ return x*x*(3-2*x); }
 
-    function mixMood(a, b, k){
-      const o = { name: b.name };
-      for (const key of ['eye','smile','open','brow','anger','sad','blush','tear','gazeX','gazeY','tilt','accent']) {
-        o[key] = lerp(a[key], b[key], k);
+    function slowNoise(t, a1, f1, a2, f2, off=0){
+      return Math.sin(t * f1 + off) * a1 + Math.sin(t * f2 + off * 1.7) * a2;
+    }
+
+    function spawnImpulse(now){
+      const kinds = ['curious','joy','surprise','sadness','anger','shy'];
+      let kind = pick(kinds);
+
+      if (emotion.valence > 0.28 && Math.random() > 0.45) kind = pick(['joy','curious','shy']);
+      if (emotion.tension > 0.32 && Math.random() > 0.55) kind = pick(['anger','surprise']);
+      if (emotion.sadness > 0.24 && Math.random() > 0.55) kind = pick(['sadness','shy']);
+
+      emotion.impulseKind = kind;
+      emotion.impulseStrength = rnd(0.45, 1.0);
+      emotion.impulseDecay = rnd(0.982, 0.991);
+      emotion.nextImpulseAt = now + rnd(10000, 22000);
+    }
+
+    function updateEmotion(now, dt){
+      const t = now * 0.001;
+
+      const targetValence   = clamp(slowNoise(t, 0.18, 0.13, 0.12, 0.043, 0.8), -0.48, 0.60);
+      const targetArousal   = clamp(0.36 + slowNoise(t, 0.10, 0.09, 0.08, 0.027, 1.6), 0.18, 0.92);
+      const targetTension   = clamp(0.16 + slowNoise(t, 0.10, 0.11, 0.05, 0.031, 2.1), 0.04, 0.84);
+      const targetCuriosity = clamp(0.48 + slowNoise(t, 0.12, 0.07, 0.09, 0.019, 4.2), 0.08, 0.98);
+      const targetSadness   = clamp(0.10 + slowNoise(t, 0.08, 0.05, 0.07, 0.021, 3.3) - targetValence * 0.12, 0.00, 0.78);
+      const targetShyness   = clamp(0.10 + slowNoise(t, 0.06, 0.06, 0.05, 0.018, 5.1), 0.00, 0.68);
+
+      emotion.valence   = damp(emotion.valence,   targetValence,   0.42, dt);
+      emotion.arousal   = damp(emotion.arousal,   targetArousal,   0.44, dt);
+      emotion.tension   = damp(emotion.tension,   targetTension,   0.34, dt);
+      emotion.curiosity = damp(emotion.curiosity, targetCuriosity, 0.38, dt);
+      emotion.sadness   = damp(emotion.sadness,   targetSadness,   0.30, dt);
+      emotion.shyness   = damp(emotion.shyness,   targetShyness,   0.27, dt);
+
+      if (now > emotion.nextImpulseAt) {
+        spawnImpulse(now);
       }
-      return o;
+
+      if (emotion.impulseStrength > 0.001) {
+        const s = emotion.impulseStrength;
+
+        if (emotion.impulseKind === 'curious') {
+          emotion.curiosity = clamp(emotion.curiosity + 0.20 * s, 0, 1);
+          emotion.arousal   = clamp(emotion.arousal   + 0.08 * s, 0, 1);
+        }
+        if (emotion.impulseKind === 'joy') {
+          emotion.valence   = clamp(emotion.valence   + 0.28 * s, -1, 1);
+          emotion.arousal   = clamp(emotion.arousal   + 0.12 * s, 0, 1);
+        }
+        if (emotion.impulseKind === 'surprise') {
+          emotion.arousal   = clamp(emotion.arousal   + 0.25 * s, 0, 1);
+          emotion.tension   = clamp(emotion.tension   + 0.10 * s, 0, 1);
+          emotion.curiosity = clamp(emotion.curiosity + 0.10 * s, 0, 1);
+        }
+        if (emotion.impulseKind === 'sadness') {
+          emotion.sadness   = clamp(emotion.sadness   + 0.22 * s, 0, 1);
+          emotion.valence   = clamp(emotion.valence   - 0.20 * s, -1, 1);
+          emotion.arousal   = clamp(emotion.arousal   - 0.06 * s, 0, 1);
+        }
+        if (emotion.impulseKind === 'anger') {
+          emotion.tension   = clamp(emotion.tension   + 0.28 * s, 0, 1);
+          emotion.valence   = clamp(emotion.valence   - 0.22 * s, -1, 1);
+          emotion.arousal   = clamp(emotion.arousal   + 0.12 * s, 0, 1);
+        }
+        if (emotion.impulseKind === 'shy') {
+          emotion.shyness   = clamp(emotion.shyness   + 0.28 * s, 0, 1);
+          emotion.curiosity = clamp(emotion.curiosity + 0.05 * s, 0, 1);
+          emotion.valence   = clamp(emotion.valence   + 0.04 * s, -1, 1);
+        }
+
+        emotion.impulseStrength *= emotion.impulseDecay;
+      }
+
+      const positive = Math.max(0, emotion.valence);
+      const negative = Math.max(0, -emotion.valence);
+
+      const raw = {
+        neutral:
+          0.25 + (1 - emotion.arousal) * 0.30 + (1 - emotion.tension) * 0.16,
+
+        interested:
+          0.15 + emotion.curiosity * 0.95 + emotion.arousal * 0.12,
+
+        surprised:
+          0.04 + emotion.arousal * 0.30 + (emotion.impulseKind === 'surprise' ? 0.82 * emotion.impulseStrength + 0.18 : 0),
+
+        happy:
+          0.06 + positive * 1.05 + Math.max(0, 0.15 - emotion.sadness) * 0.28,
+
+        laugh:
+          0.02 + positive * emotion.arousal * 1.08 + (emotion.impulseKind === 'joy' ? 0.54 * emotion.impulseStrength + 0.12 : 0),
+
+        cry:
+          0.02 + emotion.sadness * 1.12 + negative * 0.44 + (emotion.impulseKind === 'sadness' ? 0.52 * emotion.impulseStrength + 0.10 : 0),
+
+        angry:
+          0.02 + emotion.tension * 0.92 + negative * 0.52 + (emotion.impulseKind === 'anger' ? 0.64 * emotion.impulseStrength + 0.14 : 0),
+
+        shy:
+          0.06 + emotion.shyness * 1.00 + emotion.curiosity * 0.16 + (emotion.impulseKind === 'shy' ? 0.48 * emotion.impulseStrength + 0.10 : 0)
+      };
+
+      let sum = 0;
+      for (const k in raw) {
+        raw[k] = Math.max(0.001, Math.pow(raw[k], 1.5));
+        sum += raw[k];
+      }
+
+      for (const k in raw) {
+        weights[k] = damp(weights[k], raw[k] / sum, 1.55, dt);
+      }
+
+      const sum2 = Object.values(weights).reduce((a,b)=>a+b, 0) || 1;
+      for (const k in weights) weights[k] /= sum2;
+
+      for (const key of FEATURE_KEYS) {
+        let v = 0;
+        for (const name in weights) {
+          v += PROTO[name][key] * weights[name];
+        }
+        expr[key] = damp(expr[key], v, 2.2, dt);
+      }
     }
 
-    function chooseMood(now){
-      previous = current;
-      let options = moods.filter(m => m.name !== current.name);
-      if (current.name === 'surprised') options = options.filter(m => m.name !== 'surprised');
-      target = options[Math.floor(Math.random() * options.length)];
-      transitionStart = now;
-      transitionMs = rnd(1050, 2200);
-      const dwell = target.dwell;
-      nextMoodAt = now + transitionMs + rnd(dwell[0], dwell[1]);
+    function dominantMood(){
+      let best = 'neutral';
+      let bestScore = -1;
+      for (const k in weights) {
+        if (weights[k] > bestScore) {
+          bestScore = weights[k];
+          best = k;
+        }
+      }
+      return best;
     }
 
-    function updateAutonomy(now){
-      if (now > nextMoodAt) chooseMood(now);
-      const k = ease(clamp((now - transitionStart) / transitionMs, 0, 1));
-      current = mixMood(previous, target, k);
-
+    function updateBlink(now){
       if (now > blinkAt) {
-        blinkUntil = now + rnd(95, 170);
-        blinkAt = now + rnd(1600, 5400);
-        if (Math.random() > .84) blinkAt += 180;
+        blinkUntil = now + rnd(95, 165);
+        blinkAt = now + rnd(2300, 6200);
+        if (Math.random() > .88) blinkAt += 180;
       }
-      const b = clamp(1 - Math.abs(now - (blinkUntil - 80)) / 82, 0, 1);
-      blinkStrength = Math.max(blinkStrength * .68, b);
+      const b = clamp(1 - Math.abs(now - (blinkUntil - 76)) / 78, 0, 1);
+      blinkStrength = Math.max(blinkStrength * .65, b);
+    }
+
+    function updateGaze(now, dt){
+      const mood = dominantMood();
 
       if (now > nextGazeAt) {
-        gaze.tx = clamp(current.gazeX + rnd(-.45, .45), -1.3, 1.3);
-        gaze.ty = clamp(current.gazeY + rnd(-.30, .30), -.75, .95);
-        nextGazeAt = now + rnd(900, 2800);
-      }
-      gaze.x = lerp(gaze.x, gaze.tx, .022);
-      gaze.y = lerp(gaze.y, gaze.ty, .022);
+        const biasX = expr.gazeX;
+        const biasY = expr.gazeY;
 
-      if (now > glitchAt) {
-        glitchUntil = now + rnd(75, 210);
-        glitchAt = now + rnd(4200, 14500);
+        let spreadX = 0.36 + emotion.curiosity * 0.28;
+        let spreadY = 0.16 + emotion.sadness * 0.20;
+
+        if (mood === 'shy') {
+          spreadX = 0.22;
+          spreadY = 0.14;
+        }
+        if (mood === 'surprised') {
+          spreadX = 0.10;
+          spreadY = 0.12;
+        }
+
+        gaze.tx = clamp(biasX + rnd(-spreadX, spreadX), -1.2, 1.2);
+        gaze.ty = clamp(biasY + rnd(-spreadY, spreadY), -0.8, 0.9);
+        nextGazeAt = now + rnd(1200, 3600);
       }
+
+      gaze.x = damp(gaze.x, gaze.tx, 4.0, dt);
+      gaze.y = damp(gaze.y, gaze.ty, 4.0, dt);
+    }
+
+    function glyphCluster(len){
+      const chars = ['.',':',';','/','\\','|','~','*','+','^','<','>','=','░','▒','°','·'];
+      let s = '';
+      for (let i=0;i<len;i++) s += pick(chars);
+      return s;
+    }
+
+    function generateSpeechText(mood){
+      const phrases = {
+        neutral:    ['... stil ...', '... wacht ...', '... ergens ...'],
+        interested: ['... wat is dit ...', '... dichterbij ...', '... ik kijk ...'],
+        surprised:  ['... oh ...', '... ineens ...', '... wat ...'],
+        happy:      ['... zacht licht ...', '... mooi ...', '... ja ...'],
+        laugh:      ['... haha ...', '... levend ...', '... goed ...'],
+        cry:        ['... stil ...', '... koud ...', '... weg ...'],
+        angry:      ['... nee ...', '... scherp ...', '... genoeg ...'],
+        shy:        ['... misschien ...', '... zacht ...', '... niet kijken ...']
+      };
+
+      const meaningful = Math.random() < 0.18;
+      if (meaningful) {
+        return {
+          text: glyphCluster(rndInt(2,4)) + ' ' + pick(phrases[mood] || phrases.neutral) + ' ' + glyphCluster(rndInt(2,4)),
+          meaningful: true
+        };
+      }
+
+      const pieces = [];
+      const count = rndInt(2, 4);
+      for (let i=0;i<count;i++) {
+        pieces.push(glyphCluster(rndInt(3, 8)));
+      }
+      return {
+        text: pieces.join(' '),
+        meaningful: false
+      };
+    }
+
+    function rndInt(min, max){
+      return Math.floor(rnd(min, max + 1));
+    }
+
+    function updateSpeech(now){
+      const mood = dominantMood();
+
+      if (!speech.active && now > speech.nextAt) {
+        const data = generateSpeechText(mood);
+        speech.active = true;
+        speech.start = now;
+        speech.duration = rnd(1800, 3800);
+        speech.text = data.text;
+        speech.mood = mood;
+        speech.meaningful = data.meaningful;
+        speech.phase = rnd(0, 999);
+      }
+
+      if (speech.active && now > speech.start + speech.duration) {
+        speech.active = false;
+        speech.nextAt = now + rnd(7000, 18000);
+      }
+    }
+
+    function speechAlpha(now){
+      if (!speech.active) return 0;
+      const t = now - speech.start;
+      const inDur = 240;
+      const outDur = 320;
+      const total = speech.duration;
+
+      if (t < inDur) return clamp(t / inDur, 0, 1);
+      if (t > total - outDur) return clamp((total - t) / outDur, 0, 1);
+      return 1;
+    }
+
+    function rect(x,y,w,h,color){
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    }
+
+    function poly(points, color){
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(points[0][0]), Math.round(points[0][1]));
+      for (let i=1;i<points.length;i++) ctx.lineTo(Math.round(points[i][0]), Math.round(points[i][1]));
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function path(color, commands){
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (const c of commands) {
+        if (c[0] === 'M') ctx.moveTo(c[1], c[2]);
+        if (c[0] === 'L') ctx.lineTo(c[1], c[2]);
+        if (c[0] === 'Q') ctx.quadraticCurveTo(c[1], c[2], c[3], c[4]);
+        if (c[0] === 'C') ctx.bezierCurveTo(c[1], c[2], c[3], c[4], c[5], c[6]);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function ellipse(x,y,rx,ry,color){
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(Math.round(x), Math.round(y), rx, ry, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    function line(x1,y1,x2,y2,width,color){
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'butt';
+      ctx.lineJoin = 'miter';
+      ctx.beginPath();
+      ctx.moveTo(Math.round(x1),Math.round(y1));
+      ctx.lineTo(Math.round(x2),Math.round(y2));
+      ctx.stroke();
+    }
+
+    function roundedBubble(x, y, w, h, r, tailX, tailY){
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + 18, y + h);
+      ctx.lineTo(tailX, tailY);
+      ctx.lineTo(x + 32, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function splitBubbleLines(text, maxLen=18){
+      const words = text.split(' ');
+      const lines = [];
+      let line = '';
+
+      for (const w of words) {
+        const test = line ? line + ' ' + w : w;
+        if (test.length > maxLen && line) {
+          lines.push(line);
+          line = w;
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+      return lines.slice(0, 3);
     }
 
     function updateBackgroundEvents(now){
@@ -262,70 +588,17 @@
       }
     }
 
-    function rect(x,y,w,h,color){
-      ctx.fillStyle = color;
-      ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
-    }
-
-    function poly(points, color){
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(Math.round(points[0][0]), Math.round(points[0][1]));
-      for (let i=1;i<points.length;i++) ctx.lineTo(Math.round(points[i][0]), Math.round(points[i][1]));
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    function path(color, commands){
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      for (const c of commands) {
-        if (c[0] === 'M') ctx.moveTo(c[1], c[2]);
-        if (c[0] === 'L') ctx.lineTo(c[1], c[2]);
-        if (c[0] === 'Q') ctx.quadraticCurveTo(c[1], c[2], c[3], c[4]);
-        if (c[0] === 'C') ctx.bezierCurveTo(c[1], c[2], c[3], c[4], c[5], c[6]);
-      }
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    function ellipse(x,y,rx,ry,color){
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.ellipse(Math.round(x), Math.round(y), rx, ry, 0, 0, Math.PI*2);
-      ctx.fill();
-    }
-
-    function line(x1,y1,x2,y2,width,color){
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.lineCap = 'butt';
-      ctx.lineJoin = 'miter';
-      ctx.beginPath();
-      ctx.moveTo(Math.round(x1),Math.round(y1));
-      ctx.lineTo(Math.round(x2),Math.round(y2));
-      ctx.stroke();
-    }
-
     function drawBackground(now){
       ctx.fillStyle = C.bg;
       ctx.fillRect(0,0,W,H);
 
-      ctx.globalAlpha = 0.3;
-      rect(32, 28, 1, 1, C.cyan4);
-      rect(74, 56, 1, 1, C.white);
-      rect(312, 44, 1, 1, C.cyan4);
-      rect(287, 76, 1, 1, C.white);
-      rect(46, 96, 1, 1, C.cyan4);
-      rect(332, 112, 1, 1, C.white);
-      rect(18, 168, 1, 1, C.cyan4);
-      rect(340, 188, 1, 1, C.white);
+      for (const s of stars) {
+        const tw = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(now * 0.0012 + s.phase));
+        ctx.globalAlpha = 0.16 + tw * 0.38;
+        rect(s.x, s.y, s.size, s.size, s.c);
+      }
       ctx.globalAlpha = 1;
 
-      drawBackgroundEvents(now);
-    }
-
-    function drawBackgroundEvents(now){
       drawShootingStar(now);
       drawRocket(now);
       drawUfo(now);
@@ -486,16 +759,13 @@
       const base = 82 - p.brow * 8;
       const anger = p.anger;
       const sad = p.sad;
-      const leftOuterY = base - anger*5 + sad*5;
-      const leftInnerY = base + anger*11 - sad*8;
-      const rightInnerY = base + anger*11 - sad*8;
-      const rightOuterY = base - anger*5 + sad*5;
+      const leftOuterY = base - anger * 5 + sad * 5;
+      const leftInnerY = base + anger * 11 - sad * 8;
+      const rightInnerY = base + anger * 11 - sad * 8;
+      const rightOuterY = base - anger * 5 + sad * 5;
+
       line(122, leftOuterY, 163, leftInnerY, 5, C.black);
       line(197, rightInnerY, 239, rightOuterY, 5, C.black);
-      if (p.anger > .2) {
-        line(127, leftOuterY+5, 161, leftInnerY+6, 2, C.red);
-        line(199, rightInnerY+6, 235, rightOuterY+5, 2, C.red);
-      }
     }
 
     function eyeShape(cx, cy, w, h, color){
@@ -538,81 +808,91 @@
       ]);
     }
 
-    function drawMouth(p){
-  const cx = 180;
-  const y = 171;
-  const smile = p.smile;
-  const open = p.open;
-
-  const w = 27 + Math.abs(smile) * 11 + open * 8;
-  const h = Math.min(3 + open * 15, 17);
-  const corner = -smile * 5 + Math.max(0, -smile) * 7;
-
-  if (open > .18) {
-    const bottomY = Math.min(y + h + 2 + Math.max(0, smile), 190);
-
-    path(C.black, [
-      ['M',cx-w/2,y + corner*.16],
-      ['Q',cx,y-6-smile*2,cx+w/2,y + corner*.16],
-      ['Q',cx+w*.34,y+h,cx,bottomY],
-      ['Q',cx-w*.34,y+h,cx-w/2,y + corner*.16]
-    ]);
-
-    if (open > .38) {
-      path(C.white, [
-        ['M',cx-w*.28,y-1],
-        ['Q',cx,y+2,cx+w*.29,y-1],
-        ['L',cx+w*.20,y+4],
-        ['Q',cx,y+6,cx-w*.22,y+4]
-      ]);
-    } else {
-      line(cx-w*.30,y,cx+w*.26,y+1,2,C.white);
+    function speakOpen(now){
+      if (!speech.active) return 0;
+      const a = speechAlpha(now);
+      const rhythm =
+        0.35 +
+        0.35 * (0.5 + 0.5 * Math.sin(now * 0.018 + speech.phase)) +
+        0.18 * (0.5 + 0.5 * Math.sin(now * 0.041 + speech.phase * 0.67));
+      return a * rhythm * 0.72;
     }
 
-    const tongueW = 8 + Math.max(0, smile) * 9 + open * 5;
-    const tongueH = 2.5 + Math.max(0, smile) * 1.8 + open * 1.6;
-    const tongueY = Math.min(bottomY - 4, y + h * .68);
+    function drawMouth(p, now){
+      const cx = 180;
+      const y = 171;
+      const smile = p.smile;
+      const openBase = p.open;
+      const talk = speakOpen(now);
+      const open = Math.max(openBase, talk);
 
-    if (open > .34 || smile > .45) {
-      path(C.magenta, [
-        ['M', cx - tongueW / 2, tongueY],
-        ['Q', cx, tongueY + tongueH, cx + tongueW / 2, tongueY],
-        ['Q', cx, tongueY - tongueH * .55, cx - tongueW / 2, tongueY]
-      ]);
+      const w = 27 + Math.abs(smile) * 11 + open * 8;
+      const h = Math.min(3 + open * 15, 17);
+      const corner = -smile * 5 + Math.max(0, -smile) * 7;
 
-      ctx.globalAlpha = .45;
-      line(cx - tongueW * .24, tongueY - 1, cx + tongueW * .22, tongueY - 1, 1, '#ff7bea');
-      ctx.globalAlpha = 1;
+      if (open > .18) {
+        const bottomY = Math.min(y + h + 2 + Math.max(0, smile), 190);
+
+        path(C.black, [
+          ['M',cx-w/2,y + corner*.16],
+          ['Q',cx,y-6-smile*2,cx+w/2,y + corner*.16],
+          ['Q',cx+w*.34,y+h,cx,bottomY],
+          ['Q',cx-w*.34,y+h,cx-w/2,y + corner*.16]
+        ]);
+
+        if (open > .38) {
+          path(C.white, [
+            ['M',cx-w*.28,y-1],
+            ['Q',cx,y+2,cx+w*.29,y-1],
+            ['L',cx+w*.20,y+4],
+            ['Q',cx,y+6,cx-w*.22,y+4]
+          ]);
+        } else {
+          line(cx-w*.30,y,cx+w*.26,y+1,2,C.white);
+        }
+
+        const tongueW = 8 + Math.max(0, smile) * 9 + open * 5;
+        const tongueH = 2.5 + Math.max(0, smile) * 1.8 + open * 1.6;
+        const tongueY = Math.min(bottomY - 4, y + h * .68);
+
+        if (open > .34 || smile > .45) {
+          path(C.magenta, [
+            ['M', cx - tongueW / 2, tongueY],
+            ['Q', cx, tongueY + tongueH, cx + tongueW / 2, tongueY],
+            ['Q', cx, tongueY - tongueH * .55, cx - tongueW / 2, tongueY]
+          ]);
+
+          ctx.globalAlpha = .42;
+          line(cx - tongueW * .24, tongueY - 1, cx + tongueW * .22, tongueY - 1, 1, C.magentaSoft);
+          ctx.globalAlpha = 1;
+        }
+      } else {
+        const leftY = y + Math.max(0, -smile) * 6 - Math.max(0, smile) * 4;
+        const midY  = y + Math.max(0, -smile) * 2 + Math.max(0, smile) * 4;
+        const rightY = y + Math.max(0, -smile) * 6 - Math.max(0, smile) * 4;
+
+        ctx.strokeStyle = C.black;
+        ctx.lineWidth = p.anger > .35 ? 4 : 3;
+        ctx.beginPath();
+        ctx.moveTo(cx-w/2, leftY);
+        ctx.quadraticCurveTo(cx, midY, cx+w/2, rightY);
+        ctx.stroke();
+      }
+
+      rect(cx - 24, y - 9, 8, 3, C.cyan4);
     }
 
-    if (smile < -.2) {
-      ctx.globalAlpha = .55;
-      line(cx-w*.28,y+3,cx+w*.28,y+3,1,C.magenta);
-      ctx.globalAlpha = 1;
-    }
-  } else {
-    const leftY = y + Math.max(0, -smile) * 6 - Math.max(0, smile) * 4;
-    const midY = y + Math.max(0, -smile) * 2 + Math.max(0, smile) * 4;
-    const rightY = y + Math.max(0, -smile) * 6 - Math.max(0, smile) * 4;
+    function drawEffects(p, now){
+      if (p.blush > .05) {
+        const a = p.blush * .18;
+        ctx.globalAlpha = a;
+        rect(128, 150, 16, 6, C.magenta);
+        rect(214, 148, 16, 6, C.magenta);
+        ctx.globalAlpha = 1;
+      }
 
-    ctx.strokeStyle = C.black;
-    ctx.lineWidth = p.anger > .35 ? 4 : 3;
-    ctx.beginPath();
-    ctx.moveTo(cx-w/2, leftY);
-    ctx.quadraticCurveTo(cx, midY, cx+w/2, rightY);
-    ctx.stroke();
-
-    if (p.anger > .4) {
-      line(cx-w/2+4,leftY+3,cx+w/2-3,rightY+3,1,C.red);
-    }
-  }
-
-  rect(cx - 24, y - 9, 8, 3, C.cyan4);
-}
-
-    function drawEffects(p, t){
       if (p.tear > .05) {
-        const a = p.tear * (.65 + .35*Math.sin(t*.009));
+        const a = p.tear * (.65 + .35*Math.sin(now * .009));
         ctx.globalAlpha = a;
         rect(138,126,3,7,C.white);
         rect(139,133,4,8,C.cyan4);
@@ -620,27 +900,62 @@
         rect(142,149,2,2,C.white);
         ctx.globalAlpha = 1;
       }
-      if (p.accent > .25) {
-        ctx.globalAlpha = p.accent * .36;
-        line(247,88,259,153,2,C.red);
+
+      if (p.accent > .12) {
+        ctx.globalAlpha = p.accent * .22;
+        line(247,88,259,153,2,C.cyan4);
         line(107,93,96,160,1,C.magenta);
         ctx.globalAlpha = 1;
       }
     }
 
-    function drawEntity(now){
-      const t = now * .001;
-      const p = current;
-      const floatX = Math.sin(t * .42) * 2.4 + Math.sin(t*.17) * 1.1;
-      const floatY = Math.sin(t * .58) * 3.0 + Math.cos(t*.23) * 1.4;
-      const breath = 1 + Math.sin(t * 1.08) * .006;
-      const stillness = target.name === 'surprised' ? .38 : 1;
-      const tilt = p.tilt + Math.sin(t*.33) * .012 * stillness;
+    function drawSpeechBubble(now){
+      const a = speechAlpha(now);
+      if (a <= 0.001) return;
+
+      const lines = splitBubbleLines(speech.text, speech.meaningful ? 16 : 20);
+      const fontSize = speech.meaningful ? 10 : 9;
+      const padX = 8;
+      const padY = 7;
+      const lineH = 12;
+      const maxLine = Math.max(...lines.map(s=>s.length), 8);
+      const bubbleW = Math.min(150, 16 + maxLine * 6.2);
+      const bubbleH = padY * 2 + lines.length * lineH;
+
+      const x = 210;
+      const y = 24 + Math.sin(now * 0.002 + speech.phase) * 1.5;
 
       ctx.save();
-      ctx.translate(W/2 + floatX, H/2 + floatY);
-      ctx.rotate(tilt);
-      ctx.scale(breath, 1 + (breath-1)*.35);
+      ctx.globalAlpha = a * 0.94;
+
+      roundedBubble(x, y, bubbleW, bubbleH, 8, 206, 88);
+
+      ctx.fillStyle = '#06161a';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = C.bubble;
+      ctx.stroke();
+
+      ctx.fillStyle = C.bubble;
+      ctx.font = fontSize + 'px monospace';
+      ctx.textBaseline = 'top';
+
+      for (let i=0;i<lines.length;i++) {
+        ctx.fillText(lines[i], x + padX, y + padY + i * lineH);
+      }
+
+      ctx.restore();
+    }
+
+    function drawEntity(now){
+      const t = now * .001;
+      const p = expr;
+
+      const breath = 1 + Math.sin(t * 1.12) * .003;
+
+      ctx.save();
+      ctx.translate(W/2, H/2);
+      ctx.scale(breath, 1 + (breath - 1) * .25);
       ctx.translate(-W/2, -H/2);
 
       drawHairBack();
@@ -651,43 +966,69 @@
       drawEye(146, 107, -1, p);
       drawEye(207, 107, 1, p);
       drawNose();
-      drawMouth(p);
-      drawEffects(p, t);
+      drawMouth(p, now);
+      drawEffects(p, now);
 
       rect(242,118,3,17,C.black);
       rect(151,196,37,3,C.black);
 
       ctx.restore();
+
+      drawSpeechBubble(now);
     }
 
     function applyGlitch(now){
       if (now > glitchUntil) return;
+
       const intensity = clamp((glitchUntil - now) / 200, .15, 1);
       const src = ctx.getImageData(0,0,W,H);
-      for (let i=0; i<8; i++) {
-        const y = Math.floor(hash(now*.01 + i*20) * H);
-        const h = 1 + Math.floor(hash(now*.03 + i*8) * 7);
-        const shift = Math.floor((hash(now*.02 + i*99) - .5) * 18 * intensity);
+
+      for (let i=0; i<6; i++) {
+        const y = Math.floor(hash(now * .01 + i * 20) * H);
+        const h = 1 + Math.floor(hash(now * .03 + i * 8) * 5);
+        const shift = Math.floor((hash(now * .02 + i * 99) - .5) * 14 * intensity);
         ctx.putImageData(src, shift, 0, 0, y, W, h);
       }
-      ctx.globalAlpha = .45 * intensity;
-      rect(73 + hash(now)*200, 73 + hash(now*.2)*92, 43, 2, C.green1);
-      rect(82 + hash(now*.4)*190, 100 + hash(now*.6)*72, 28, 1, C.magenta);
+
+      ctx.globalAlpha = .35 * intensity;
+      rect(73 + hash(now)*200, 73 + hash(now*.2)*92, 30, 2, C.green1);
+      rect(82 + hash(now*.4)*190, 100 + hash(now*.6)*72, 18, 1, C.magenta);
       ctx.globalAlpha = 1;
     }
 
-    function draw(now){
-      updateAutonomy(now);
+    function maybeGlitch(now){
+      if (speech.active) return;
+      if (now > glitchAt) {
+        glitchUntil = now + rnd(70, 170);
+        glitchAt = now + rnd(9000, 18000);
+      }
+    }
+
+    function update(now){
+      const dt = Math.min(0.05, (now - lastNow) / 1000);
+      lastNow = now;
+
+      updateEmotion(now, dt);
+      updateBlink(now);
+      updateGaze(now, dt);
+      updateSpeech(now);
       updateBackgroundEvents(now);
+      maybeGlitch(now);
+    }
+
+    function render(now){
+      update(now);
       drawBackground(now);
       drawEntity(now);
       applyGlitch(now);
-      if (!STATIC_PREVIEW) requestAnimationFrame(draw);
+
+      if (!STATIC_PREVIEW) requestAnimationFrame(render);
     }
 
     blinkUntil = performance.now() + 120;
-    if (STATIC_PREVIEW) draw(performance.now() + 1600);
-    else requestAnimationFrame(draw);
+    if (STATIC_PREVIEW) render(performance.now() + 1600);
+    else requestAnimationFrame(render);
+
   })();
   </script>
 </body>
