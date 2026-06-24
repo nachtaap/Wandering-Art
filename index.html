@@ -8,8 +8,15 @@
     :root{
       --bg:#020207;
     }
+
     *{box-sizing:border-box;margin:0;padding:0;}
-    html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);}
+    html,body{
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:var(--bg);
+    }
+
     body{
       display:grid;
       place-items:center;
@@ -19,6 +26,7 @@
       touch-action:none;
       cursor:none;
     }
+
     #stage{
       position:fixed;
       inset:0;
@@ -30,6 +38,7 @@
         radial-gradient(circle at 48% 50%, rgba(14,80,100,.10), transparent 48%),
         #020207;
     }
+
     canvas{
       display:block;
       width:min(100vw, calc(100vh * 1.384615));
@@ -42,6 +51,7 @@
         drop-shadow(0 0 22px rgba(0,255,214,.16))
         drop-shadow(0 0 56px rgba(35,255,87,.08));
     }
+
     #stage::before{
       content:"";
       position:absolute;
@@ -51,6 +61,7 @@
         radial-gradient(circle at 50% 45%, transparent 0 48%, rgba(0,0,0,.36) 82%);
       opacity:.8;
     }
+
     #stage::after{
       content:"";
       position:absolute;
@@ -60,6 +71,7 @@
         linear-gradient(90deg, rgba(255,0,170,.028), transparent 18%, transparent 82%, rgba(0,255,180,.035)),
         radial-gradient(circle at center, transparent 0 62%, rgba(0,0,0,.72) 100%);
     }
+
     @media (prefers-reduced-motion: reduce){
       canvas{
         filter:
@@ -80,6 +92,7 @@
     'use strict';
 
     const STATIC_PREVIEW = new URLSearchParams(location.search).has('static');
+
     const canvas = document.getElementById('entity');
     const ctx = canvas.getContext('2d', { alpha: false });
     const W = canvas.width;
@@ -104,7 +117,8 @@
       magentaSoft: '#ff7bea',
       red: '#ff3159',
       amber: '#ffd35d',
-      bubble: '#d9fff9'
+      bubble: '#d9fff9',
+      bubbleFill: '#06161a'
     };
 
     const PROTO = {
@@ -114,11 +128,24 @@
       happy:      { eye:0.76, smile:0.67, open:0.14, brow:0.12, anger:0.00, sad:0.00, blush:0.22, tear:0.00, gazeX:-0.12, gazeY:0.00, accent:0.08 },
       laugh:      { eye:0.54, smile:0.96, open:0.88, brow:0.18, anger:0.00, sad:0.00, blush:0.36, tear:0.00, gazeX:0.08, gazeY:-0.10, accent:0.12 },
       cry:        { eye:0.62, smile:-0.58, open:0.25, brow:0.18, anger:0.00, sad:0.88, blush:0.10, tear:1.00, gazeX:-0.28, gazeY:0.42, accent:0.00 },
-      angry:      { eye:0.62, smile:-0.22, open:0.06, brow:-0.08, anger:1.00, sad:0.00, blush:0.00, tear:0.00, gazeX:0.00, gazeY:-0.12, accent:0.40 },
+      angry:      { eye:0.62, smile:-0.22, open:0.06, brow:-0.08, anger:1.00, sad:0.00, blush:0.00, tear:0.00, gazeX:0.00, gazeY:-0.12, accent:0.32 },
       shy:        { eye:0.60, smile:0.20, open:0.05, brow:0.14, anger:0.00, sad:0.14, blush:0.88, tear:0.00, gazeX:-0.76, gazeY:0.58, accent:0.04 }
     };
 
     const FEATURE_KEYS = ['eye','smile','open','brow','anger','sad','blush','tear','gazeX','gazeY','accent'];
+
+    const expr = {...PROTO.neutral};
+
+    const weights = {
+      neutral:1,
+      interested:0,
+      surprised:0,
+      happy:0,
+      laugh:0,
+      cry:0,
+      angry:0,
+      shy:0
+    };
 
     const emotion = {
       valence: 0.06,
@@ -134,30 +161,59 @@
       nextImpulseAt: performance.now() + rnd(8000, 16000)
     };
 
-    let expr = {...PROTO.neutral};
-    let weights = {
-      neutral:1, interested:0, surprised:0, happy:0, laugh:0, cry:0, angry:0, shy:0
+    const blink = {
+      nextAt: performance.now() + rnd(1800, 5200),
+      until: performance.now() + 120,
+      strength: 0
     };
 
-    let blinkAt = performance.now() + rnd(1800, 5200);
-    let blinkUntil = 0;
-    let blinkStrength = 0;
+    const gaze = {
+      x:0, y:0,
+      tx:0, ty:0,
+      nextAt: performance.now() + 1200
+    };
 
-    let gaze = {x:0, y:0, tx:0, ty:0};
-    let nextGazeAt = performance.now() + 1200;
+    const motion = {
+      x:0, y:0, tilt:0,
+      tx:0, ty:0, ttilt:0,
+      nextAt: performance.now() + rnd(3500, 7000)
+    };
 
-    let glitchUntil = 0;
-    let glitchAt = performance.now() + rnd(6000, 14000);
+    const speech = {
+      active:false,
+      start:0,
+      duration:0,
+      nextAt: performance.now() + rnd(4500, 9000),
+      text:'',
+      mood:'neutral',
+      meaningful:false,
+      phase:rnd(0, 999)
+    };
 
-    let lastNow = performance.now();
+    const newsBrain = {
+      enabled: true,
+      loading: false,
+      lastFetch: 0,
+      nextFetchAt: 0,
+      keywords: ['signaal', 'ruimte', 'wereld', 'licht', 'verandering'],
+      topics: [],
+      failures: 0
+    };
 
-    const stars = Array.from({length: 18}, (_, i) => ({
-      x: Math.floor(hash(i * 91.1) * (W - 12)) + 6,
-      y: Math.floor(hash(i * 41.7) * 170) + 10,
-      phase: hash(i * 17.4) * Math.PI * 2,
-      size: hash(i * 7.3) > 0.72 ? 2 : 1,
-      c: hash(i * 5.1) > 0.5 ? C.white : C.cyan4
-    }));
+    const NEWS_API_URL =
+      'https://api.gdeltproject.org/api/v2/doc/doc' +
+      '?query=' + encodeURIComponent('(technology OR climate OR economy OR conflict OR science OR energy OR AI OR politics)') +
+      '&mode=ArtList' +
+      '&format=json' +
+      '&maxrecords=60' +
+      '&timespan=24h' +
+      '&sort=HybridRel';
+
+    const STOPWORDS = new Set([
+      'de','het','een','en','van','voor','met','naar','door','over','onder','tegen','uit','bij','aan','dat','dit','die','wat','zijn','haar','hun','als','maar','niet','wel','ook','nog','meer','minder',
+      'the','and','for','with','from','this','that','are','was','were','have','has','will','about','after','before','into','over','under','than','then','they','them','their',
+      'nieuws','vandaag','update','live','video','foto','laatste','breaking','report','says','said','could','would','should','there','where','which','while'
+    ]);
 
     const bgEvents = {
       star: {
@@ -174,35 +230,205 @@
       }
     };
 
-    const speech = {
-      active:false,
-      start:0,
-      duration:0,
-      nextAt:performance.now() + rnd(4000, 9000),
-      text:'',
-      mood:'neutral',
-      phase:rnd(0, 999),
-      meaningful:false
-    };
+    const stars = Array.from({length: 18}, (_, i) => ({
+      x: Math.floor(hash(i * 91.1) * (W - 12)) + 6,
+      y: Math.floor(hash(i * 41.7) * 170) + 10,
+      phase: hash(i * 17.4) * Math.PI * 2,
+      size: hash(i * 7.3) > 0.72 ? 2 : 1,
+      c: hash(i * 5.1) > 0.5 ? C.white : C.cyan4
+    }));
+
+    let glitchUntil = 0;
+    let glitchAt = performance.now() + rnd(9000, 18000);
+    let lastNow = performance.now();
 
     function rnd(min, max){ return min + Math.random() * (max - min); }
+    function rndInt(min, max){ return Math.floor(rnd(min, max + 1)); }
     function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
     function lerp(a, b, t){ return a + (b - a) * t; }
     function ease(t){ return t * t * (3 - 2 * t); }
     function damp(current, target, lambda, dt){
       return lerp(current, target, 1 - Math.exp(-lambda * dt));
     }
-    function pick(arr){
-      return arr[(Math.random() * arr.length) | 0];
-    }
+    function pick(arr){ return arr[(Math.random() * arr.length) | 0]; }
+
     function hash(n){
       const v = (Math.sin(n * 127.1 + 311.7) * 43758.5453) % 1;
       return v < 0 ? v + 1 : v;
     }
-    function softstep(x){ return x*x*(3-2*x); }
 
     function slowNoise(t, a1, f1, a2, f2, off=0){
       return Math.sin(t * f1 + off) * a1 + Math.sin(t * f2 + off * 1.7) * a2;
+    }
+
+    function dominantMood(){
+      let best = 'neutral';
+      let bestScore = -1;
+      for (const k in weights) {
+        if (weights[k] > bestScore) {
+          bestScore = weights[k];
+          best = k;
+        }
+      }
+      return best;
+    }
+
+    function glyphCluster(len){
+      const chars = ['.',':',';','/','\\','|','~','*','+','^','<','>','=','░','▒','°','·','#'];
+      let s = '';
+      for (let i=0;i<len;i++) s += pick(chars);
+      return s;
+    }
+
+    async function fetchNewsKeywords(force = false){
+      const now = performance.now();
+
+      if (!newsBrain.enabled) return;
+      if (newsBrain.loading) return;
+      if (!force && now < newsBrain.nextFetchAt) return;
+
+      newsBrain.loading = true;
+
+      try {
+        const res = await fetch(NEWS_API_URL, {
+          headers: { 'Accept': 'application/json' },
+          cache: 'no-store'
+        });
+
+        if (!res.ok) throw new Error('News API returned ' + res.status);
+
+        const data = await res.json();
+        const articles = Array.isArray(data.articles) ? data.articles : [];
+
+        const titles = articles
+          .map(a => a.title || '')
+          .filter(Boolean)
+          .slice(0, 50);
+
+        const keywords = extractNewsKeywords(titles);
+
+        if (keywords.length) {
+          newsBrain.keywords = keywords.slice(0, 28);
+          newsBrain.topics = titles.slice(0, 8);
+          newsBrain.failures = 0;
+        }
+
+        newsBrain.lastFetch = now;
+        newsBrain.nextFetchAt = now + 1000 * 60 * 20;
+      } catch (err) {
+        newsBrain.failures++;
+        newsBrain.nextFetchAt = now + 1000 * 60 * Math.min(30, 5 + newsBrain.failures * 5);
+      } finally {
+        newsBrain.loading = false;
+      }
+    }
+
+    function extractNewsKeywords(titles){
+      const counts = new Map();
+
+      for (const title of titles) {
+        const clean = title
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/https?:\/\/\S+/g, ' ')
+          .replace(/[^a-z0-9\u00c0-\u024f]+/gi, ' ');
+
+        const words = clean
+          .split(/\s+/)
+          .map(w => w.trim())
+          .filter(w =>
+            w.length >= 5 &&
+            w.length <= 18 &&
+            !STOPWORDS.has(w) &&
+            !/^\d+$/.test(w)
+          );
+
+        for (const w of words) {
+          counts.set(w, (counts.get(w) || 0) + 1);
+        }
+      }
+
+      return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([word]) => word);
+    }
+
+    function newsWord(){
+      if (!newsBrain.keywords.length) return pick(['signaal','wereld','ruimte','verandering']);
+      return pick(newsBrain.keywords);
+    }
+
+    function newsFragment(mood){
+      const wordCount =
+        mood === 'interested' ? rndInt(2, 4) :
+        mood === 'surprised'  ? rndInt(1, 3) :
+        mood === 'angry'      ? rndInt(1, 2) :
+        mood === 'cry'        ? rndInt(1, 2) :
+        rndInt(1, 3);
+
+      const parts = [];
+      for (let i = 0; i < wordCount; i++) parts.push(newsWord());
+      return parts.join(' / ');
+    }
+
+    function generateSpeechText(mood){
+      const phrases = {
+        neutral:    ['... stil ...', '... wacht ...', '... ergens ...'],
+        interested: ['... wat is dit ...', '... dichterbij ...', '... ik kijk ...'],
+        surprised:  ['... oh ...', '... ineens ...', '... wat ...'],
+        happy:      ['... zacht licht ...', '... mooi ...', '... ja ...'],
+        laugh:      ['... haha ...', '... levend ...', '... goed ...'],
+        cry:        ['... stil ...', '... koud ...', '... weg ...'],
+        angry:      ['... nee ...', '... scherp ...', '... genoeg ...'],
+        shy:        ['... misschien ...', '... zacht ...', '... niet kijken ...']
+      };
+
+      const includeNews = Math.random() < 0.72;
+      const meaningful = Math.random() < 0.18;
+
+      if (includeNews) {
+        const leftNoise = glyphCluster(rndInt(2, 6));
+        const rightNoise = glyphCluster(rndInt(2, 6));
+        const middle = newsFragment(mood);
+
+        if (meaningful) {
+          return {
+            text:
+              leftNoise + ' ' +
+              pick(phrases[mood] || phrases.neutral) + ' ' +
+              middle + ' ' +
+              rightNoise,
+            meaningful: true
+          };
+        }
+
+        return {
+          text: leftNoise + ' ' + middle + ' ' + rightNoise,
+          meaningful: false
+        };
+      }
+
+      if (meaningful) {
+        return {
+          text:
+            glyphCluster(rndInt(2,4)) + ' ' +
+            pick(phrases[mood] || phrases.neutral) + ' ' +
+            glyphCluster(rndInt(2,4)),
+          meaningful: true
+        };
+      }
+
+      const pieces = [];
+      const count = rndInt(2, 4);
+      for (let i = 0; i < count; i++) {
+        pieces.push(glyphCluster(rndInt(3, 8)));
+      }
+
+      return {
+        text: pieces.join(' '),
+        meaningful: false
+      };
     }
 
     function spawnImpulse(now){
@@ -326,32 +552,20 @@
       }
     }
 
-    function dominantMood(){
-      let best = 'neutral';
-      let bestScore = -1;
-      for (const k in weights) {
-        if (weights[k] > bestScore) {
-          bestScore = weights[k];
-          best = k;
-        }
-      }
-      return best;
-    }
-
     function updateBlink(now){
-      if (now > blinkAt) {
-        blinkUntil = now + rnd(95, 165);
-        blinkAt = now + rnd(2300, 6200);
-        if (Math.random() > .88) blinkAt += 180;
+      if (now > blink.nextAt) {
+        blink.until = now + rnd(95, 165);
+        blink.nextAt = now + rnd(2300, 6200);
+        if (Math.random() > .88) blink.nextAt += 180;
       }
-      const b = clamp(1 - Math.abs(now - (blinkUntil - 76)) / 78, 0, 1);
-      blinkStrength = Math.max(blinkStrength * .65, b);
+      const b = clamp(1 - Math.abs(now - (blink.until - 76)) / 78, 0, 1);
+      blink.strength = Math.max(blink.strength * .65, b);
     }
 
     function updateGaze(now, dt){
       const mood = dominantMood();
 
-      if (now > nextGazeAt) {
+      if (now > gaze.nextAt) {
         const biasX = expr.gazeX;
         const biasY = expr.gazeY;
 
@@ -369,53 +583,36 @@
 
         gaze.tx = clamp(biasX + rnd(-spreadX, spreadX), -1.2, 1.2);
         gaze.ty = clamp(biasY + rnd(-spreadY, spreadY), -0.8, 0.9);
-        nextGazeAt = now + rnd(1200, 3600);
+        gaze.nextAt = now + rnd(1200, 3600);
       }
 
       gaze.x = damp(gaze.x, gaze.tx, 4.0, dt);
       gaze.y = damp(gaze.y, gaze.ty, 4.0, dt);
     }
 
-    function glyphCluster(len){
-      const chars = ['.',':',';','/','\\','|','~','*','+','^','<','>','=','░','▒','°','·'];
-      let s = '';
-      for (let i=0;i<len;i++) s += pick(chars);
-      return s;
-    }
+    function updateMotion(now, dt){
+      const mood = dominantMood();
 
-    function generateSpeechText(mood){
-      const phrases = {
-        neutral:    ['... stil ...', '... wacht ...', '... ergens ...'],
-        interested: ['... wat is dit ...', '... dichterbij ...', '... ik kijk ...'],
-        surprised:  ['... oh ...', '... ineens ...', '... wat ...'],
-        happy:      ['... zacht licht ...', '... mooi ...', '... ja ...'],
-        laugh:      ['... haha ...', '... levend ...', '... goed ...'],
-        cry:        ['... stil ...', '... koud ...', '... weg ...'],
-        angry:      ['... nee ...', '... scherp ...', '... genoeg ...'],
-        shy:        ['... misschien ...', '... zacht ...', '... niet kijken ...']
-      };
+      if (now > motion.nextAt) {
+        let rangeX = 3.2;
+        let rangeY = 2.2;
+        let rangeTilt = 0.012;
 
-      const meaningful = Math.random() < 0.18;
-      if (meaningful) {
-        return {
-          text: glyphCluster(rndInt(2,4)) + ' ' + pick(phrases[mood] || phrases.neutral) + ' ' + glyphCluster(rndInt(2,4)),
-          meaningful: true
-        };
+        if (mood === 'laugh' || mood === 'happy') rangeX = 4.2;
+        if (mood === 'shy') rangeX = 2.0;
+        if (mood === 'angry') rangeTilt = 0.008;
+        if (mood === 'surprised') rangeY = 1.4;
+
+        motion.tx = rnd(-rangeX, rangeX);
+        motion.ty = rnd(-rangeY, rangeY);
+        motion.ttilt = rnd(-rangeTilt, rangeTilt);
+
+        motion.nextAt = now + rnd(4500, 9500);
       }
 
-      const pieces = [];
-      const count = rndInt(2, 4);
-      for (let i=0;i<count;i++) {
-        pieces.push(glyphCluster(rndInt(3, 8)));
-      }
-      return {
-        text: pieces.join(' '),
-        meaningful: false
-      };
-    }
-
-    function rndInt(min, max){
-      return Math.floor(rnd(min, max + 1));
+      motion.x = damp(motion.x, motion.tx, 0.55, dt);
+      motion.y = damp(motion.y, motion.ty, 0.55, dt);
+      motion.tilt = damp(motion.tilt, motion.ttilt, 0.55, dt);
     }
 
     function updateSpeech(now){
@@ -448,6 +645,82 @@
       if (t < inDur) return clamp(t / inDur, 0, 1);
       if (t > total - outDur) return clamp((total - t) / outDur, 0, 1);
       return 1;
+    }
+
+    function speakOpen(now){
+      if (!speech.active) return 0;
+      const a = speechAlpha(now);
+      const rhythm =
+        0.35 +
+        0.35 * (0.5 + 0.5 * Math.sin(now * 0.018 + speech.phase)) +
+        0.18 * (0.5 + 0.5 * Math.sin(now * 0.041 + speech.phase * 0.67));
+      return a * rhythm * 0.72;
+    }
+
+    function updateBackgroundEvents(now){
+      const star = bgEvents.star;
+      if (!star.active && now > star.nextAt) {
+        star.active = true;
+        star.start = now;
+        star.duration = rnd(650, 1200);
+        star.x0 = rnd(W * 0.66, W - 20);
+        star.y0 = rnd(14, 70);
+        star.x1 = star.x0 - rnd(90, 150);
+        star.y1 = star.y0 + rnd(34, 64);
+      }
+      if (star.active && now > star.start + star.duration) {
+        star.active = false;
+        star.nextAt = now + rnd(5500, 12000);
+      }
+
+      const rocket = bgEvents.rocket;
+      if (!rocket.active && now > rocket.nextAt) {
+        rocket.active = true;
+        rocket.start = now;
+        rocket.duration = rnd(1700, 2800);
+        rocket.dir = Math.random() > 0.5 ? 1 : -1;
+        rocket.y = rnd(42, 104);
+        if (rocket.dir === 1) {
+          rocket.fromX = -30;
+          rocket.toX = W + 30;
+        } else {
+          rocket.fromX = W + 30;
+          rocket.toX = -30;
+        }
+      }
+      if (rocket.active && now > rocket.start + rocket.duration) {
+        rocket.active = false;
+        rocket.nextAt = now + rnd(12000, 22000);
+      }
+
+      const ufo = bgEvents.ufo;
+      if (!ufo.active && now > ufo.nextAt) {
+        ufo.active = true;
+        ufo.start = now;
+        ufo.duration = rnd(8500, 12000);
+        ufo.dir = Math.random() > 0.5 ? 1 : -1;
+        ufo.y = rnd(26, 72);
+        ufo.bob = rnd(0, Math.PI * 2);
+        if (ufo.dir === 1) {
+          ufo.fromX = -42;
+          ufo.toX = W + 42;
+        } else {
+          ufo.fromX = W + 42;
+          ufo.toX = -42;
+        }
+      }
+      if (ufo.active && now > ufo.start + ufo.duration) {
+        ufo.active = false;
+        ufo.nextAt = now + rnd(15000, 26000);
+      }
+    }
+
+    function maybeGlitch(now){
+      if (speech.active) return;
+      if (now > glitchAt) {
+        glitchUntil = now + rnd(70, 170);
+        glitchAt = now + rnd(9000, 18000);
+      }
     }
 
     function rect(x,y,w,h,color){
@@ -530,64 +803,6 @@
       return lines.slice(0, 3);
     }
 
-    function updateBackgroundEvents(now){
-      const star = bgEvents.star;
-      if (!star.active && now > star.nextAt) {
-        star.active = true;
-        star.start = now;
-        star.duration = rnd(650, 1200);
-        star.x0 = rnd(W * 0.66, W - 20);
-        star.y0 = rnd(14, 70);
-        star.x1 = star.x0 - rnd(90, 150);
-        star.y1 = star.y0 + rnd(34, 64);
-      }
-      if (star.active && now > star.start + star.duration) {
-        star.active = false;
-        star.nextAt = now + rnd(5500, 12000);
-      }
-
-      const rocket = bgEvents.rocket;
-      if (!rocket.active && now > rocket.nextAt) {
-        rocket.active = true;
-        rocket.start = now;
-        rocket.duration = rnd(1700, 2800);
-        rocket.dir = Math.random() > 0.5 ? 1 : -1;
-        rocket.y = rnd(42, 104);
-        if (rocket.dir === 1) {
-          rocket.fromX = -30;
-          rocket.toX = W + 30;
-        } else {
-          rocket.fromX = W + 30;
-          rocket.toX = -30;
-        }
-      }
-      if (rocket.active && now > rocket.start + rocket.duration) {
-        rocket.active = false;
-        rocket.nextAt = now + rnd(12000, 22000);
-      }
-
-      const ufo = bgEvents.ufo;
-      if (!ufo.active && now > ufo.nextAt) {
-        ufo.active = true;
-        ufo.start = now;
-        ufo.duration = rnd(8500, 12000);
-        ufo.dir = Math.random() > 0.5 ? 1 : -1;
-        ufo.y = rnd(26, 72);
-        ufo.bob = rnd(0, Math.PI * 2);
-        if (ufo.dir === 1) {
-          ufo.fromX = -42;
-          ufo.toX = W + 42;
-        } else {
-          ufo.fromX = W + 42;
-          ufo.toX = -42;
-        }
-      }
-      if (ufo.active && now > ufo.start + ufo.duration) {
-        ufo.active = false;
-        ufo.nextAt = now + rnd(15000, 26000);
-      }
-    }
-
     function drawBackground(now){
       ctx.fillStyle = C.bg;
       ctx.fillRect(0,0,W,H);
@@ -639,7 +854,6 @@
       rect(-15, -1, 7, 2, C.cyan2);
       rect(-10, -2, 6, 4, C.amber);
       rect(-7, -3, 3, 6, C.red);
-
       rect(-4, -3, 10, 6, C.white);
       rect(6, -2, 4, 4, C.cyan3);
       rect(10, -1, 2, 2, C.green2);
@@ -676,8 +890,8 @@
       rect(-9, 3, 4, 1, C.magenta);
       rect(-3, 3, 4, 1, C.green1);
       rect(3, 3, 4, 1, C.cyan4);
-      ctx.globalAlpha = 1;
 
+      ctx.globalAlpha = 1;
       ctx.restore();
     }
 
@@ -778,7 +992,7 @@
     }
 
     function drawEye(cx, cy, side, p){
-      const open = clamp(p.eye * (1 - blinkStrength * .93), .06, 1.34);
+      const open = clamp(p.eye * (1 - blink.strength * .93), .06, 1.34);
       const ew = 52 + p.brow * 2 + p.anger * -5;
       const eh = 16 * open;
       const irisX = cx + gaze.x * 4.8;
@@ -789,7 +1003,7 @@
 
       if (open >= .11) {
         ellipse(irisX, irisY, 8.4, 8.8 * clamp(open, .35, 1.1), C.green1);
-        ellipse(irisX + side*.5, irisY + .6, 4.1, 4.7 * clamp(open, .35, 1.0), C.black);
+        ellipse(irisX + side * .5, irisY + .6, 4.1, 4.7 * clamp(open, .35, 1.0), C.black);
         rect(irisX - 3 + side, irisY - 5, 2, 2, C.green2);
         rect(irisX + 2 + side, irisY - 2, 2, 1, C.white);
       }
@@ -806,16 +1020,6 @@
       path(C.white, [
         ['M',181,127],['C',178,140,174,148,169,153],['L',180,154],['L',187,149],['C',184,142,184,135,181,127]
       ]);
-    }
-
-    function speakOpen(now){
-      if (!speech.active) return 0;
-      const a = speechAlpha(now);
-      const rhythm =
-        0.35 +
-        0.35 * (0.5 + 0.5 * Math.sin(now * 0.018 + speech.phase)) +
-        0.18 * (0.5 + 0.5 * Math.sin(now * 0.041 + speech.phase * 0.67));
-      return a * rhythm * 0.72;
     }
 
     function drawMouth(p, now){
@@ -892,7 +1096,7 @@
       }
 
       if (p.tear > .05) {
-        const a = p.tear * (.65 + .35*Math.sin(now * .009));
+        const a = p.tear * (.65 + .35 * Math.sin(now * .009));
         ctx.globalAlpha = a;
         rect(138,126,3,7,C.white);
         rect(139,133,4,8,C.cyan4);
@@ -918,11 +1122,11 @@
       const padX = 8;
       const padY = 7;
       const lineH = 12;
-      const maxLine = Math.max(...lines.map(s=>s.length), 8);
+      const maxLine = Math.max(...lines.map(s => s.length), 8);
       const bubbleW = Math.min(150, 16 + maxLine * 6.2);
       const bubbleH = padY * 2 + lines.length * lineH;
 
-      const x = 210;
+      const x = 210 + Math.sin(now * 0.0013 + speech.phase) * 1.2;
       const y = 24 + Math.sin(now * 0.002 + speech.phase) * 1.5;
 
       ctx.save();
@@ -930,8 +1134,9 @@
 
       roundedBubble(x, y, bubbleW, bubbleH, 8, 206, 88);
 
-      ctx.fillStyle = '#06161a';
+      ctx.fillStyle = C.bubbleFill;
       ctx.fill();
+
       ctx.lineWidth = 2;
       ctx.strokeStyle = C.bubble;
       ctx.stroke();
@@ -948,13 +1153,17 @@
     }
 
     function drawEntity(now){
-      const t = now * .001;
+      const t = now * 0.001;
       const p = expr;
 
       const breath = 1 + Math.sin(t * 1.12) * .003;
+      const driftX = motion.x + Math.sin(t * .37) * 0.55 + Math.sin(t * .19 + 1.2) * 0.35;
+      const driftY = motion.y + Math.sin(t * .43 + .8) * 0.45;
+      const tilt = motion.tilt + Math.sin(t * .31) * 0.004;
 
       ctx.save();
-      ctx.translate(W/2, H/2);
+      ctx.translate(W/2 + driftX, H/2 + driftY);
+      ctx.rotate(tilt);
       ctx.scale(breath, 1 + (breath - 1) * .25);
       ctx.translate(-W/2, -H/2);
 
@@ -996,14 +1205,6 @@
       ctx.globalAlpha = 1;
     }
 
-    function maybeGlitch(now){
-      if (speech.active) return;
-      if (now > glitchAt) {
-        glitchUntil = now + rnd(70, 170);
-        glitchAt = now + rnd(9000, 18000);
-      }
-    }
-
     function update(now){
       const dt = Math.min(0.05, (now - lastNow) / 1000);
       lastNow = now;
@@ -1011,6 +1212,7 @@
       updateEmotion(now, dt);
       updateBlink(now);
       updateGaze(now, dt);
+      updateMotion(now, dt);
       updateSpeech(now);
       updateBackgroundEvents(now);
       maybeGlitch(now);
@@ -1025,9 +1227,14 @@
       if (!STATIC_PREVIEW) requestAnimationFrame(render);
     }
 
-    blinkUntil = performance.now() + 120;
-    if (STATIC_PREVIEW) render(performance.now() + 1600);
-    else requestAnimationFrame(render);
+    fetchNewsKeywords(true);
+    setInterval(() => fetchNewsKeywords(false), 1000 * 60 * 5);
+
+    if (STATIC_PREVIEW) {
+      render(performance.now() + 1600);
+    } else {
+      requestAnimationFrame(render);
+    }
 
   })();
   </script>
