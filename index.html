@@ -4,10 +4,60 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Wandering Art — Living Pixel World v9</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/Wandering-Art/manifest.json" />
+
+  <!-- Theme & status bar -->
+  <meta name="theme-color" content="#020207" />
+
+  <!-- iOS PWA (Add to Home Screen) -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Wandering Art" />
+  <link rel="apple-touch-icon" href="/Wandering-Art/icon-192.png" />
+
+  <!-- Android / Chrome -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/Wandering-Art/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/Wandering-Art/icon-512.png" />
+
+  <!-- Prevent sharing UI & search engines from indexing -->
+  <meta name="robots" content="noindex" />
+
+  <!-- Service Worker registratie -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/Wandering-Art/sw.js', { scope: '/Wandering-Art/' }).then(r => r.update()).catch(() => {});
+      });
+    }
+    // Screen Wake Lock: scherm blijft aan terwijl de entiteit leeft
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          window._wakeLock = await navigator.wakeLock.request('screen');
+          document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && !window._wakeLock) {
+              try { window._wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
+            }
+          });
+        } catch(e) {}
+      }
+    }
+    requestWakeLock();
+  </script>
+
   <style>
     :root{ --bg:#020207; }
     *{ box-sizing:border-box; margin:0; padding:0; }
-    html,body{ width:100%; height:100%; overflow:hidden; background:var(--bg); }
+    html,body{
+      width:100%; height:100%; overflow:hidden; background:var(--bg);
+      /* Mobiel: voorkom tekst-selectie en tap-highlight */
+      -webkit-user-select:none; user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      -webkit-touch-callout:none;
+    }
     body{
       display:grid;
       place-items:center;
@@ -16,6 +66,12 @@
       font-smooth:never;
       touch-action:none;
       cursor:none;
+      /* Safe area voor notch/home indicator (iPhone X+) */
+      padding:
+        env(safe-area-inset-top, 0)
+        env(safe-area-inset-right, 0)
+        env(safe-area-inset-bottom, 0)
+        env(safe-area-inset-left, 0);
     }
     #stage{
       position:fixed;
