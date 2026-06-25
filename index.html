@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — GPT Living Pixel World</title>
+  <title>Wandering Art — Living Pixel World v4</title>
   <style>
     :root{ --bg:#020207; }
     *{ box-sizing:border-box; margin:0; padding:0; }
@@ -84,15 +84,18 @@
     const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const CONFIG = {
-      locationDelayMs: 9000,
-      shipDensity: 1.05,
+      locationDelayMs: 12000,
+      shipDensity: 0.92,
       ambientGlyphs: true,
-      ambientGlyphChance: 0.018,
+      ambientGlyphChance: 0.014,
       clothingChangeMinMs: 65000,
       clothingChangeMaxMs: 190000,
-      speechFrequency: 0.90,
+      speechFrequency: 0.82,
       newsMoodInfluence: 0.28,
-      weatherIntensity: 0.86
+      weatherIntensity: 0.86,
+      speechAboveGlitch: true,
+      attentionToEvents: true,
+      iconicShips: true
     };
 
     const canvas = document.getElementById('entity');
@@ -486,21 +489,72 @@
 
     function generateSpeechText(mood){
       const phrases = {
-        neutral:['... stil ...','... wacht ...','... ergens ...'], interested:['... wat is dit ...','... dichterbij ...','... ik kijk ...'],
-        surprised:['... oh ...','... ineens ...','... wat ...'], happy:['... zacht licht ...','... mooi ...','... ja ...'],
-        laugh:['... haha ...','... levend ...','... goed ...'], cry:['... stil ...','... koud ...','... weg ...'],
-        angry:['... nee ...','... scherp ...','... genoeg ...'], shy:['... misschien ...','... zacht ...','... niet kijken ...']
+        neutral:[
+          '... ruis draagt iets ...',
+          '... ik hoor licht ...',
+          '... stilte beweegt ...'
+        ],
+        interested:[
+          '... daar ... zie je dat ...',
+          '... dichterbij de rand ...',
+          '... een teken in de verte ...'
+        ],
+        surprised:[
+          '... ineens open ...',
+          '... het keek terug ...',
+          '... wat brak daar los ...'
+        ],
+        happy:[
+          '... zacht licht leeft ...',
+          '... de lucht zingt ...',
+          '... even warm ...'
+        ],
+        laugh:[
+          '... haha de sterren liegen ...',
+          '... alles knippert ...',
+          '... levend genoeg ...'
+        ],
+        cry:[
+          '... natte stilte ...',
+          '... iets zakt weg ...',
+          '... de wereld lekt ...'
+        ],
+        angry:[
+          '... nee scherp genoeg ...',
+          '... snij het signaal ...',
+          '... niet dichterbij ...'
+        ],
+        shy:[
+          '... misschien niet kijken ...',
+          '... half verborgen ...',
+          '... zacht achter glas ...'
+        ]
       };
-      const includeNews = Math.random() < .76;
-      const meaningful = Math.random() < .18;
-      const left = glyphCluster(rndInt(2,6));
-      const right = glyphCluster(rndInt(2,6));
-      if (includeNews) {
-        const middle = newsFragment(mood);
-        return { text: meaningful ? `${left} ${pick(phrases[mood]||phrases.neutral)} ${middle} ${right}` : `${left} ${middle} ${right}`, meaningful };
+
+      const includeNews = Math.random() < .72;
+      const includeWeather = Math.random() < .42;
+      const meaningful = Math.random() < .16;
+      const left = glyphCluster(rndInt(3,7));
+      const right = glyphCluster(rndInt(3,7));
+      const joiner = pick([' / ', ' :: ', ' // ', ' · ']);
+
+      const fragments = [];
+      if (includeWeather) fragments.push(weatherWord());
+      if (includeNews) fragments.push(newsFragment(mood));
+      if (!fragments.length) fragments.push(glyphCluster(rndInt(4,9)));
+      if (Math.random() < .22) fragments.push(WorldBrain.time.phaseName || 'nacht');
+
+      const middle = fragments.join(joiner);
+      if (meaningful) {
+        return {
+          text: `${left} ${pick(phrases[mood] || phrases.neutral)} ${middle} ${right}`,
+          meaningful: true
+        };
       }
-      if (meaningful) return { text:`${left} ${pick(phrases[mood]||phrases.neutral)} ${right}`, meaningful:true };
-      return { text:Array.from({length:rndInt(2,4)},()=>glyphCluster(rndInt(3,8))).join(' '), meaningful:false };
+      return {
+        text: `${left} ${middle} ${right}`,
+        meaningful: false
+      };
     }
 
     function dominantMood(){
@@ -680,16 +734,56 @@
       blink.strength = Math.max(blink.strength * .65, b);
     }
 
+    function attentionTarget(){
+      if (!CONFIG.attentionToEvents) return null;
+      let best = null;
+      let score = 0;
+
+      for (const s of ShipBrain.ships) {
+        if (s.y > 146) continue;
+        const centerBias = 1 - clamp(Math.abs(s.x - W/2) / (W/2), 0, 1);
+        const sizeBias = s.depth + (s.archetype === 'carrier' ? .34 : 0) + (s.archetype === 'probe' ? .12 : 0);
+        const visible = s.x > -12 && s.x < W + 12 ? 1 : .2;
+        const sc = (centerBias * .52 + sizeBias * .48) * visible;
+        if (sc > score) { score = sc; best = { x:s.x, y:s.y, strength:clamp(sc,0,1), kind:s.archetype }; }
+      }
+
+      if (bgEvents.star.active) {
+        const e = bgEvents.star;
+        const t = clamp((performance.now() - e.start) / e.duration, 0, 1);
+        const x = lerp(e.x0, e.x1, t);
+        const y = lerp(e.y0, e.y1, t);
+        if (.58 > score) best = { x, y, strength:.58, kind:'falling-star' };
+      }
+
+      if (DriftGlyphBrain.glyphs.length && Math.random() < .18) {
+        const g = pick(DriftGlyphBrain.glyphs);
+        if (.38 > score) best = { x:g.x, y:g.y, strength:.38, kind:'word' };
+      }
+
+      return best && best.strength > .30 ? best : null;
+    }
+
     function updateGaze(now, dt){
       const mood = dominantMood();
       if (now > gaze.nextAt) {
-        let spreadX = .34 + emotion.curiosity*.25;
-        let spreadY = .15 + emotion.sadness*.18;
-        if (mood === 'shy') { spreadX=.20; spreadY=.14; }
-        if (mood === 'surprised') { spreadX=.10; spreadY=.12; }
-        gaze.tx = clamp(expr.gazeX + rnd(-spreadX, spreadX), -1.2, 1.2);
-        gaze.ty = clamp(expr.gazeY + rnd(-spreadY, spreadY), -.8, .9);
-        gaze.nextAt = now + rnd(1400, 4200);
+        const target = attentionTarget();
+        if (target && Math.random() > .22) {
+          gaze.tx = clamp((target.x - 180) / 70, -1.15, 1.15);
+          gaze.ty = clamp((target.y - 106) / 72, -.75, .80);
+          gaze.nextAt = now + rnd(900, 2300) + target.strength * 1200;
+          if (target.kind === 'carrier' || target.kind === 'falling-star') {
+            emotion.curiosity = clamp(emotion.curiosity + .025, 0, 1);
+          }
+        } else {
+          let spreadX = .34 + emotion.curiosity*.25;
+          let spreadY = .15 + emotion.sadness*.18;
+          if (mood === 'shy') { spreadX=.20; spreadY=.14; }
+          if (mood === 'surprised') { spreadX=.10; spreadY=.12; }
+          gaze.tx = clamp(expr.gazeX + rnd(-spreadX, spreadX), -1.2, 1.2);
+          gaze.ty = clamp(expr.gazeY + rnd(-spreadY, spreadY), -.8, .9);
+          gaze.nextAt = now + rnd(1400, 4200);
+        }
       }
       gaze.x = damp(gaze.x, gaze.tx, 3.7, dt);
       gaze.y = damp(gaze.y, gaze.ty, 3.7, dt);
@@ -753,50 +847,83 @@
     function createShip(seed, archetype, depth){
       const rng = mulberry32(seed);
       const specs = {
-        needle:[13,5], freighter:[17,7], drone:[9,5], saucer:[15,5], organic:[13,7], broken:[15,7], carrier:[25,9]
+        needle:[15,5], freighter:[19,7], drone:[9,7], saucer:[17,5], organic:[15,9], broken:[17,7], carrier:[29,9]
       };
       const [gw, gh] = specs[archetype] || specs.needle;
       const grid = Array.from({length:gh},()=>Array(gw).fill(0));
       const midY = Math.floor(gh/2), midX = Math.floor(gw/2);
       const cell = (x,y,v) => { if (x>=0 && x<gw && y>=0 && y<gh) grid[y][x] = Math.max(grid[y][x], v); };
+      const erase = (x,y) => { if (x>=0 && x<gw && y>=0 && y<gh) grid[y][x] = 0; };
 
-      for (let x=1; x<gw-1; x++) {
-        const bodyChance = archetype === 'needle' ? .78 : archetype === 'freighter' ? .82 : .62;
-        if (rng() < bodyChance) { cell(x,midY,2); if (rng()>.55) cell(x,midY-1,1); if (rng()>.55) cell(x,midY+1,1); }
+      if (archetype === 'needle') {
+        for (let x=1; x<gw-2; x++) cell(x, midY, 2);
+        for (let x=4; x<gw-5; x++) if (rng()>.35) { cell(x, midY-1, 1); cell(x, midY+1, 1); }
+        cell(gw-2, midY, 3); cell(gw-3, midY-1, 3); cell(gw-3, midY+1, 3);
+        cell(0, midY, 5); cell(1, midY-1, 4); cell(1, midY+1, 4);
       }
-      const wingSpan = archetype === 'carrier' ? 4 : archetype === 'freighter' ? 3 : 2;
-      for (let x=2; x<gw-2; x++) {
-        if (rng()>.52) {
-          const span = 1 + Math.floor(rng()*wingSpan);
-          for(let s=1;s<=span;s++){ cell(x,midY-s,1); cell(x,midY+s,1); }
+
+      if (archetype === 'freighter' || archetype === 'carrier') {
+        const margin = archetype === 'carrier' ? 2 : 1;
+        for (let x=margin; x<gw-margin; x++) {
+          cell(x, midY, 2);
+          if (x > 3 && x < gw-4) { cell(x, midY-1, 1); cell(x, midY+1, 1); }
+          if (archetype === 'carrier' && x > 5 && x < gw-6 && x % 2 === 0) { cell(x, midY-2, 1); cell(x, midY+2, 1); }
         }
+        for (let x=4; x<gw-4; x+=3) { cell(x, 1, 1); cell(x, gh-2, 1); }
+        cell(gw-3, midY-1, 3); cell(gw-3, midY, 3);
+        cell(1, midY-1, 5); cell(1, midY+1, 5);
+        if (archetype === 'carrier') { cell(0, midY, 5); cell(2, 1, 4); cell(2, gh-2, 4); }
       }
+
+      if (archetype === 'drone') {
+        for (let y=1;y<gh-1;y++) cell(midX, y, 2);
+        for (let x=1;x<gw-1;x++) cell(x, midY, 2);
+        cell(midX, midY, 3); cell(midX-2, midY-2, 4); cell(midX+2, midY+2, 4);
+        cell(1, midY, 5); cell(gw-2, midY, 5);
+        cell(midX, 0, 6); cell(midX, gh-1, 6);
+      }
+
       if (archetype === 'saucer') {
-        for(let x=2;x<gw-2;x++){ cell(x,midY,2); if (x>4 && x<gw-5) { cell(x,midY-1,1); cell(x,midY+1,1); } }
+        for (let x=2;x<gw-2;x++) cell(x, midY, 2);
+        for (let x=4;x<gw-4;x++) { cell(x, midY-1, 1); cell(x, midY+1, 1); }
+        for (let x=6;x<gw-6;x++) cell(x, midY-2, 3);
+        cell(2, midY, 5); cell(gw-3, midY, 5);
+        cell(midX-3, midY+1, 4); cell(midX, midY+1, 4); cell(midX+3, midY+1, 4);
       }
+
       if (archetype === 'organic') {
-        for(let y=1;y<gh-1;y++) for(let x=2;x<gw-2;x++) if (Math.abs(y-midY)+rng()*2 < 2.4) cell(x,y,rng()>.55?2:1);
+        for (let x=1;x<gw-1;x++) {
+          const wave = Math.round(Math.sin(x*.85 + rng()*1.3) * 1.4);
+          const half = 1 + Math.floor(rng()*2);
+          for (let d=-half; d<=half; d++) cell(x, clamp(midY + wave + d, 0, gh-1), rng()>.55 ? 2 : 1);
+        }
+        for (let i=0;i<5;i++) cell(2 + Math.floor(rng()*(gw-4)), Math.floor(rng()*gh), 4);
+        cell(gw-3, midY, 3); cell(1, midY, 5);
       }
+
       if (archetype === 'broken') {
-        for(let i=0;i<Math.floor(gw*gh*.08);i++) cell(Math.floor(rng()*gw), Math.floor(rng()*gh), 0);
+        for (let x=1; x<gw-1; x++) { cell(x, midY, 2); if (rng()>.45) cell(x, midY-1, 1); if (rng()>.45) cell(x, midY+1, 1); }
+        cell(gw-2, midY, 3); cell(1, midY, 5);
+        for(let i=0;i<Math.floor(gw*gh*.16);i++) erase(Math.floor(rng()*gw), Math.floor(rng()*gh));
+        for(let i=0;i<4;i++) cell(Math.floor(rng()*gw), Math.floor(rng()*gh), 6);
       }
-      cell(midX, midY-1, 3);
-      cell(gw-2, midY, 4);
-      cell(1, midY, 5);
-      if (rng()>.52) cell(midX + Math.floor(rng()*4)-2, 0, 6);
-      if (rng()>.55) cell(midX + Math.floor(rng()*4)-2, gh-1, 6);
+
+      // Algemene kleine details, maar niet te random: elk schip krijgt een herkenbare kern.
+      if (rng()>.45) cell(midX, Math.max(0, midY-1), 3);
+      if (rng()>.55) cell(midX + Math.floor(rng()*4)-2, 0, 6);
+      if (rng()>.62) cell(midX + Math.floor(rng()*4)-2, gh-1, 6);
 
       const dir = rng() > .5 ? 1 : -1;
-      const y = rnd(18, 126);
-      const speedBase = archetype === 'carrier' ? .010 : archetype === 'freighter' ? .018 : archetype === 'needle' ? .055 : .028;
+      const y = archetype === 'carrier' ? rnd(24, 82) : rnd(18, 126);
+      const speedBase = archetype === 'carrier' ? .004 : archetype === 'freighter' ? .008 : archetype === 'needle' ? .022 : archetype === 'drone' ? .014 : .012;
       return {
         seed, archetype, grid, gw, gh, depth, dir,
-        x:dir > 0 ? -gw*7 : W + gw*7,
-        y, scale:lerp(.75, 1.9, depth),
-        speed:speedBase * lerp(.55, 1.7, depth),
-        alpha:lerp(.28, .88, depth),
+        x:dir > 0 ? -gw*8 : W + gw*8,
+        y, scale:lerp(.70, 1.75, depth),
+        speed:speedBase * lerp(.38, 1.10, depth),
+        alpha:lerp(.22, .82, depth),
         phase:rng()*999,
-        behavior:pick(['straight','hover','arc','burst','glitch'])
+        behavior:archetype === 'saucer' ? 'hover' : archetype === 'broken' ? 'glitch' : pick(['straight','hover','arc','burst','glitch'])
       };
     }
 
@@ -804,7 +931,7 @@
       const night = WorldBrain.time.isNight;
       const archetypes = rare ? ['carrier','organic','broken'] : night ? ['needle','freighter','drone','saucer','organic','broken'] : ['needle','freighter','drone','saucer'];
       const archetype = pick(archetypes);
-      const depth = rare ? rnd(.46,.78) : Math.pow(rnd(.10, .95), 1.25);
+      const depth = rare ? rnd(.44,.74) : Math.pow(rnd(.08, .92), 1.55);
       ShipBrain.ships.push(createShip(++ShipBrain.seed, archetype, depth));
     }
 
@@ -812,11 +939,11 @@
       const quietness = WorldBrain.weather.visual.fog * 1800 + WorldBrain.time.isNight * -900;
       if (now > ShipBrain.nextSpawnAt && ShipBrain.ships.length < ShipBrain.maxShips) {
         spawnShip(now, false);
-        ShipBrain.nextSpawnAt = now + rnd(3600, 15000) + quietness;
+        ShipBrain.nextSpawnAt = now + rnd(12000, 36000) / CONFIG.shipDensity + quietness;
       }
       if (now > ShipBrain.rareAt) {
         spawnShip(now, true);
-        ShipBrain.rareAt = now + rnd(45000, 95000);
+        ShipBrain.rareAt = now + rnd(80000, 170000);
       }
       const wind = WorldBrain.weather.visual.wind;
       for (const s of ShipBrain.ships) {
@@ -940,28 +1067,59 @@
       drawDriftGlyphs(now);
       drawShootingStar(now);
       drawSignal(now);
-      drawWeather(now);
+      drawWeatherBack(now);
     }
 
     function drawShips(now){
       for (const s of ShipBrain.ships) {
         ctx.save();
-        ctx.globalAlpha = s.alpha * (WorldBrain.weather.visual.fog > .5 ? .72 : 1);
-        const bob = Math.sin(now*.002 + s.phase) * (s.behavior === 'hover' ? 2.6 : .7);
-        ctx.translate(Math.round(s.x), Math.round(s.y + bob));
+        const fogFade = WorldBrain.weather.visual.fog > .5 ? .70 : 1;
+        const clarity = .52 + WorldBrain.weather.visual.clarity * .48;
+        ctx.globalAlpha = s.alpha * fogFade * clarity;
+        const bob = Math.sin(now*.002 + s.phase) * (s.behavior === 'hover' ? 2.8 : .7);
+        const tremble = s.archetype === 'broken' ? Math.sin(now*.035 + s.seed) * .8 : 0;
+        ctx.translate(Math.round(s.x + tremble), Math.round(s.y + bob));
         if (s.dir < 0) ctx.scale(-1,1);
         ctx.scale(s.scale, s.scale);
+
         const cellSize = 2;
         const offX = -s.gw * cellSize / 2, offY = -s.gh * cellSize / 2;
         const wp = WardrobeBrain.current || { accent:C.green1, line:C.cyan4 };
         const pal = [C.black, C.cyan1, C.cyan3, C.white, wp.accent, C.amber, C.magenta];
+
+        if (s.archetype === 'carrier') {
+          ctx.globalAlpha *= .55;
+          rect(offX - 3, offY + 2, s.gw * cellSize + 6, s.gh * cellSize - 4, C.black);
+          ctx.globalAlpha *= 1.55;
+        }
+
         for (let y=0;y<s.gh;y++) {
           for (let x=0;x<s.gw;x++) {
             const v = s.grid[y][x];
             if (!v) continue;
-            rect(offX + x*cellSize, offY + y*cellSize, cellSize, cellSize, pal[v] || C.cyan4);
+            const flicker = (s.archetype === 'broken' && hash(Math.floor(now/120) + x*13 + y*7 + s.seed) > .92);
+            const col = flicker ? C.magenta : (pal[v] || C.cyan4);
+            rect(offX + x*cellSize, offY + y*cellSize, cellSize, cellSize, col);
           }
         }
+
+        if (s.archetype === 'probe') {
+          ctx.globalAlpha *= .28;
+          line(0, offY + s.gh * cellSize, 0, offY + s.gh * cellSize + 18, 1, C.green2);
+          rect(-1, offY + s.gh * cellSize + 18, 3, 1, C.green2);
+        }
+
+        if (s.archetype === 'saucer' && Math.sin(now*.004+s.phase) > .12) {
+          ctx.globalAlpha *= .22;
+          path(C.cyan4,[['M',-6,offY+s.gh*cellSize],['L',6,offY+s.gh*cellSize],['L',14,offY+s.gh*cellSize+22],['L',-14,offY+s.gh*cellSize+22]]);
+        }
+
+        if (s.archetype === 'organic') {
+          ctx.globalAlpha *= .28;
+          line(offX - 5, 0, offX - 13, -4 + Math.sin(now*.004+s.phase)*3, 1, C.magenta);
+          line(offX - 4, 2, offX - 12, 7 + Math.cos(now*.004+s.phase)*3, 1, C.green2);
+        }
+
         if (s.depth > .55) {
           ctx.globalAlpha *= .35;
           rect(offX - 8, -1, 7, 1, C.cyan4);
@@ -993,51 +1151,75 @@
       ctx.globalAlpha = 1;
     }
 
-    function drawWeather(now){
+    function drawWeatherBack(now){
       const v = WorldBrain.weather.visual;
       if (v.cloud > .18) {
-        ctx.globalAlpha = v.cloud * .10;
+        ctx.globalAlpha = v.cloud * .11;
         for (let i=0;i<5;i++) {
-          const y = 24 + i*24 + Math.sin(now*.0005 + i)*4;
-          rect(0,y,W,7, i%2 ? C.cyan0 : C.fog);
+          const y = 22 + i*25 + Math.sin(now*.0005 + i)*4;
+          rect(0,y,W,8, i%2 ? C.cyan0 : C.fog);
         }
         ctx.globalAlpha = 1;
       }
+      if (v.fog > .03) {
+        ctx.globalAlpha = v.fog * .13;
+        rect(0,32,W,40,C.fog);
+        rect(0,98,W,25,C.cyan4);
+        rect(0,178,W,38,C.fog);
+        ctx.globalAlpha = 1;
+      }
+      if (v.heat > .04) {
+        ctx.globalAlpha = v.heat * .07;
+        rect(0,0,W,H,C.amber);
+        ctx.globalAlpha = 1;
+      }
+      if (v.cold > .04) {
+        ctx.globalAlpha = v.cold * .06;
+        rect(0,0,W,H,C.cyan4);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawWeatherFront(now){
+      const v = WorldBrain.weather.visual;
       if (v.rain > .03) {
-        ctx.globalAlpha = v.rain * .55;
-        for (const d of rainDrops) {
+        ctx.globalAlpha = v.rain * .48;
+        const rn = REDUCED ? 14 : Math.floor(rainDrops.length * .78);
+        for (let i=0;i<rn;i++) {
+          const d = rainDrops[i];
           const x = (d.x + now*.032*v.wind*d.s) % W;
           const y = (d.y + now*.085*d.s) % H;
-          line(x,y,x-3-v.wind*5,y+7,1,C.cyan4);
+          const foreground = i % 5 === 0;
+          line(x,y,x-3-v.wind*(foreground?7:5),y+(foreground?10:7),foreground?2:1,C.cyan4);
         }
         ctx.globalAlpha = 1;
       }
       if (v.snow > .03) {
-        ctx.globalAlpha = v.snow * .62;
-        for (const f of snowFlakes) {
+        ctx.globalAlpha = v.snow * .58;
+        const sn = REDUCED ? 12 : Math.floor(snowFlakes.length * .82);
+        for (let i=0;i<sn;i++) {
+          const f = snowFlakes[i];
           const x = (f.x + Math.sin(now*.001+f.p)*8 + W) % W;
           const y = (f.y + now*.018*f.s) % H;
           rect(x,y,f.s>1.2?2:1,f.s>1.2?2:1,C.white);
         }
         ctx.globalAlpha = 1;
       }
-      if (v.fog > .03) {
-        ctx.globalAlpha = v.fog * .17;
-        rect(0,38,W,42,C.fog);
-        rect(0,104,W,26,C.cyan4);
-        rect(0,182,W,34,C.fog);
+      if (v.fog > .10) {
+        ctx.globalAlpha = v.fog * .08;
+        rect(0,140,W,60,C.fog);
         ctx.globalAlpha = 1;
       }
-      if (v.heat > .04) {
-        ctx.globalAlpha = v.heat * .09;
-        rect(0,0,W,H,C.amber);
+      if (v.storm > .05 && hash(Math.floor(now/220)) > .975) {
+        ctx.globalAlpha = v.storm * .22;
+        rect(0,0,W,H,C.white);
         ctx.globalAlpha = 1;
       }
-      if (v.cold > .04) {
-        ctx.globalAlpha = v.cold * .08;
-        rect(0,0,W,H,C.cyan4);
-        ctx.globalAlpha = 1;
-      }
+    }
+
+    function drawWeather(now){
+      drawWeatherBack(now);
+      drawWeatherFront(now);
     }
 
     function drawHairBack(){
@@ -1048,16 +1230,58 @@
 
     function drawShouldersAndNeck(){
       const wp = WardrobeBrain.current || { base:C.cyan2, shade:C.cyan0, accent:C.green1, line:C.cyan4, outfit:'cloak' };
+      const outfit = wp.outfit || 'cloak';
+
       path(C.black,[['M',115,255],['C',126,214,137,198,152,191],['C',167,186,194,187,210,194],['C',230,202,244,219,254,255],['L',115,255]]);
       path(wp.base,[['M',126,255],['C',135,219,146,203,159,198],['C',174,194,194,195,206,201],['C',223,209,235,226,244,255],['L',126,255]]);
       path(wp.shade,[['M',154,196],['C',166,207,181,211,199,201],['L',205,255],['L',148,255]]);
       line(151,198,143,244,3,C.black); line(210,201,226,246,3,C.black);
       rect(162,206,29,5,C.black); rect(166,205,23,3,wp.line);
-      if (wp.outfit === 'armor') { rect(132,224,18,5,wp.line); rect(213,224,18,5,wp.line); rect(172,220,16,4,wp.accent); }
-      if (wp.outfit === 'nightdress') { ctx.globalAlpha=.7; rect(139,233,2,2,wp.accent); rect(203,228,1,1,wp.line); rect(188,244,2,2,wp.accent); ctx.globalAlpha=1; }
-      if (wp.outfit === 'ceremonial') { rect(159,218,6,20,wp.accent); rect(196,218,6,20,wp.accent); rect(176,211,9,3,wp.line); }
-      if (wp.outfit === 'raincoat') { ctx.globalAlpha=.55; line(139,211,130,248,1,wp.line); line(222,211,237,249,1,wp.line); ctx.globalAlpha=1; }
-      if (wp.outfit === 'storm-jacket') { rect(128,217,20,3,wp.accent); rect(213,217,22,3,wp.accent); }
+
+      if (outfit === 'cloak') {
+        ctx.globalAlpha=.58;
+        path(wp.shade,[['M',122,255],['C',132,224,146,207,162,199],['L',144,255]]);
+        path(wp.shade,[['M',238,255],['C',228,224,214,207,199,200],['L',218,255]]);
+        ctx.globalAlpha=1;
+        rect(176,213,8,23,wp.accent);
+      }
+      if (outfit === 'armor') {
+        rect(128,221,24,7,C.black); rect(132,224,18,5,wp.line);
+        rect(208,221,26,7,C.black); rect(213,224,18,5,wp.line);
+        rect(169,218,22,6,C.black); rect(172,220,16,4,wp.accent);
+        rect(156,232,48,3,wp.line);
+      }
+      if (outfit === 'nightdress') {
+        ctx.globalAlpha=.75;
+        rect(139,233,2,2,wp.accent); rect(203,228,1,1,wp.line); rect(188,244,2,2,wp.accent);
+        rect(162,229,1,1,wp.line); rect(222,241,2,2,wp.accent);
+        ctx.globalAlpha=1;
+        line(151,215,134,255,1,wp.accent); line(210,215,229,255,1,wp.accent);
+      }
+      if (outfit === 'ceremonial') {
+        rect(158,216,8,23,wp.accent); rect(195,216,8,23,wp.accent); rect(174,211,12,4,wp.line);
+        rect(168,225,25,2,wp.line); rect(171,236,19,2,wp.accent);
+      }
+      if (outfit === 'raincoat') {
+        ctx.globalAlpha=.62;
+        line(139,211,130,248,1,wp.line); line(222,211,237,249,1,wp.line);
+        rect(145,210,70,2,wp.line); rect(155,222,5,22,wp.accent); rect(202,222,5,22,wp.accent);
+        ctx.globalAlpha=1;
+      }
+      if (outfit === 'storm-jacket') {
+        rect(126,215,25,6,C.black); rect(128,217,20,3,wp.accent);
+        rect(210,215,27,6,C.black); rect(213,217,22,3,wp.accent);
+        line(154,214,135,255,2,wp.line); line(207,214,230,255,2,wp.line);
+      }
+      if (outfit === 'robe') {
+        path(wp.shade,[['M',146,210],['C',164,221,173,236,179,255],['L',142,255]]);
+        path(wp.shade,[['M',216,210],['C',198,221,189,236,183,255],['L',220,255]]);
+        rect(178,213,5,40,wp.accent);
+      }
+      if (outfit === 'suit') {
+        rect(144,218,20,4,wp.line); rect(198,218,20,4,wp.line);
+        rect(170,216,22,3,wp.accent); rect(176,226,10,21,wp.line);
+      }
     }
 
     function drawFaceBase(){
@@ -1177,7 +1401,6 @@
       drawEye(146,107,-1,p); drawEye(207,107,1,p); drawNose(); drawMouth(p,now); drawEffects(p,now);
       rect(242,118,3,17,C.black); rect(151,196,37,3,C.black);
       ctx.restore();
-      drawSpeechBubble(now);
     }
 
     function applyGlitch(now){
@@ -1197,7 +1420,7 @@
       if (!DEBUG || !dbgEl) return;
       const w = WorldBrain.weather.visual;
       dbgEl.textContent = [
-        'Wandering Art v3',
+        'Wandering Art v4',
         'mood ' + dominantMood() + '  val ' + emotion.valence.toFixed(2) + '  cur ' + emotion.curiosity.toFixed(2),
         'weather ' + WorldBrain.weather.status + ' / ' + (WorldBrain.weather.mood || 'clear') + '  t ' + Math.round(WorldBrain.weather.temperature) + 'c',
         'rain ' + w.rain.toFixed(2) + ' storm ' + w.storm.toFixed(2) + ' fog ' + w.fog.toFixed(2) + ' wind ' + w.wind.toFixed(2),
@@ -1211,7 +1434,6 @@
       lastNow=now;
       updateTimeBrain(now);
       updateWeatherBrain(now,dt);
-      fetchNewsKeywords(false);
       updateEmotion(now,dt);
       updateMemory(dt);
       updateWardrobe(now,dt);
@@ -1229,8 +1451,12 @@
     function render(now){
       update(now);
       drawBackground(now);
+      drawMoodAura(now);
       drawEntity(now);
+      drawWeatherFront(now);
       applyGlitch(now);
+      drawSpeechBubble(now);
+      drawDebug(now);
       if(!STATIC_PREVIEW) requestAnimationFrame(render);
     }
 
