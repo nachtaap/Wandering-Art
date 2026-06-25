@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — Living Pixel World v6</title>
+  <title>Wandering Art — Living Pixel World v9</title>
   <style>
     :root{ --bg:#020207; }
     *{ box-sizing:border-box; margin:0; padding:0; }
@@ -63,6 +63,16 @@
       font:10px/1.35 monospace; color:#69fff3; opacity:.72;
       text-shadow:0 0 4px #000;
     }
+    #enter{
+      position:fixed; left:0; right:0; bottom:7%; z-index:8;
+      text-align:center; pointer-events:none;
+      font:11px/1 monospace; letter-spacing:.32em; text-transform:lowercase;
+      color:#69fff3; opacity:0;
+      text-shadow:0 0 6px rgba(0,255,214,.4);
+      transition:opacity 2.4s ease;
+    }
+    #enter.show{ opacity:.16; }
+    #enter.gone{ opacity:0; transition:opacity 1.4s ease; }
     @media (prefers-reduced-motion: reduce){
       canvas{ filter:contrast(1.06) saturate(1.08) drop-shadow(0 0 18px rgba(0,255,214,.12)); }
     }
@@ -72,6 +82,7 @@
   <main id="stage" aria-label="Wandering Art — autonomous pixel entity">
     <canvas id="entity" width="360" height="260"></canvas>
   </main>
+  <div id="enter" aria-hidden="true">binnentreden</div>
   <pre id="dbg"></pre>
 
   <script>
@@ -82,12 +93,15 @@
     const STATIC_PREVIEW = PARAMS.has('static');
     const DEBUG = PARAMS.has('debug');
     const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Audio standaard aan (na de drempel-gesture). ?audio=off of ?mute = pure stille versie.
+    // Bij reduced-motion standaard uit, tenzij ?audio=on.
+    const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
 
     const CONFIG = {
       locationDelayMs: 12000,
-      shipDensity: 0.42,
+      shipDensity: 0.85,
       ambientGlyphs: true,
-      ambientGlyphChance: 0.010,
+      ambientGlyphChance: 0.0035,
       // Outfit blijft stabiel. Alleen bij een zeldzame vertrek/terugkomst-scène wisselt ze kleding.
       outfitChangeEnabled: true,
       outfitFirstDepartureMinMs: 210000,
@@ -176,7 +190,8 @@
 
     const NewsBrain = {
       enabled:true, loading:false, lastFetch:0, nextFetchAt:0, failures:0,
-      keywords:['signaal','ruimte','wereld','licht','verandering'], topics:[], tone:0
+      keywords:['voetbal','hittegolf','aardbeving','signaal','ruimte','wereld','licht','verandering','klimaat','stroom'],
+      topics:[], tone:0
     };
 
     const MemoryBrain = {
@@ -200,16 +215,18 @@
     };
 
     const ShipBrain = {
-      ships:[], nextSpawnAt:performance.now() + rnd(16000, 32000), seed:1000,
-      maxShips:REDUCED ? 2 : 3,
-      rareAt:performance.now() + rnd(65000, 135000),
+      ships:[], nextSpawnAt:performance.now() + rnd(2500, 6000), seed:1000,
+      maxShips:REDUCED ? 3 : 5,
+      rareAt:performance.now() + rnd(38000, 90000),
       majorAt:performance.now() + rnd(CONFIG.hugeShipMinMs, CONFIG.hugeShipMaxMs)
     };
 
     const FREIGHT_ROUTES = [
-      { name:'upper freight lane', y:38, wobble:2.5, depth:.16, speedMul:.62, alphaMul:.70 },
-      { name:'middle freight lane', y:72, wobble:3.0, depth:.28, speedMul:.72, alphaMul:.82 },
-      { name:'distant freight lane', y:106, wobble:2.0, depth:.12, speedMul:.52, alphaMul:.58 }
+      { name:'upper freight lane', y:34, wobble:2.5, depth:.32, speedMul:.66, alphaMul:.92 },
+      { name:'high freight lane', y:58, wobble:3.0, depth:.46, speedMul:.78, alphaMul:1.0 },
+      { name:'middle freight lane', y:88, wobble:3.2, depth:.40, speedMul:.74, alphaMul:.96 },
+      { name:'low freight lane', y:120, wobble:2.6, depth:.28, speedMul:.62, alphaMul:.86 },
+      { name:'distant freight lane', y:150, wobble:2.0, depth:.20, speedMul:.54, alphaMul:.74 }
     ];
 
     const speech = {
@@ -218,6 +235,18 @@
     };
 
     const blink = { nextAt:performance.now() + rnd(1800, 5200), until:performance.now() + 120, strength:0 };
+
+    // Dynamische pupilgrootte per oog, reageert op emotie en licht
+    const PupilBrain = { left:1.0, right:1.0 };
+
+    // Uitgebreide oogtoestanden: trage sluiting, knipoog, heavy-lid, wide-open, fourth wall
+    const EyeBrain = {
+      state:'idle',      // idle | slowClose | winkL | winkR | heavyLid | wideOpen | fourthWall
+      stateStart:0,
+      stateDur:0,
+      leftLid:0,         // 0=open, 1=gesloten — gecombineerd met blink.strength in drawEye
+      rightLid:0,
+    };
     const gaze = { x:0, y:0, tx:0, ty:0, nextAt:performance.now() + 1200 };
     const motion = { x:0, y:0, tilt:0, tx:0, ty:0, ttilt:0, nextAt:performance.now() + rnd(3500,7000) };
 
@@ -239,18 +268,236 @@
 
     const DriftGlyphBrain = {
       glyphs: [],
-      nextAt: performance.now() + rnd(3500, 9000),
-      max: REDUCED ? 5 : 12
+      nextAt: performance.now() + rnd(14000, 30000),
+      max: REDUCED ? 2 : 4
+    };
+
+    // Procedureel kosmisch event-systeem: een gewogen pool van zeldzame,
+    // gevarieerde verschijnselen die op organische, ongelijke timers vuren.
+    const CosmicBrain = {
+      events: [],
+      nextAt: performance.now() + rnd(5000, 12000),
+      pool: [
+        { type:'comet',        w:14 },
+        { type:'satellite',    w:13 },
+        { type:'flash',        w:12 },
+        { type:'debris',       w:11 },
+        { type:'ripple',       w:10 },
+        { type:'pulsar',       w:9  },
+        { type:'meteorShower', w:7  },
+        { type:'riftGlow',     w:6  },
+        { type:'aurora',       w:4  },
+        { type:'driftMoon',    w:2  }
+      ]
+    };
+
+    // Generatieve, ambient audio: een readback van dezelfde brains die het beeld sturen.
+    // Geen soundtrack maar ruimte: lage ademende drone + weerruis + spaarzame event-klanken.
+    const AudioBrain = {
+      ctx:null, master:null, reverb:null, revSend:null,
+      drone:null, droneGain:null, droneLP:null, pad:null, padGain:null,
+      noiseGain:null, noiseBP:null,
+      started:false, enabled:!AUDIO_OFF, root:55, lastTick:0,
+
+      makeIR(sec, decay){
+        const ctx=this.ctx, rate=ctx.sampleRate, len=Math.floor(rate*sec);
+        const buf=ctx.createBuffer(2,len,rate);
+        for(let ch=0;ch<2;ch++){ const d=buf.getChannelData(ch);
+          for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay); }
+        return buf;
+      },
+      makeNoise(sec){
+        const ctx=this.ctx, rate=ctx.sampleRate, len=Math.floor(rate*sec);
+        const buf=ctx.createBuffer(1,len,rate), d=buf.getChannelData(0);
+        for(let i=0;i<len;i++) d[i]=Math.random()*2-1; return buf;
+      },
+
+      start(){
+        if(this.started || !this.enabled) return;
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC){ this.enabled=false; return; }
+        this.started=true;
+        const ctx=this.ctx=new AC();
+        const master=this.master=ctx.createGain(); master.gain.value=0.0001;
+        const comp=ctx.createDynamicsCompressor();
+        comp.threshold.value=-16; comp.ratio.value=6; comp.attack.value=.01; comp.release.value=.3;
+        master.connect(comp).connect(ctx.destination);
+
+        const reverb=this.reverb=ctx.createConvolver(); reverb.buffer=this.makeIR(4.5,3.2);
+        const revSend=this.revSend=ctx.createGain(); revSend.gain.value=.8;
+        const revReturn=ctx.createGain(); revReturn.gain.value=.7;
+        revSend.connect(reverb).connect(revReturn).connect(master);
+
+        const droneLP=this.droneLP=ctx.createBiquadFilter(); droneLP.type='lowpass'; droneLP.frequency.value=360; droneLP.Q.value=.6;
+        const droneGain=this.droneGain=ctx.createGain(); droneGain.gain.value=0;
+        droneLP.connect(droneGain); droneGain.connect(master); droneGain.connect(revSend);
+        const dmuls=[1,1.004,0.5];
+        this.drone=[['sine',0],['triangle',1],['sine',2]].map((spec,i)=>{
+          const o=ctx.createOscillator(); o.type=spec[0]; o.frequency.value=this.root*dmuls[i]; o.connect(droneLP); o.start(); return o;
+        });
+
+        const padLP=ctx.createBiquadFilter(); padLP.type='lowpass'; padLP.frequency.value=900;
+        const padGain=this.padGain=ctx.createGain(); padGain.gain.value=0;
+        padLP.connect(padGain); padGain.connect(revSend); padGain.connect(master);
+        this.pad=[1.5,2.0,3.0].map((mul,i)=>{ const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=this.root*mul; const g=ctx.createGain(); g.gain.value=i?.3:.6; o.connect(g).connect(padLP); o.start(); return o; });
+
+        // Adem-LFO gesynct met de visuele breath (~1.12 rad/s -> Hz)
+        const breathGain=ctx.createGain(); breathGain.gain.value=.045;
+        const breathLFO=ctx.createOscillator(); breathLFO.frequency.value=1.12/(2*Math.PI);
+        breathLFO.connect(breathGain).connect(droneGain.gain); breathLFO.start();
+
+        // Weerruis-laag
+        const noiseSrc=ctx.createBufferSource(); noiseSrc.buffer=this.makeNoise(3); noiseSrc.loop=true;
+        const noiseBP=this.noiseBP=ctx.createBiquadFilter(); noiseBP.type='bandpass'; noiseBP.frequency.value=600; noiseBP.Q.value=.8;
+        const noiseGain=this.noiseGain=ctx.createGain(); noiseGain.gain.value=0;
+        noiseSrc.connect(noiseBP).connect(noiseGain); noiseGain.connect(master); noiseGain.connect(revSend); noiseSrc.start();
+
+        const t=ctx.currentTime;
+        master.gain.setTargetAtTime(.42, t, 6);
+        droneGain.gain.setTargetAtTime(.14, t, 8);
+        padGain.gain.setTargetAtTime(.04, t, 10);
+      },
+
+      setRoot(){
+        const ph=WorldBrain.time.phaseName||'day';
+        let r=55;
+        if(ph.includes('night')) r=46.25; else if(ph.includes('dawn')) r=51.91; else if(ph.includes('dusk')) r=58.27;
+        if(Math.abs(r-this.root)<.01) return;
+        this.root=r;
+        if(this.drone){ const t=this.ctx.currentTime, m=[1,1.004,0.5]; this.drone.forEach((o,i)=>o.frequency.setTargetAtTime(r*m[i],t,6)); }
+      },
+
+      tick(now){
+        if(!this.started || !this.ctx || now-this.lastTick<90) return;
+        this.lastTick=now;
+        const ctx=this.ctx, t=ctx.currentTime, w=WorldBrain.weather.visual, em=emotion;
+        const night=WorldBrain.time.isNight?1:0;
+        this.setRoot();
+        this.droneLP.frequency.setTargetAtTime(clamp(240+em.valence*520+(1-night)*220-w.fog*120,120,1400), t, .6);
+        this.droneGain.gain.setTargetAtTime(clamp(.12+em.arousal*.05-night*.02,.05,.22), t, 1.4);
+        if(this.pad){ this.pad[0].frequency.setTargetAtTime(this.root*(em.sadness>.4?1.2:1.5), t, 4); }
+        this.padGain.gain.setTargetAtTime(clamp(.025+em.curiosity*.025,.01,.07), t, 3);
+        this.noiseGain.gain.setTargetAtTime(clamp(w.wind*.09+w.rain*.15+w.storm*.20+w.fog*.03,0,.35), t, .8);
+        this.noiseBP.frequency.setTargetAtTime(clamp(300+w.wind*900+w.rain*1300,150,3000), t, 1);
+        this.noiseBP.Q.setTargetAtTime(w.storm>.3?.4:.9, t, 1);
+        this.revSend.gain.setTargetAtTime(clamp(.6+em.shyness*.4+w.fog*.4,.4,1.6), t, 2);
+      },
+
+      voice(freq, dur, type, o={}){
+        if(!this.started || !this.ctx) return;
+        const ctx=this.ctx, t=ctx.currentTime, gain=o.gain==null?.12:o.gain, send=o.send==null?.6:o.send, attack=o.attack==null?.02:o.attack;
+        const osc=ctx.createOscillator(); osc.type=type||'sine'; osc.frequency.value=freq;
+        const g=ctx.createGain(); g.gain.value=0; let node=osc;
+        if(o.filter){ const f=ctx.createBiquadFilter(); f.type=o.filter; f.frequency.value=freq*1.6; if(o.q)f.Q.value=o.q; osc.connect(f); node=f; }
+        node.connect(g); g.connect(this.master);
+        if(send>0){ const s=ctx.createGain(); s.gain.value=send; g.connect(s); s.connect(this.revSend); }
+        if(o.slideTo!=null) osc.frequency.setTargetAtTime(o.slideTo, t, dur*.4);
+        g.gain.linearRampToValueAtTime(gain, t+attack);
+        g.gain.setTargetAtTime(0, t+attack+dur*.2, dur*.4);
+        osc.start(t); osc.stop(t+dur+.7);
+      },
+
+      noiseBurst(dur, o={}){
+        if(!this.started || !this.ctx) return;
+        const ctx=this.ctx, t=ctx.currentTime, gain=o.gain==null?.1:o.gain, send=o.send==null?.3:o.send;
+        const src=ctx.createBufferSource(); src.buffer=this.makeNoise(Math.max(.2,dur));
+        const f=ctx.createBiquadFilter(); f.type=o.type||'highpass'; f.frequency.value=o.freq||1200; if(o.q)f.Q.value=o.q;
+        const g=ctx.createGain(); g.gain.value=0;
+        src.connect(f).connect(g); g.connect(this.master);
+        if(send>0){ const s=ctx.createGain(); s.gain.value=send; g.connect(s); s.connect(this.revSend); }
+        g.gain.linearRampToValueAtTime(gain, t+.012);
+        g.gain.setTargetAtTime(0, t+.02, dur*.5);
+        src.start(t); src.stop(t+dur+.3);
+      },
+
+      event(type){
+        if(!this.started || !this.ctx) return; const r=this.root;
+        if(type==='comet'){ this.voice(r*6,2.6,'sine',{slideTo:r*3,gain:.09,send:.85,attack:.4}); }
+        else if(type==='satellite'){ this.voice(r*8,.12,'square',{gain:.035,send:.5}); }
+        else if(type==='flash'){ this.voice(r*8,1.6,'sine',{gain:.11,send:.9,attack:.004}); this.voice(r*12,1.1,'sine',{gain:.045,send:.9,attack:.004}); }
+        else if(type==='debris'){ for(let i=0;i<4;i++){ const f=r*(4+Math.random()*6); setTimeout(()=>this.voice(f,.28,'triangle',{gain:.035,send:.4}), i*120); } }
+        else if(type==='ripple'){ this.noiseBurst(1.4,{gain:.05,type:'bandpass',freq:r*6,q:3,send:.7}); }
+        else if(type==='pulsar'){ this.voice(r*1.5,2.2,'sine',{gain:.09,send:.6,attack:.05}); }
+        else if(type==='meteorShower'){ for(let i=0;i<6;i++){ const f=r*(10+Math.random()*8); setTimeout(()=>this.voice(f,.16,'sine',{gain:.045,send:.6}), i*90); } }
+        else if(type==='aurora'){ this.voice(r*1.5,6,'sine',{gain:.045,send:.95,attack:1.6}); this.voice(r*2.0,6,'sine',{gain:.03,send:.95,attack:1.9}); }
+        else if(type==='riftGlow'){ this.voice(r*5,3,'sawtooth',{gain:.035,send:.8,attack:.6}); this.voice(r*5.03,3,'sawtooth',{gain:.035,send:.8,attack:.6}); }
+        else if(type==='driftMoon'){ this.voice(r*.5,8,'sine',{gain:.11,send:.7,attack:2.5}); }
+      },
+
+      glitch(){
+        if(!this.started || !this.ctx) return;
+        this.noiseBurst(.12,{gain:.09,type:'highpass',freq:2200,send:.2});
+        this.voice(this.root*7.9,.08,'square',{gain:.045,send:.1,attack:.001});
+      },
+
+      murmur(mood){
+        if(!this.started || !this.ctx) return;
+        const base=this.root*(mood==='shy'?5:mood==='angry'?4:6), n=rndInt(2,4);
+        for(let i=0;i<n;i++){ const f=base*(0.9+Math.random()*0.5); setTimeout(()=>this.voice(f,.10,'square',{gain:.03,send:.4,filter:'bandpass',q:6}), i*130); }
+      },
+
+      suspend(){ if(this.ctx && this.ctx.state==='running') this.ctx.suspend(); },
+      resume(){ if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); }
+    };
+
+    // ────────────────────────────────────────────────────
+    // RarityBrain — 10-tier zeldzaamheidssysteem
+    // Tier 1 = al aanwezig (micro-expressies via emotie-engine)
+    // Tier 10 = procedurele bezoeker — het zeldzaamste event
+    // ────────────────────────────────────────────────────
+    const RarityBrain = {
+      // Elke tier: id, naam, cooldown (ms), kans per seconde, lastAt
+      tiers: [
+        { id:2, name:'slowClose',    cooldown:70000,    chance:0.007,  lastAt:0 },
+        { id:3, name:'wink',         cooldown:180000,   chance:0.004,  lastAt:0 },
+        { id:4, name:'fourthWall',   cooldown:280000,   chance:0.0025, lastAt:0 },
+        { id:5, name:'cascade',      cooldown:450000,   chance:0.0016, lastAt:0 },
+        { id:6, name:'rareTear',     cooldown:700000,   chance:0.0011, lastAt:0 },
+        { id:7, name:'paletteFlash', cooldown:1000000,  chance:0.0008, lastAt:0 },
+        { id:8, name:'notices',      cooldown:1300000,  chance:0.0006, lastAt:0 },
+        { id:9, name:'worldShift',   cooldown:2200000,  chance:0.0004, lastAt:0 },
+        { id:10, name:'visitor',     cooldown:2600000,  chance:0.0002, lastAt:0 },
+      ],
+      cascadeQueue: [],
+      paletteFlash: null,
+      _lastCheck: 0,
+    };
+
+    // ────────────────────────────────────────────────────
+    // VisitorBrain — procedurele bezoeker (tier 10)
+    // Archetype wordt gekozen op basis van nieuws + mood + tijdstip
+    // ────────────────────────────────────────────────────
+    const VisitorBrain = {
+      phase: 'idle',      // idle | entering | present | departing
+      phaseStart: 0,
+      presentDur: 8000,
+      archetype: 'cloaked',
+      dir: 1,             // 1=komt van links, -1=van rechts
+      x: -80, y: 205,
+      startX: -80, targetX: 75, endX: -80,
+      alpha: 0,
+      gazeOverride: null,
     };
 
     let glitchUntil = 0;
     let glitchAt = performance.now() + rnd(9000, 18000);
     let lastNow = performance.now();
 
-    const NEWS_API_URL =
-      'https://api.gdeltproject.org/api/v2/doc/doc' +
-      '?query=' + encodeURIComponent('(technology OR climate OR economy OR conflict OR science OR energy OR AI OR politics OR space)') +
-      '&mode=ArtList&format=json&maxrecords=70&timespan=24h&sort=HybridRel';
+    // Multi-source nieuws: NOS RSS (Nederlands, primair) + GDELT (Engels, secundair)
+    const NEWS_NOS_URL  = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent('https://feeds.nos.nl/nosnieuwsalgemeen') + '&count=50';
+    const NEWS_GDELT_URL = 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent('(climate OR conflict OR science OR sport OR politics OR economy OR earthquake OR heatwave OR football OR worldcup OR hurricane OR flood)') + '&mode=ArtList&format=json&maxrecords=60&timespan=24h&sort=HybridRel';
+
+    // Rijke Nederlandse fallback met actuele sfeer (wordt bijgewerkt bij live fetch)
+    const FALLBACK_KEYWORDS = [
+      'voetbal','wereldkampioenschap','hittegolf','aardbeving','venezuela',
+      'temperatuurrecord','finale','tribune','doelpunt','elftal','stadion',
+      'klimaat','droogte','branden','extreme','zomerstorm','overstromingen',
+      'kunstmatige','intelligentie','deepfake','kwantum','robotica','model',
+      'kernenergie','waterstof','windpark','zonnepanelen','stroom','netcongestie',
+      'ruimtevaart','planeet','satelliet','lancering','telescoop','exoplaneet',
+      'verkiezingen','verdrag','grens','sancties','vredesonderhandelingen',
+      'signaal','stilte','frequentie','echo','resonantie','drift','ruis'
+    ];
 
     const STOPWORDS = new Set([
       'de','het','een','en','van','voor','met','naar','door','over','onder','tegen','uit','bij','aan','dat','dit','die','wat','zijn','haar','hun','als','maar','niet','wel','ook','nog','meer','minder','geen','veel','waar','wie','hoe','waarom','omdat','heeft','hebben','wordt','worden','jaar','jaren',
@@ -262,6 +509,7 @@
     function rndInt(min,max){ return Math.floor(rnd(min, max + 1)); }
     function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
     function lerp(a,b,t){ return a + (b - a) * t; }
+    function mod(n,m){ return ((n % m) + m) % m; }
     function ease(t){ return t * t * (3 - 2 * t); }
     function damp(current,target,lambda,dt){ return lerp(current, target, 1 - Math.exp(-lambda * dt)); }
     function pick(arr){ return arr[(Math.random() * arr.length) | 0]; }
@@ -433,27 +681,49 @@
       if (!NewsBrain.enabled || NewsBrain.loading) return;
       if (!force && now < NewsBrain.nextFetchAt) return;
       NewsBrain.loading = true;
+      let keywords = [], titles = [];
+
+      // 1. NOS RSS (Nederlands)
       try {
-        const res = await fetch(NEWS_API_URL, { headers:{Accept:'application/json'}, cache:'no-store' });
-        if (!res.ok) throw new Error('news status ' + res.status);
-        const data = await res.json();
-        const articles = Array.isArray(data.articles) ? data.articles : [];
-        const titles = articles.map(a => a.title || '').filter(Boolean).slice(0,60);
-        const keywords = extractNewsKeywords(titles);
-        if (keywords.length) {
-          NewsBrain.keywords = keywords.slice(0,30);
-          NewsBrain.topics = titles.slice(0,10);
-          NewsBrain.tone = estimateNewsTone(keywords);
-          NewsBrain.failures = 0;
+        const res = await fetch(NEWS_NOS_URL, { cache:'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.items && data.items.length) {
+            titles = data.items.map(i=>(i.title||'')).filter(Boolean);
+            keywords = extractNewsKeywords(titles);
+          }
         }
-        NewsBrain.lastFetch = now;
-        NewsBrain.nextFetchAt = now + 1000 * 60 * 20;
-      } catch (err) {
-        NewsBrain.failures++;
-        NewsBrain.nextFetchAt = now + 1000 * 60 * Math.min(35, 6 + NewsBrain.failures * 6);
-      } finally {
-        NewsBrain.loading = false;
+      } catch(e) {}
+
+      // 2. GDELT als aanvulling
+      if (keywords.length < 8) {
+        try {
+          const res = await fetch(NEWS_GDELT_URL, { headers:{Accept:'application/json'}, cache:'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            const arts = Array.isArray(data.articles) ? data.articles : [];
+            const gt = arts.map(a=>a.title||'').filter(Boolean);
+            const gk = extractNewsKeywords(gt);
+            keywords = [...new Set([...keywords, ...gk])];
+            titles = [...titles, ...gt.slice(0, 8)];
+          }
+        } catch(e) {}
       }
+
+      if (keywords.length >= 4) {
+        NewsBrain.keywords = keywords.slice(0, 32);
+        NewsBrain.topics = titles.slice(0, 10);
+        NewsBrain.tone = estimateNewsTone(keywords);
+        NewsBrain.failures = 0;
+      } else {
+        // Rijke fallback zodat er altijd iets staat
+        NewsBrain.keywords = [...FALLBACK_KEYWORDS].sort(()=>Math.random()-.5).slice(0, 20);
+        NewsBrain.failures++;
+      }
+
+      NewsBrain.loading = false;
+      NewsBrain.lastFetch = now;
+      NewsBrain.nextFetchAt = now + 1000 * 60 * 20;
     }
 
     function extractNewsKeywords(titles){
@@ -548,18 +818,30 @@
         ]
       };
 
-      const includeNews = Math.random() < .72;
-      const includeWeather = Math.random() < .42;
-      const meaningful = Math.random() < .16;
-      const left = glyphCluster(rndInt(3,7));
-      const right = glyphCluster(rndInt(3,7));
-      const joiner = pick([' / ', ' :: ', ' // ', ' · ']);
+      const includeNews = Math.random() < .82;
+      const includeWeather = Math.random() < .38;
+      const meaningful = Math.random() < .45;   // was .16
+      const left = glyphCluster(rndInt(2,5));
+      const right = glyphCluster(rndInt(2,5));
+      const joiner = pick([' / ', ' :: ', ' · ', ' — ']);
+
+      // Rijke nieuws-zinsfragmenten
+      const nw = () => pick(NewsBrain.keywords.length ? NewsBrain.keywords.slice(0,18) : FALLBACK_KEYWORDS);
+      const newsLine = () => {
+        const w1=nw(), w2=nw(), w3=nw();
+        return pick([
+          `... ${w1} ...`, `... ${w1} / ${w2} ...`, `... ${w1} en ${w2} ...`,
+          `... ze zeggen ${w1} ...`, `... iets met ${w1} ...`,
+          `... ${w2} · ${w3} ...`, `... heb je ${w1} gezien ...`,
+          `... ${w1} beweegt verder ...`, `... ${w1} verandert alles ...`,
+        ]);
+      };
 
       const fragments = [];
       if (includeWeather) fragments.push(weatherWord());
-      if (includeNews) fragments.push(newsFragment(mood));
-      if (!fragments.length) fragments.push(glyphCluster(rndInt(4,9)));
-      if (Math.random() < .22) fragments.push(WorldBrain.time.phaseName || 'nacht');
+      if (includeNews) fragments.push(meaningful ? newsLine() : newsFragment(mood));
+      if (!fragments.length) fragments.push(glyphCluster(rndInt(3,7)));
+      if (Math.random() < .18) fragments.push(WorldBrain.time.phaseName || 'nacht');
 
       const middle = fragments.join(joiner);
       if (meaningful) {
@@ -858,6 +1140,206 @@
       blink.strength = Math.max(blink.strength * .65, b);
     }
 
+    function updatePupils(now, dt){
+      // Doel-pupilgrootte op basis van emotie en lichtomstandigheid
+      let target = 0.88
+        + weights.surprised * 0.50   // verrassing = grote pupillen
+        + emotion.curiosity  * 0.22  // nieuwsgierigheid = iets groter
+        + (WorldBrain.time.isNight ? 0.32 : 0)  // nacht = groter
+        + weights.happy      * 0.10  // blij = licht groter
+        - weights.angry      * 0.38  // boosheid = kleiner/scherper
+        - emotion.shyness    * 0.16; // verlegen = iets kleiner
+      target = clamp(target, 0.44, 1.58);
+
+      // Fourth-wall: maximale dilatatie (snel)
+      if (EyeBrain.state === 'fourthWall') {
+        const ft = clamp((now - EyeBrain.stateStart) / (EyeBrain.stateDur * 0.25), 0, 1);
+        target = lerp(target, 1.56, ft);
+      }
+      // Winkende oog: pupil trekt samen
+      if ((EyeBrain.state === 'winkL') && EyeBrain.leftLid > .5) {
+        PupilBrain.left  = damp(PupilBrain.left,  0.32, 8, dt);
+        PupilBrain.right = damp(PupilBrain.right, target, 2.5, dt);
+      } else if ((EyeBrain.state === 'winkR') && EyeBrain.rightLid > .5) {
+        PupilBrain.right = damp(PupilBrain.right, 0.32, 8, dt);
+        PupilBrain.left  = damp(PupilBrain.left,  target, 2.5, dt);
+      } else {
+        PupilBrain.left  = damp(PupilBrain.left,  target, 2.5, dt);
+        // Minieme asymmetrie voor organisch gevoel
+        PupilBrain.right = damp(PupilBrain.right, clamp(target + Math.sin(now*.00041)*.05, .44, 1.58), 2.5, dt);
+      }
+    }
+
+    function updateEyeBrain(now){
+      if (EyeBrain.state === 'idle') return;
+      const t = clamp((now - EyeBrain.stateStart) / EyeBrain.stateDur, 0, 1);
+
+      if (EyeBrain.state === 'slowClose'){
+        // 0-.35: sluiten, .35-.65: gesloten houden, .65-1: openen
+        const s = t < .35 ? ease(t/.35) : t < .65 ? 1 : ease((1-t)/.35);
+        EyeBrain.leftLid = s; EyeBrain.rightLid = s;
+        if (t >= 1){ EyeBrain.leftLid=0; EyeBrain.rightLid=0; EyeBrain.state='idle'; }
+
+      } else if (EyeBrain.state === 'winkL' || EyeBrain.state === 'winkR'){
+        const w = t < .28 ? ease(t/.28) : t < .55 ? 1 : ease((1-t)/.45);
+        if (EyeBrain.state === 'winkL'){ EyeBrain.leftLid=w; EyeBrain.rightLid=0; }
+        else                            { EyeBrain.rightLid=w; EyeBrain.leftLid=0; }
+        if (t >= 1){ EyeBrain.leftLid=0; EyeBrain.rightLid=0; EyeBrain.state='idle'; }
+
+      } else if (EyeBrain.state === 'heavyLid'){
+        const h = t < .3 ? ease(t/.3)*.58 : t < .72 ? .58 : (1-ease((t-.72)/.28))*.58;
+        EyeBrain.leftLid=h; EyeBrain.rightLid=h;
+        if (t >= 1){ EyeBrain.leftLid=0; EyeBrain.rightLid=0; EyeBrain.state='idle'; }
+
+      } else if (EyeBrain.state === 'wideOpen' || EyeBrain.state === 'fourthWall'){
+        EyeBrain.leftLid=0; EyeBrain.rightLid=0;
+        if (t >= 1) EyeBrain.state='idle';
+      }
+    }
+
+    // ── Helpersfuncties voor tier-events ────────────────
+    function selectVisitorArchetype(){
+      const kw = [...NewsBrain.keywords, ...NewsBrain.topics.join(' ').split(' ')].join(' ').toLowerCase();
+      if (/voetbal|wk|sport|football|soccer|atletiek|kampioen/.test(kw)) return 'athlete';
+      if (/space|ruimte|nasa|esa|raket|rocket|astronaut|planeet|sterren/.test(kw)) return 'astronaut';
+      if (/oorlog|war|conflict|soldaat|soldier|military|aanval|wapen/.test(kw)) return 'soldier';
+      if (/robot|ai|tech|cyber|android|model|algoritme|quantu/.test(kw)) return 'android';
+      if (/wetenschap|onderzoek|scientist|researcher|lab|studie/.test(kw)) return 'scholar';
+      if (NewsBrain.tone < -.35 || WorldBrain.time.isNight) return Math.random() < .45 ? 'ghost' : 'cloaked';
+      return pick(['cloaked','traveler','scholar']);
+    }
+
+    function spawnVisitor(now){
+      const V = VisitorBrain;
+      V.archetype = selectVisitorArchetype();
+      V.dir = Math.random() < .5 ? 1 : -1;
+      V.y = rnd(188, 218);
+      V.startX  = V.dir > 0 ? -65  : W + 65;
+      V.targetX = V.dir > 0 ? rnd(52, 88) : rnd(W-88, W-52);
+      V.endX    = V.dir > 0 ? W + 65 : -65;
+      V.presentDur = rnd(7000, 13000);
+      V.x = V.startX;
+      V.alpha = 0;
+      V.phase = 'entering';
+      V.phaseStart = now;
+      V.gazeOverride = null;
+      weights.surprised = clamp(weights.surprised + .35, 0, 1);
+    }
+
+    function triggerRarity(id, now){
+      const debug = DEBUG ? .05 : 1;
+      if (id === 2){
+        EyeBrain.state='slowClose'; EyeBrain.stateStart=now; EyeBrain.stateDur=rnd(3000,4400);
+      } else if (id === 3){
+        EyeBrain.state=Math.random()<.5?'winkL':'winkR'; EyeBrain.stateStart=now; EyeBrain.stateDur=rnd(900,1300);
+      } else if (id === 4){
+        EyeBrain.state='fourthWall'; EyeBrain.stateStart=now; EyeBrain.stateDur=rnd(3800,6500);
+        emotion.curiosity = clamp(emotion.curiosity+.18, 0, 1);
+      } else if (id === 5){
+        weights.surprised = clamp(weights.surprised+.75, 0, 1);
+        RarityBrain.cascadeQueue.push(
+          { at:now+700,  fn:()=>{ weights.surprised=Math.max(0,weights.surprised-.5); weights.happy+=.55; }},
+          { at:now+2200, fn:()=>{ weights.happy=Math.max(0,weights.happy-.28); }},
+          { at:now+4000, fn:()=>{ weights.happy=Math.max(0,weights.happy-.27); }}
+        );
+      } else if (id === 6){
+        weights.cry = clamp(weights.cry+.65, 0, 1);
+        emotion.sadness = clamp(emotion.sadness+.32, 0, 1);
+        RarityBrain.cascadeQueue.push(
+          { at:now+5000, fn:()=>{ weights.cry=Math.max(0,weights.cry-.4); }},
+          { at:now+8000, fn:()=>{ weights.cry=Math.max(0,weights.cry-.25); emotion.sadness=Math.max(0,emotion.sadness-.2); }}
+        );
+      } else if (id === 7){
+        RarityBrain.paletteFlash = { start:now, dur:2600 };
+      } else if (id === 8){
+        const side = Math.random()<.5 ? -1.12 : 1.12;
+        gaze.tx=side; gaze.ty=-.55; gaze.nextAt=now+3800;
+        weights.surprised = clamp(weights.surprised+.45, 0, 1);
+        EyeBrain.state='wideOpen'; EyeBrain.stateStart=now; EyeBrain.stateDur=3600;
+        RarityBrain.cascadeQueue.push(
+          { at:now+2800, fn:()=>{ weights.surprised=Math.max(0,weights.surprised-.35); gaze.nextAt=now; }},
+          { at:now+4200, fn:()=>{ weights.surprised=Math.max(0,weights.surprised-.1); }}
+        );
+      } else if (id === 9){
+        WorldBrain.weather.visual.storm = .85;
+        WorldBrain.weather.visual.cloud = .92;
+        emotion.tension = 1; emotion.arousal = .85;
+        if (AudioBrain.started) AudioBrain.noiseBurst(2,{gain:.14,type:'lowpass',freq:300,send:.8});
+        RarityBrain.cascadeQueue.push(
+          { at:now+9000,  fn:()=>{ WorldBrain.weather.visual.storm=Math.max(0,WorldBrain.weather.visual.storm-.5); }},
+          { at:now+18000, fn:()=>{ WorldBrain.weather.visual.storm=Math.max(0,WorldBrain.weather.visual.storm-.35); emotion.tension=Math.max(0,emotion.tension-.6); }}
+        );
+      } else if (id === 10){
+        if (VisitorBrain.phase === 'idle') spawnVisitor(now);
+      }
+    }
+
+    function updateRarity(now, dt){
+      // Cascade-wachtrij verwerken (voor expressie-overgangen na een trigger)
+      const stillPending = [];
+      for (const item of RarityBrain.cascadeQueue){
+        if (now >= item.at) item.fn(); else stillPending.push(item);
+      }
+      RarityBrain.cascadeQueue = stillPending;
+
+      // Tiers checken (hoog→laag: zeldzaamste eerst, maar stoppen bij eerste hit)
+      const dbg = DEBUG ? 20 : 1;
+      const elapsed = now - RarityBrain._lastCheck;
+      RarityBrain._lastCheck = now;
+      const sec = Math.min(elapsed, 200) / 1000;
+
+      // Tier 10: alleen triggeren als bezoeker idle is
+      for (const tier of [...RarityBrain.tiers].reverse()){
+        if (tier.id === 10 && VisitorBrain.phase !== 'idle') continue;
+        const cd = tier.cooldown / dbg;
+        if (now - tier.lastAt < cd) continue;
+        if (Math.random() < tier.chance * sec * dbg){
+          tier.lastAt = now;
+          triggerRarity(tier.id, now);
+          break; // één tier per check-cyclus
+        }
+      }
+    }
+
+    function updateVisitor(now, dt){
+      const V = VisitorBrain;
+      if (V.phase === 'idle'){ V.alpha=0; V.gazeOverride=null; return; }
+      const el = now - V.phaseStart;
+
+      if (V.phase === 'entering'){
+        const dur = 7500;
+        const t = clamp(el/dur, 0, 1);
+        V.alpha = ease(t) * .84;
+        V.x = lerp(V.startX, V.targetX, ease(t));
+        if (t >= 1){
+          V.phase='present'; V.phaseStart=now;
+          V.gazeOverride = { tx:clamp((V.x-180)/70,-1.1,1.1), ty:.18 };
+          speech.nextAt = Math.min(speech.nextAt, now+rnd(900,2200));
+          if (AudioBrain.started) AudioBrain.voice(AudioBrain.root*1.5, 3,'sine',{gain:.06,send:.9,attack:1.2});
+        }
+
+      } else if (V.phase === 'present'){
+        V.alpha = clamp(.84+Math.sin(now*.0018)*.03, 0, 1);
+        V.gazeOverride = { tx:clamp((V.x-180)/70,-1.1,1.1), ty:.18 };
+        if (el >= V.presentDur){
+          V.phase='departing'; V.phaseStart=now; V.gazeOverride=null;
+          weights.surprised = clamp(weights.surprised+.18, 0, 1);
+        }
+
+      } else if (V.phase === 'departing'){
+        const dur = 5800;
+        const t = clamp(el/dur, 0, 1);
+        V.alpha = (1-ease(t))*.84;
+        V.x = lerp(V.targetX, V.endX, ease(t));
+        if (t >= 1){
+          V.phase='idle'; V.alpha=0; V.gazeOverride=null;
+          // Reset tier-10 cooldown
+          const t10 = RarityBrain.tiers.find(t=>t.id===10);
+          if (t10) t10.lastAt = now;
+        }
+      }
+    }
+
     function attentionTarget(){
       if (!CONFIG.attentionToEvents) return null;
       let best = null;
@@ -885,12 +1367,25 @@
         if (.38 > score) best = { x:g.x, y:g.y, strength:.38, kind:'word' };
       }
 
+      // Bezoeker trekt maximale aandacht
+      if (VisitorBrain.phase === 'present' && VisitorBrain.alpha > .3) {
+        best = { x:VisitorBrain.x, y:VisitorBrain.y - 28, strength:.92, kind:'visitor' };
+      }
+
       return best && best.strength > .30 ? best : null;
     }
 
     function updateGaze(now, dt){
       const mood = dominantMood();
-      if (now > gaze.nextAt) {
+      // Fourth-wall: blik dwingen naar midden (camera)
+      if (EyeBrain.state === 'fourthWall') {
+        gaze.tx = 0; gaze.ty = 0;
+        gaze.nextAt = now + 400;
+      } else if (VisitorBrain.gazeOverride && VisitorBrain.phase === 'present') {
+        gaze.tx = VisitorBrain.gazeOverride.tx;
+        gaze.ty = VisitorBrain.gazeOverride.ty;
+        gaze.nextAt = now + 600;
+      } else if (now > gaze.nextAt) {
         const target = attentionTarget();
         if (target && Math.random() > .22) {
           gaze.tx = clamp((target.x - 180) / 70, -1.15, 1.15);
@@ -950,6 +1445,7 @@
         speech.meaningful = data.meaningful;
         speech.phase = rnd(0,999);
         MemoryBrain.lastSpeechAt = now;
+        AudioBrain.murmur(mood);
       }
       if (speech.active && now > speech.start + speech.duration) {
         speech.active = false;
@@ -1041,7 +1537,7 @@
       if (rng()>.68 && archetype !== 'carrier') cell(midX + Math.floor(rng()*4)-2, 0, 6);
 
       const dir = rng() > .5 ? 1 : -1;
-      const y = route ? route.y + rnd(-route.wobble, route.wobble) : (archetype === 'carrier' ? rnd(28, 62) : rnd(18, 126));
+      const y = route ? route.y + rnd(-route.wobble, route.wobble) : (archetype === 'carrier' ? rnd(26, 64) : rnd(20, 150));
       const speedBase = archetype === 'carrier' ? .00115 : archetype === 'freighter' ? .0032 : archetype === 'needle' ? .0065 : archetype === 'drone' ? .0055 : .0048;
       const routeDepth = route ? route.depth : depth;
       return {
@@ -1049,9 +1545,9 @@
         routeName: route ? route.name : 'wander',
         x:dir > 0 ? -gw*10 : W + gw*10,
         y, baseY:y,
-        scale: archetype === 'carrier' ? lerp(1.65, 2.25, routeDepth) : lerp(.58, 1.28, routeDepth),
+        scale: archetype === 'carrier' ? lerp(1.65, 2.25, routeDepth) : lerp(.82, 1.55, routeDepth),
         speed:speedBase * (route ? route.speedMul : 1) * lerp(.55, 1.05, routeDepth),
-        alpha:lerp(.18, .70, routeDepth) * (route ? route.alphaMul : 1),
+        alpha:lerp(.46, .92, routeDepth) * (route ? route.alphaMul : 1),
         phase:rng()*999,
         behavior: route ? 'route' : archetype === 'saucer' ? 'hover' : archetype === 'broken' ? 'glitch' : pick(['straight','hover','arc'])
       };
@@ -1066,7 +1562,8 @@
 
       if (!rare) {
         const route = pick(FREIGHT_ROUTES);
-        const archetype = Math.random() < .82 ? 'freighter' : 'needle';
+        const r = Math.random();
+        const archetype = r < .58 ? 'freighter' : r < .78 ? 'needle' : r < .90 ? 'drone' : r < .97 ? 'saucer' : 'organic';
         ShipBrain.ships.push(createShip(++ShipBrain.seed, archetype, route.depth, route));
         return;
       }
@@ -1081,15 +1578,19 @@
       const nightEase = WorldBrain.time.isNight ? -3000 : 0;
       if (now > ShipBrain.nextSpawnAt && ShipBrain.ships.length < ShipBrain.maxShips) {
         spawnShip(now, false, false);
-        ShipBrain.nextSpawnAt = now + rnd(22000, 52000) / Math.max(.2, CONFIG.shipDensity) + fogPause + nightEase;
+        ShipBrain.nextSpawnAt = now + rnd(7000, 17000) / Math.max(.3, CONFIG.shipDensity) + fogPause * .5 + nightEase;
       }
       if (now > ShipBrain.rareAt && ShipBrain.ships.length < ShipBrain.maxShips + 1) {
         spawnShip(now, true, false);
-        ShipBrain.rareAt = now + rnd(90000, 190000);
+        ShipBrain.rareAt = now + rnd(48000, 120000);
       }
       if (now > ShipBrain.majorAt) {
-        spawnShip(now, true, true);
-        ShipBrain.majorAt = now + rnd(CONFIG.hugeShipMinMs, CONFIG.hugeShipMaxMs);
+        if (ShipBrain.ships.length < ShipBrain.maxShips) {
+          spawnShip(now, true, true);
+          ShipBrain.majorAt = now + rnd(CONFIG.hugeShipMinMs, CONFIG.hugeShipMaxMs);
+        } else {
+          ShipBrain.majorAt = now + rnd(6000, 14000); // wacht op rustiger lucht
+        }
       }
 
       const wind = WorldBrain.weather.visual.wind;
@@ -1130,6 +1631,7 @@
       if (now > glitchAt - stormBoost) {
         glitchUntil = now + rnd(70, 170 + WorldBrain.weather.visual.storm * 150);
         glitchAt = now + rnd(10000, 21000);
+        AudioBrain.glitch();
       }
     }
 
@@ -1143,27 +1645,27 @@
     function updateDriftGlyphs(now, dt){
       if (!CONFIG.ambientGlyphs) return;
       const weather = WorldBrain.weather.visual;
-      const urge = CONFIG.ambientGlyphChance + emotion.curiosity * .008 + weather.storm * .016 + WorldBrain.time.isNight * .006;
+      const urge = CONFIG.ambientGlyphChance + emotion.curiosity * .004 + weather.storm * .010 + WorldBrain.time.isNight * .004;
       if (now > DriftGlyphBrain.nextAt && DriftGlyphBrain.glyphs.length < DriftGlyphBrain.max) {
-        const word = Math.random() < .62 ? driftWord() : glyphCluster(rndInt(3, 7));
+        const word = Math.random() < .55 ? driftWord() : glyphCluster(rndInt(2, 5));
         DriftGlyphBrain.glyphs.push({
           text: word,
-          x: rnd(8, W - 70),
-          y: rnd(12, 170),
-          vy: rnd(.006, .022) * (weather.wind > .35 ? 1.4 : 1),
-          vx: rnd(-.012, .012) + weather.wind * .012,
-          life: rnd(4500, 9500),
+          x: rnd(14, W - 80),
+          y: rnd(70, H - 40),
+          vy: rnd(-.012, -.004) * (weather.storm > .35 ? 1.5 : 1),
+          vx: rnd(-.006, .006) + (weather.wind - .15) * .008,
+          life: rnd(6000, 12000),
           born: now,
-          color: Math.random() < .45 ? C.cyan4 : (Math.random() < .5 ? C.green2 : C.magenta),
-          size: Math.random() < .30 ? 10 : 9
+          color: Math.random() < .5 ? C.cyan4 : (Math.random() < .55 ? C.green2 : C.magentaSoft),
+          size: Math.random() < .25 ? 10 : 9
         });
-        DriftGlyphBrain.nextAt = now + rnd(1700, 6400) / (1 + urge * 20);
+        DriftGlyphBrain.nextAt = now + rnd(9000, 22000) / (1 + urge * 6);
       }
       for (const g of DriftGlyphBrain.glyphs) {
         g.x += g.vx * 1000 * dt;
         g.y += g.vy * 1000 * dt;
       }
-      DriftGlyphBrain.glyphs = DriftGlyphBrain.glyphs.filter(g => now - g.born < g.life && g.x > -80 && g.x < W + 80 && g.y < H + 20);
+      DriftGlyphBrain.glyphs = DriftGlyphBrain.glyphs.filter(g => now - g.born < g.life && g.x > -80 && g.x < W + 80 && g.y > -30);
     }
 
     function drawDriftGlyphs(now){
@@ -1173,7 +1675,7 @@
       ctx.textBaseline = 'top';
       for (const g of DriftGlyphBrain.glyphs) {
         const age = (now - g.born) / g.life;
-        const a = Math.sin(clamp(age, 0, 1) * Math.PI) * .28;
+        const a = Math.sin(clamp(age, 0, 1) * Math.PI) * .20;
         if (a <= .01) continue;
         ctx.globalAlpha = a * (WorldBrain.weather.visual.fog > .4 ? .55 : 1);
         ctx.fillStyle = g.color;
@@ -1217,6 +1719,7 @@
       }
       ctx.globalAlpha = 1;
 
+      drawCosmic(now);
       drawShips(now);
       drawDriftGlyphs(now);
       drawShootingStar(now);
@@ -1283,6 +1786,187 @@
       }
     }
 
+    function spawnCosmicEvent(now){
+      const total = CosmicBrain.pool.reduce((s,e)=>s+e.w,0);
+      let r = Math.random() * total, type = CosmicBrain.pool[0].type;
+      for (const e of CosmicBrain.pool){ r -= e.w; if (r <= 0){ type = e.type; break; } }
+
+      const ev = { type, start:now, seed:rnd(1,9999) };
+      const fromLeft = Math.random() < .5;
+      const accent = pick([C.cyan4, C.green2, C.magentaSoft, C.amber]);
+
+      if (type === 'comet'){
+        ev.dur = rnd(2600, 4400);
+        ev.y0 = rnd(14, 90); ev.y1 = ev.y0 + rnd(30, 80);
+        ev.x0 = fromLeft ? -20 : W + 20; ev.x1 = fromLeft ? W + 20 : -20;
+        ev.color = accent;
+      } else if (type === 'satellite'){
+        ev.dur = rnd(7000, 12000);
+        ev.y0 = rnd(16, 120); ev.y1 = ev.y0 + rnd(-18, 18);
+        ev.x0 = fromLeft ? -10 : W + 10; ev.x1 = fromLeft ? W + 10 : -10;
+        ev.blink = rnd(.006, .012);
+      } else if (type === 'flash'){
+        ev.dur = rnd(1400, 2300);
+        ev.x = rnd(30, W - 30); ev.y = rnd(14, 150); ev.color = Math.random()<.6 ? C.white : accent;
+      } else if (type === 'debris'){
+        ev.dur = rnd(5200, 9000);
+        const n = REDUCED ? 3 : rndInt(4, 7);
+        ev.bits = Array.from({length:n}, (_,i)=>({
+          x: fromLeft ? rnd(-30,-4) : rnd(W+4, W+30),
+          y: rnd(20, 170),
+          vx: (fromLeft ? 1 : -1) * rnd(6, 16),
+          vy: rnd(-3, 3),
+          s: rndInt(1, 3),
+          rot: hash(i*9.1+ev.seed)
+        }));
+        ev.color = Math.random()<.5 ? C.cyan2 : C.green0;
+      } else if (type === 'ripple'){
+        ev.dur = rnd(2200, 3600);
+        ev.x = rnd(40, W - 40); ev.y = rnd(20, 150); ev.color = accent;
+      } else if (type === 'pulsar'){
+        ev.dur = rnd(5000, 9000);
+        ev.x = rnd(36, W - 36); ev.y = rnd(16, 70); ev.period = rnd(620, 1100); ev.color = accent;
+      } else if (type === 'aurora'){
+        ev.dur = rnd(7000, 13000);
+        ev.y = rnd(20, 64); ev.amp = rnd(6, 16); ev.color = pick([C.green2, C.cyan4, C.magentaSoft]);
+      } else if (type === 'meteorShower'){
+        ev.dur = rnd(3000, 4600);
+        const n = REDUCED ? 4 : rndInt(6, 10);
+        ev.streaks = Array.from({length:n}, (_,i)=>({
+          t: hash(i*5.7+ev.seed) * .7,
+          x: rnd(W*.45, W - 10), y: rnd(8, 60),
+          len: rnd(10, 22)
+        }));
+      } else if (type === 'riftGlow'){
+        ev.dur = rnd(5000, 9000);
+        ev.x = rnd(50, W - 50); ev.y = rnd(20, 150);
+        ev.w = rnd(20, 50); ev.h = rnd(2, 5); ev.color = pick([C.magenta, C.cyan4, C.green1]);
+      } else if (type === 'driftMoon'){
+        ev.dur = rnd(24000, 42000);
+        ev.r = rnd(10, 20);
+        ev.y0 = rnd(20, 60); ev.y1 = ev.y0 + rnd(8, 26);
+        ev.x0 = fromLeft ? -ev.r*2 : W + ev.r*2; ev.x1 = fromLeft ? W + ev.r*2 : -ev.r*2;
+        ev.color = Math.random()<.5 ? C.cyan0 : C.hair0;
+      }
+      CosmicBrain.events.push(ev);
+      AudioBrain.event(ev.type);
+    }
+
+    function updateCosmic(now){
+      if (now > CosmicBrain.nextAt){
+        spawnCosmicEvent(now);
+        const lively = emotion.curiosity * .35 + (WorldBrain.time.isNight ? .25 : 0);
+        CosmicBrain.nextAt = now + rnd(5000, 17000) * (1 - clamp(lively, 0, .55));
+      }
+      CosmicBrain.events = CosmicBrain.events.filter(e => now - e.start < e.dur);
+    }
+
+    function cosmicFade(e, now){
+      const t = (now - e.start) / e.dur;
+      return Math.sin(clamp(t, 0, 1) * Math.PI);
+    }
+
+    function drawCosmic(now){
+      for (const e of CosmicBrain.events){
+        const t = clamp((now - e.start) / e.dur, 0, 1);
+        const fade = cosmicFade(e, now);
+
+        if (e.type === 'comet'){
+          const x = lerp(e.x0, e.x1, t), y = lerp(e.y0, e.y1, t);
+          const dir = e.x1 > e.x0 ? -1 : 1;
+          for (let i=0;i<10;i++){
+            ctx.globalAlpha = fade * (1 - i/10) * .5;
+            rect(x + dir*i*4, y + i*1.6, i<2?3:2, i<2?2:1, i<3 ? C.white : e.color);
+          }
+          ctx.globalAlpha = fade * .9; rect(x, y, 3, 3, C.white);
+
+        } else if (e.type === 'satellite'){
+          const x = lerp(e.x0, e.x1, t), y = lerp(e.y0, e.y1, t);
+          const blink = .35 + .65 * (Math.sin(now * e.blink) > .2 ? 1 : .15);
+          ctx.globalAlpha = fade * blink * .85; rect(x, y, 2, 2, C.white);
+          ctx.globalAlpha = fade * .18; rect(x-3, y, 2, 1, C.cyan4);
+
+        } else if (e.type === 'flash'){
+          const ring = t * 26;
+          ctx.globalAlpha = fade * .22;
+          line(e.x-ring, e.y, e.x-ring+4, e.y, 1, e.color);
+          line(e.x+ring-4, e.y, e.x+ring, e.y, 1, e.color);
+          line(e.x, e.y-ring, e.x, e.y-ring+4, 1, e.color);
+          line(e.x, e.y+ring-4, e.x, e.y+ring, 1, e.color);
+          ctx.globalAlpha = fade * .95;
+          rect(e.x-1, e.y-1, 3, 3, C.white);
+          ctx.globalAlpha = 1;
+
+        } else if (e.type === 'debris'){
+          const dt2 = (now - e.start) / 1000;
+          for (const b of e.bits){
+            const bx = b.x + b.vx * dt2, by = b.y + b.vy * dt2 + Math.sin(now*.002 + b.rot*9) * 3;
+            ctx.globalAlpha = fade * .5;
+            rect(bx, by, b.s, b.s, e.color);
+            if (b.s > 1){ ctx.globalAlpha = fade * .25; rect(bx+1, by+1, 1, 1, C.white); }
+          }
+
+        } else if (e.type === 'ripple'){
+          for (let k=0;k<3;k++){
+            const rr = (t*30) - k*9;
+            if (rr <= 1) continue;
+            ctx.globalAlpha = fade * .16 * (1 - k*.3);
+            ctx.strokeStyle = e.color; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.ellipse(e.x, e.y, rr, rr*.72, 0, 0, Math.PI*2); ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+
+        } else if (e.type === 'pulsar'){
+          const beat = (now - e.start) % e.period / e.period;
+          const rr = beat * 22;
+          ctx.globalAlpha = fade * (1 - beat) * .22;
+          ctx.strokeStyle = e.color; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.ellipse(e.x, e.y, rr, rr, 0, 0, Math.PI*2); ctx.stroke();
+          ctx.globalAlpha = fade * (.4 + .6*(1-beat)) * .8; rect(e.x-1, e.y-1, 2, 2, C.white);
+          ctx.globalAlpha = 1;
+
+        } else if (e.type === 'aurora'){
+          ctx.globalAlpha = fade * .10;
+          for (let x=0; x<W; x+=4){
+            const yy = e.y + Math.sin(x*.05 + now*.001 + e.seed) * e.amp + Math.sin(x*.013 + now*.0006) * e.amp*.5;
+            rect(x, yy, 4, 3 + Math.sin(x*.08+now*.002)*2, e.color);
+          }
+          ctx.globalAlpha = 1;
+
+        } else if (e.type === 'meteorShower'){
+          for (const s of e.streaks){
+            const lt = clamp((t - s.t) / .22, 0, 1);
+            if (lt <= 0 || lt >= 1) continue;
+            const x = s.x - lt * 60, y = s.y + lt * 40;
+            const a = Math.sin(lt * Math.PI);
+            ctx.globalAlpha = a * .7;
+            line(x, y, x + s.len*.5, y - s.len*.4, 1, C.white);
+            ctx.globalAlpha = a * .3;
+            line(x + s.len*.5, y - s.len*.4, x + s.len, y - s.len*.8, 1, C.cyan4);
+          }
+          ctx.globalAlpha = 1;
+
+        } else if (e.type === 'riftGlow'){
+          const pulse = .5 + .5*Math.sin(now*.003 + e.seed);
+          ctx.globalAlpha = fade * (.12 + pulse*.06);
+          ellipse(e.x, e.y, e.w, e.h, e.color);
+          ctx.globalAlpha = fade * .5;
+          rect(e.x-1, e.y-1, 2, 2, C.white);
+          ctx.globalAlpha = 1;
+
+        } else if (e.type === 'driftMoon'){
+          const x = lerp(e.x0, e.x1, t), y = lerp(e.y0, e.y1, t);
+          ctx.globalAlpha = fade * .14; ellipse(x, y, e.r+4, e.r+4, e.color);
+          ctx.globalAlpha = fade * .5; ellipse(x, y, e.r, e.r, e.color);
+          ctx.globalAlpha = fade * .6;
+          ellipse(x - e.r*.3, y - e.r*.25, e.r*.3, e.r*.3, C.ink);
+          ellipse(x + e.r*.35, y + e.r*.2, e.r*.22, e.r*.22, C.ink);
+          ctx.globalAlpha = 1;
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+
     function drawShootingStar(now){
       const e = bgEvents.star; if (!e.active) return;
       const t = clamp((now-e.start)/e.duration,0,1);
@@ -1306,19 +1990,33 @@
 
     function drawWeatherBack(now){
       const v = WorldBrain.weather.visual;
-      if (v.cloud > .18) {
-        ctx.globalAlpha = v.cloud * .11;
-        for (let i=0;i<5;i++) {
-          const y = 22 + i*25 + Math.sin(now*.0005 + i)*4;
-          rect(0,y,W,8, i%2 ? C.cyan0 : C.fog);
+      if (v.cloud > .22) {
+        const puffN = REDUCED ? 4 : 7;
+        const span = W * 1.5;
+        for (let i=0;i<puffN;i++) {
+          const seed = i * 53.13 + WeatherBrain.fallbackSeed;
+          const drift = now * (.0026 + hash(seed * 1.7) * .0030) * (i % 2 ? 1 : -1);
+          const px = mod(hash(seed) * span + drift, span) - W * .25;
+          const py = 26 + hash(seed * 2.1) * 150 + Math.sin(now * .0004 + seed) * 5;
+          const rx = 24 + hash(seed * 3.7) * 40;
+          const ry = 8 + hash(seed * 1.9) * 9;
+          ctx.globalAlpha = v.cloud * (.045 + hash(seed * 5.5) * .05);
+          ellipse(px, py, rx, ry, i % 2 ? C.cyan0 : C.fog);
+          ellipse(px + rx * .55, py + ry * .35, rx * .6, ry * .7, C.cyan0);
+          ellipse(px - rx * .45, py + ry * .2, rx * .5, ry * .6, i % 2 ? C.fog : C.cyan0);
         }
         ctx.globalAlpha = 1;
       }
       if (v.fog > .03) {
-        ctx.globalAlpha = v.fog * .13;
-        rect(0,32,W,40,C.fog);
-        rect(0,98,W,25,C.cyan4);
-        rect(0,178,W,38,C.fog);
+        const veils = REDUCED ? 2 : 3;
+        for (let i=0;i<veils;i++) {
+          const seed = i * 71.3 + 9.1;
+          const drift = now * .0012 * (i % 2 ? 1 : -1);
+          const px = mod(hash(seed) * W * 1.4 + drift * 40, W * 1.4) - W * .2;
+          const py = 40 + i * 56 + Math.sin(now * .0006 + i * 1.7) * 8;
+          ctx.globalAlpha = v.fog * (.07 + i * .015);
+          ellipse(px, py, 90 + i * 22, 22 + i * 4, i % 2 ? C.fog : C.cyan4);
+        }
         ctx.globalAlpha = 1;
       }
       if (v.heat > .04) {
@@ -1359,8 +2057,10 @@
         ctx.globalAlpha = 1;
       }
       if (v.fog > .10) {
-        ctx.globalAlpha = v.fog * .08;
-        rect(0,140,W,60,C.fog);
+        ctx.globalAlpha = v.fog * .06;
+        const fx = mod(now * .0009, W * 1.3) - W * .15;
+        ellipse(fx, 168, 130, 30, C.fog);
+        ellipse(W - fx * .6, 188, 110, 24, C.cyan4);
         ctx.globalAlpha = 1;
       }
       if (v.storm > .05 && hash(Math.floor(now/220)) > .975) {
@@ -1381,13 +2081,99 @@
       line(270,73,283,132,3,C.black); line(96,104,84,169,4,C.black);
     }
 
+    function getVisitorPalette(archetype){
+      return {
+        cloaked:   { dark:C.cyan0,    light:C.cyan4,    accent:C.green1,   skin:C.cyan1   },
+        astronaut: { dark:C.cyan1,    light:C.white,    accent:C.cyan3,    skin:C.fog,    suit:C.fog,     visor:C.cyan2  },
+        athlete:   { dark:'#1a1a30', light:C.white,    accent:C.red,      skin:'#c8a870', jersey:C.red   },
+        android:   { dark:C.black,    light:C.cyan4,    accent:C.green2,   skin:C.black,  body:C.cyan0   },
+        soldier:   { dark:'#1a2a1a', light:'#8a9c66', accent:'#6aaa44',  skin:'#9aaa88', body:'#3a4a3a' },
+        scholar:   { dark:C.ink,      light:C.cyan4,    accent:C.amber,    skin:'#c8a870', robe:C.amber  },
+        ghost:     { dark:C.black,    light:C.white,    accent:C.cyan4,    skin:C.white,  body:C.white   },
+        traveler:  { dark:C.black,    light:C.cyan2,    accent:C.hair0,    skin:'#c8a870', coat:C.cyan1, hat:C.cyan0 },
+      }[archetype] || { dark:C.cyan0, light:C.cyan4, accent:C.green1, skin:C.cyan1 };
+    }
+
+    function drawVisitor(now){
+      const V = VisitorBrain;
+      if (V.phase === 'idle' || V.alpha <= .01) return;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      const vx=Math.round(V.x), vy=Math.round(V.y);
+      const al=clamp(V.alpha, 0, 1);
+      const sa=(a)=>{ ctx.globalAlpha=clamp(al*a, 0, 1); };
+      const arch=V.archetype;
+      const c=getVisitorPalette(arch);
+      // f = richting die figuur uitkijkt (naar het midden = naar ons personage)
+      const f = V.x < W/2 ? 1 : -1;
+
+      if (arch === 'cloaked'){
+        sa(.88); path(c.dark,[['M',vx-10,vy],['C',vx-13,vy-18,vx-9,vy-40,vx,vy-50],['C',vx+9,vy-40,vx+13,vy-18,vx+10,vy]]);
+        sa(.72); path(c.dark,[['M',vx-8,vy-43],['C',vx-5,vy-58,vx+5,vy-58,vx+8,vy-43]]);
+        sa(.25); line(vx+f*8,vy,vx+f*6,vy-48,1,c.light);
+        sa(.70); ellipse(vx+f*1.5,vy-47,1.5,1.5,c.accent);
+
+      } else if (arch === 'astronaut'){
+        sa(.90); rect(vx-9,vy-28,18,28,c.suit); rect(vx-7,vy-26,14,24,c.light);
+        sa(.90); ellipse(vx,vy-38,12,13,c.suit); ellipse(vx,vy-38,9,10,c.visor);
+        sa(.70); rect(vx+f*2,vy-44,3,2,c.light);
+        sa(.85); rect(vx-12,vy-28,3,15,c.suit); rect(vx+9,vy-28,3,15,c.suit);
+        sa(.60); rect(vx-f*9,vy-28,5,16,c.dark);
+
+      } else if (arch === 'athlete'){
+        sa(.85); rect(vx-5,vy-22,4,22,c.dark); rect(vx+1,vy-22,4,22,c.dark);
+        sa(.90); path(c.jersey,[['M',vx-8,vy-22],['L',vx+8,vy-22],['L',vx+7,vy-42],['L',vx-7,vy-42]]);
+        sa(.80); ellipse(vx,vy-48,7,8,c.skin);
+        sa(.35); line(vx-4,vy-36,vx+4,vy-36,1,c.light);
+        sa(.40); rect(vx-2,vy-34,4,5,c.light); // rugnummer hint
+
+      } else if (arch === 'android'){
+        sa(.85); path(c.body,[['M',vx-8,vy],['L',vx-10,vy-22],['L',vx+10,vy-22],['L',vx+8,vy]]); rect(vx-7,vy-40,14,18,c.body);
+        sa(.90); rect(vx-7,vy-52,14,12,c.dark);
+        sa(.75); rect(vx-11,vy-38,3,16,c.body); rect(vx+8,vy-38,3,16,c.body);
+        sa(.80); rect(vx+f*2,vy-47,3,2,c.accent); rect(vx-f*4,vy-47,2,2,c.accent);
+        sa(.40); rect(vx-3,vy-35,6,4,c.accent); // borst-paneel
+
+      } else if (arch === 'soldier'){
+        sa(.85); rect(vx-5,vy-20,4,20,c.dark); rect(vx+1,vy-20,4,20,c.dark);
+        sa(.90); path(c.body,[['M',vx-7,vy-20],['L',vx-9,vy-40],['L',vx+9,vy-40],['L',vx+7,vy-20]]);
+        sa(.80); ellipse(vx,vy-47,7,7,c.skin);
+        sa(.88); path(c.dark,[['M',vx-9,vy-46],['L',vx-8,vy-52],['L',vx+8,vy-52],['L',vx+9,vy-46]]);
+        sa(.45); line(vx+f*9,vy-38,vx+f*14,vy-30,2,c.accent);
+
+      } else if (arch === 'scholar'){
+        sa(.88); path(c.robe,[['M',vx-10,vy],['C',vx-12,vy-18,vx-8,vy-40,vx-3,vy-48],['C',vx+3,vy-48,vx+8,vy-40],['C',vx+12,vy-18,vx+10,vy]]);
+        sa(.80); ellipse(vx-f*.8,vy-52,7,8,c.skin);
+        sa(.70); rect(vx+f*7,vy-28,5,9,c.accent); line(vx+f*9,vy-28,vx+f*9,vy-19,1,c.dark);
+
+      } else if (arch === 'ghost'){
+        const alphas=[.22,.17,.12,.08,.05,.03];
+        for(let i=0;i<6;i++){
+          sa(alphas[i]);
+          ellipse(vx+Math.sin(now*.0012+i*.9)*2, vy-i*8, 7-i*.3, 5, c.body);
+        }
+        sa(.22); ellipse(vx,vy-44,6,9,c.body);
+        sa(.55); rect(vx+2,vy-46,2,1,c.accent); rect(vx-4,vy-46,2,1,c.accent);
+
+      } else { // traveler
+        sa(.85); rect(vx-4,vy-18,3,18,c.dark); rect(vx+1,vy-18,3,18,c.dark);
+        sa(.90); path(c.coat,[['M',vx-8,vy-18],['L',vx-9,vy-40],['L',vx+9,vy-40],['L',vx+8,vy-18]]);
+        sa(.80); ellipse(vx,vy-48,7,8,c.skin);
+        sa(.88); path(c.hat,[['M',vx-10,vy-53],['L',vx+10,vy-53],['L',vx+8,vy-57],['L',vx-8,vy-57]]);
+        sa(.50); rect(vx-f*9,vy-38,4,14,c.dark);
+      }
+
+      ctx.globalAlpha=1;
+      ctx.restore();
+    }
+
     function drawShouldersAndNeck(){
       const wp = WardrobeBrain.current || { base:C.cyan2, shade:C.cyan0, accent:C.green1, line:C.cyan4, outfit:'cloak' };
       const outfit = wp.outfit || 'cloak';
 
-      path(C.black,[['M',115,255],['C',126,214,137,198,152,191],['C',167,186,194,187,210,194],['C',230,202,244,219,254,255],['L',115,255]]);
-      path(wp.base,[['M',126,255],['C',135,219,146,203,159,198],['C',174,194,194,195,206,201],['C',223,209,235,226,244,255],['L',126,255]]);
-      path(wp.shade,[['M',154,196],['C',166,207,181,211,199,201],['L',205,255],['L',148,255]]);
+      path(C.black,[['M',115,285],['C',126,214,137,198,152,191],['C',167,186,194,187,210,194],['C',230,202,244,219,254,285],['L',115,285]]);
+      path(wp.base,[['M',126,285],['C',135,219,146,203,159,198],['C',174,194,194,195,206,201],['C',223,209,235,226,244,285],['L',126,285]]);
+      path(wp.shade,[['M',154,196],['C',166,207,181,211,199,201],['L',205,285],['L',148,285]]);
       line(151,198,143,244,3,C.black);
       line(210,201,226,246,3,C.black);
 
@@ -1402,8 +2188,8 @@
 
       if (outfit === 'cloak') {
         ctx.globalAlpha=.42;
-        path(wp.shade,[['M',124,255],['C',134,224,147,208,162,200],['L',146,255]]);
-        path(wp.shade,[['M',236,255],['C',226,224,213,208,199,201],['L',216,255]]);
+        path(wp.shade,[['M',124,285],['C',134,224,147,208,162,200],['L',146,285]]);
+        path(wp.shade,[['M',236,285],['C',226,224,213,208,199,201],['L',216,285]]);
         ctx.globalAlpha=1;
       }
       if (outfit === 'armor') {
@@ -1464,13 +2250,30 @@
     }
 
     function drawEye(cx,cy,side,p){
-      const open=clamp(p.eye*(1-blink.strength*.93),.06,1.34);
-      const ew=52+p.brow*2+p.anger*-5;
-      const eh=16*open;
-      const irisX=cx+gaze.x*4.8, irisY=cy+gaze.y*3.2;
+      const lidVal  = side < 0 ? EyeBrain.leftLid  : EyeBrain.rightLid;
+      const combined = Math.min(1, Math.max(blink.strength, lidVal));
+      let eyeP = p.eye;
+      if (EyeBrain.state === 'wideOpen') eyeP = Math.min(1.38, eyeP * 1.28);
+      if (EyeBrain.state === 'fourthWall') eyeP = 1.04;
+      const open = clamp(eyeP * (1 - combined * .93), .06, 1.38);
+      const ew  = 52 + p.brow*2 + p.anger*-5;
+      const eh  = 16*open;
+      const irisX = cx + gaze.x*4.8, irisY = cy + gaze.y*3.2;
+      // Fourth-wall: blik dwingen naar camera-centrum
+      const dIrisX = EyeBrain.state === 'fourthWall' ? cx      : irisX;
+      const dIrisY = EyeBrain.state === 'fourthWall' ? cy-.5   : irisY;
       eyeShape(cx,cy,ew+8,eh+5,C.black);
       eyeShape(cx,cy,ew,eh,open<.11?C.black:C.white);
-      if(open>=.11){ ellipse(irisX,irisY,8.4,8.8*clamp(open,.35,1.1),C.green1); ellipse(irisX+side*.5,irisY+.6,4.1,4.7*clamp(open,.35,1),C.black); rect(irisX-3+side,irisY-5,2,2,C.green2); rect(irisX+2+side,irisY-2,2,1,C.white); }
+      if(open>=.11){
+        // Dynamische pupil: PupilBrain bepaalt de grootte
+        const pm = side < 0 ? PupilBrain.left : PupilBrain.right;
+        const ir = clamp(pm*.92,.55,1.22);
+        const pr = clamp(pm,.38,1.62);
+        ellipse(dIrisX,dIrisY,8.4*ir,8.8*clamp(open,.35,1.1)*ir,C.green1);
+        ellipse(dIrisX+side*.5,dIrisY+.6,4.1*pr,4.7*clamp(open,.35,1)*pr,C.black);
+        rect(dIrisX-3+side,dIrisY-5,2,2,C.green2);
+        rect(dIrisX+2+side,dIrisY-2,2,1,C.white);
+      }
       if(open<.35) line(cx-ew/2+4,cy,cx+ew/2-4,cy+(p.smile>.4?2:0),3,C.black);
     }
 
@@ -1577,12 +2380,14 @@
       if (!DEBUG || !dbgEl) return;
       const w = WorldBrain.weather.visual;
       dbgEl.textContent = [
-        'Wandering Art v6',
+        'Wandering Art v9',
         'mood ' + dominantMood() + '  val ' + emotion.valence.toFixed(2) + '  cur ' + emotion.curiosity.toFixed(2),
         'weather ' + WorldBrain.weather.status + ' / ' + (WorldBrain.weather.mood || 'clear') + '  t ' + Math.round(WorldBrain.weather.temperature) + 'c',
         'rain ' + w.rain.toFixed(2) + ' storm ' + w.storm.toFixed(2) + ' fog ' + w.fog.toFixed(2) + ' wind ' + w.wind.toFixed(2),
-        'ships ' + ShipBrain.ships.length + ' glyphs ' + DriftGlyphBrain.glyphs.length + ' news ' + NewsBrain.keywords.length,
-        'outfit ' + ((WardrobeBrain.current && WardrobeBrain.current.outfit) || '...') + ' / ' + WardrobeBrain.phase + ' ' + (WardrobeBrain.opacity || 0).toFixed(2)
+        'ships ' + ShipBrain.ships.length + ' cosmic ' + CosmicBrain.events.length + ' news ' + NewsBrain.keywords.length,
+        'audio ' + (AudioBrain.enabled ? (AudioBrain.started ? ('on root ' + AudioBrain.root.toFixed(1) + 'Hz') : 'wacht op gesture') : 'uit'),
+        'eye ' + EyeBrain.state + '  pupL ' + PupilBrain.left.toFixed(2) + '  pupR ' + PupilBrain.right.toFixed(2),
+        'visitor ' + VisitorBrain.phase + ' ' + VisitorBrain.archetype + '  rarity cascades ' + RarityBrain.cascadeQueue.length,
       ].join('\n');
     }
 
@@ -1595,23 +2400,43 @@
       updateMemory(dt);
       updateWardrobe(now,dt);
       updateBlink(now);
+      updatePupils(now, dt);
+      updateEyeBrain(now);
+      updateRarity(now, dt);
+      updateVisitor(now, dt);
       updateGaze(now,dt);
       updateMotion(now,dt);
       updateSpeech(now);
       updateShips(now,dt);
       updateDriftGlyphs(now,dt);
       updateBackgroundEvents(now);
+      updateCosmic(now);
       maybeGlitch(now);
+      AudioBrain.tick(now);
       saveMemory(now);
     }
 
     function render(now){
       update(now);
       drawBackground(now);
+      drawCosmic(now);
       drawMoodAura(now);
+      drawVisitor(now);
       drawEntity(now);
       drawWeatherFront(now);
       applyGlitch(now);
+      // Tier-7 paletteFlash: subtiele difference-blend over het hele canvas
+      if (RarityBrain.paletteFlash){
+        const pf = RarityBrain.paletteFlash;
+        const pt = (now - pf.start) / pf.dur;
+        if (pt < 1){
+          const intensity = Math.sin(pt * Math.PI) * .12;
+          ctx.globalCompositeOperation='difference';
+          ctx.fillStyle='#ffffff'; ctx.globalAlpha=intensity;
+          ctx.fillRect(0,0,W,H);
+          ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
+        } else { RarityBrain.paletteFlash=null; }
+      }
       drawSpeechBubble(now);
       drawDebug(now);
     }
@@ -1621,14 +2446,33 @@
     function startLoop(){ if (rafId == null) { lastNow = performance.now(); rafId = requestAnimationFrame(frame); } }
     function stopLoop(){ if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) stopLoop();
-      else startLoop();
+      if (document.hidden) { stopLoop(); AudioBrain.suspend(); }
+      else { startLoop(); AudioBrain.resume(); }
     });
 
     loadMemory();
     initWardrobe();
     fetchNewsKeywords(true);
     setInterval(() => fetchNewsKeywords(false), 1000 * 60 * 5);
+
+    // Eenmalige drempel: één gesture ontgrendelt audio, daarna nooit meer UI.
+    (() => {
+      const veil = document.getElementById('enter');
+      if (!AudioBrain.enabled) { if (veil) veil.remove(); return; }
+      let unlocked = false;
+      const showAt = setTimeout(() => { if (!unlocked && veil) veil.classList.add('show'); }, 1500);
+      function unlock() {
+        if (unlocked) return; unlocked = true; clearTimeout(showAt);
+        AudioBrain.start(); AudioBrain.resume();
+        if (veil) { veil.classList.remove('show'); veil.classList.add('gone'); setTimeout(() => veil.remove(), 1600); }
+        window.removeEventListener('pointerdown', unlock);
+        window.removeEventListener('keydown', unlock);
+        window.removeEventListener('touchstart', unlock);
+      }
+      window.addEventListener('pointerdown', unlock, { once:true });
+      window.addEventListener('keydown', unlock, { once:true });
+      window.addEventListener('touchstart', unlock, { once:true });
+    })();
 
     if (STATIC_PREVIEW) render(performance.now() + 1600);
     else startLoop();
