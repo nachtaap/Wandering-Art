@@ -1529,16 +1529,13 @@
     function mu_melo(freq, time, dur){
       if (!AudioBrain.ctx) return;
       const ac=AudioBrain.ctx, bus=MusicBrain.bus;
+      const o=ac.createOscillator(); o.type='sine'; o.frequency.value=freq;
       const g=ac.createGain(); g.gain.value=0;
-      [[freq,1],[freq*2,.25]].forEach(([fr,amp])=>{
-        const o=ac.createOscillator(); o.type='sine'; o.frequency.value=fr;
-        const og=ac.createGain(); og.gain.value=amp;
-        o.connect(og).connect(g); o.start(time); o.stop(time+dur+1.2);
-      });
-      g.connect(bus); g.connect(AudioBrain.revSend);
+      o.connect(g); g.connect(bus); g.connect(AudioBrain.revSend);
+      o.start(time); o.stop(time+dur+1.2);
       g.gain.setValueAtTime(0,time);
-      g.gain.setTargetAtTime(.065,time,.20);
-      g.gain.setTargetAtTime(0,time+dur,.35);
+      g.gain.setTargetAtTime(.062,time,.22);
+      g.gain.setTargetAtTime(0,time+dur,.42);
     }
 
     // ── Muzieklogica: mood → muziekparameters ────────────────────
@@ -1667,16 +1664,17 @@
         if (Math.floor(pos)!==beatInBar) return;
         const t=time+(pos-beatInBar)*beatDur;
         if (t<AudioBrain.ctx.currentTime) return;
-        const idx=Math.min(Math.max(0,ni),notes.length-1);
+        const maxIdx=Math.floor(notes.length*.80); // bovenste 20% overslaan
+        const idx=Math.min(Math.max(0,ni),maxIdx-1);
         const vel=.055+Math.random()*.028+emotion.arousal*.030+emotion.curiosity*.012;
         mu_arp(notes[idx], t+(Math.random()-.5)*.009, beatDur*.44, vel);
       });
 
-      // Melodie: zeldzaam, alleen op beat 0, hoog register
-      if (beatInBar===0&&M.beat>4&&Math.random()<.08+(emotion.curiosity*.06)){
-        const hi=Math.floor(notes.length*.62+Math.random()*notes.length*.3);
-        const mf=notes[Math.min(hi,notes.length-1)]*2;
-        if (mf<3000) mu_melo(mf, time+.22, (60/M.bpm)*2.8);
+      // Melodie: zeldzaam, alleen op beat 0, middenregister (max ~900Hz om pieptonen te vermijden)
+      if (beatInBar===0&&M.beat>4&&Math.random()<.07+(emotion.curiosity*.05)){
+        const hi=Math.floor(notes.length*.25+Math.random()*notes.length*.35);
+        const mf=notes[Math.min(hi,notes.length-1)];
+        if (mf>140&&mf<900) mu_melo(mf, time+.22, (60/M.bpm)*2.8);
       }
     }
 
