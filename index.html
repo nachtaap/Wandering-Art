@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — Living Pixel World v5</title>
+  <title>Wandering Art — Living Pixel World v6</title>
   <style>
     :root{ --bg:#020207; }
     *{ box-sizing:border-box; margin:0; padding:0; }
@@ -88,8 +88,15 @@
       shipDensity: 0.42,
       ambientGlyphs: true,
       ambientGlyphChance: 0.010,
-      clothingChangeMinMs: 65000,
-      clothingChangeMaxMs: 190000,
+      // Outfit blijft stabiel. Alleen bij een zeldzame vertrek/terugkomst-scène wisselt ze kleding.
+      outfitChangeEnabled: true,
+      outfitFirstDepartureMinMs: 210000,
+      outfitFirstDepartureMaxMs: 390000,
+      outfitDepartureMinMs: 300000,
+      outfitDepartureMaxMs: 720000,
+      outfitLeaveMs: 2400,
+      outfitAwayMs: 3600,
+      outfitReturnMs: 3000,
       speechFrequency: 0.82,
       newsMoodInfluence: 0.28,
       weatherIntensity: 0.86,
@@ -180,8 +187,15 @@
     };
 
     const WardrobeBrain = {
-      current:null, from:null, target:null, blend:1,
-      nextChangeAt:performance.now() + rnd(18000, 42000),
+      current:null,
+      target:null,
+      pending:null,
+      phase:'present',      // present | leaving | away | returning
+      phaseStart:0,
+      phaseDuration:0,
+      opacity:1,
+      offsetY:0,
+      nextChangeAt:performance.now() + rnd(CONFIG.outfitFirstDepartureMinMs, CONFIG.outfitFirstDepartureMaxMs),
       outfits:['cloak','suit','robe','armor','raincoat','nightdress','storm-jacket','ceremonial']
     };
 
@@ -721,25 +735,117 @@
     }
 
     function initWardrobe(){
-      WardrobeBrain.current = chooseWardrobeTarget();
-      WardrobeBrain.from = {...WardrobeBrain.current};
-      WardrobeBrain.target = {...WardrobeBrain.current};
+      let initial = chooseWardrobeTarget();
+      if (MemoryBrain.recentOutfit) {
+        const remembered = ['cloak','suit','robe','armor','raincoat','nightdress','storm-jacket','ceremonial'].includes(MemoryBrain.recentOutfit);
+        if (remembered) {
+          const palettes = {
+            cloak:{ base:'#0b3b44', shade:'#061b23', accent:'#22e64f', line:'#69fff3' },
+            suit:{ base:'#0b6f7a', shade:'#063941', accent:'#a2ff75', line:'#f7fff8' },
+            robe:{ base:'#102d3e', shade:'#06141d', accent:'#ff7bea', line:'#69fff3' },
+            armor:{ base:'#14343f', shade:'#071016', accent:'#ff3159', line:'#f7fff8' },
+            raincoat:{ base:'#09566c', shade:'#062331', accent:'#69fff3', line:'#a8fff2' },
+            nightdress:{ base:'#081527', shade:'#03070f', accent:'#ff2bd6', line:'#69fff3' },
+            'storm-jacket':{ base:'#17254d', shade:'#060916', accent:'#8a9cff', line:'#ffd35d' },
+            ceremonial:{ base:'#11523c', shade:'#061b16', accent:'#ff2bd6', line:'#a2ff75' }
+          };
+          initial = { outfit:MemoryBrain.recentOutfit, ...palettes[MemoryBrain.recentOutfit] };
+        }
+      }
+      WardrobeBrain.current = initial;
+      WardrobeBrain.target = {...initial};
+      WardrobeBrain.pending = null;
+      WardrobeBrain.phase = 'present';
+      WardrobeBrain.opacity = 1;
+      WardrobeBrain.offsetY = 0;
+      WardrobeBrain.nextChangeAt = performance.now() + rnd(CONFIG.outfitFirstDepartureMinMs, CONFIG.outfitFirstDepartureMaxMs);
+    }
+
+    function chooseDifferentWardrobeTarget(){
+      const currentName = WardrobeBrain.current && WardrobeBrain.current.outfit;
+      let next = chooseWardrobeTarget();
+      if (!currentName || next.outfit !== currentName) return next;
+
+      const alternatives = WardrobeBrain.outfits.filter(o => o !== currentName);
+      const forced = pick(alternatives);
+      const palettes = {
+        cloak:{ base:'#0b3b44', shade:'#061b23', accent:'#22e64f', line:'#69fff3' },
+        suit:{ base:'#0b6f7a', shade:'#063941', accent:'#a2ff75', line:'#f7fff8' },
+        robe:{ base:'#102d3e', shade:'#06141d', accent:'#ff7bea', line:'#69fff3' },
+        armor:{ base:'#14343f', shade:'#071016', accent:'#ff3159', line:'#f7fff8' },
+        raincoat:{ base:'#09566c', shade:'#062331', accent:'#69fff3', line:'#a8fff2' },
+        nightdress:{ base:'#081527', shade:'#03070f', accent:'#ff2bd6', line:'#69fff3' },
+        'storm-jacket':{ base:'#17254d', shade:'#060916', accent:'#8a9cff', line:'#ffd35d' },
+        ceremonial:{ base:'#11523c', shade:'#061b16', accent:'#ff2bd6', line:'#a2ff75' }
+      };
+      return { outfit:forced, ...palettes[forced] };
     }
 
     function updateWardrobe(now, dt){
       if (!WardrobeBrain.current) initWardrobe();
-      if (now > WardrobeBrain.nextChangeAt) {
-        WardrobeBrain.from = {...WardrobeBrain.current};
-        WardrobeBrain.target = chooseWardrobeTarget();
-        WardrobeBrain.blend = 0;
-        WardrobeBrain.nextChangeAt = now + rnd(CONFIG.clothingChangeMinMs, CONFIG.clothingChangeMaxMs);
-        MemoryBrain.recentOutfit = WardrobeBrain.target.outfit;
+
+      if (!CONFIG.outfitChangeEnabled) {
+        WardrobeBrain.phase = 'present';
+        WardrobeBrain.opacity = 1;
+        WardrobeBrain.offsetY = 0;
+        return;
       }
-      WardrobeBrain.blend = clamp(WardrobeBrain.blend + dt * .08, 0, 1);
-      const b = ease(WardrobeBrain.blend);
-      const keys = ['base','shade','accent','line'];
-      for (const k of keys) WardrobeBrain.current[k] = mixHex(WardrobeBrain.from[k], WardrobeBrain.target[k], b);
-      WardrobeBrain.current.outfit = WardrobeBrain.target.outfit;
+
+      if (WardrobeBrain.phase === 'present') {
+        WardrobeBrain.opacity = 1;
+        WardrobeBrain.offsetY = 0;
+        if (now > WardrobeBrain.nextChangeAt) {
+          WardrobeBrain.pending = chooseDifferentWardrobeTarget();
+          WardrobeBrain.phase = 'leaving';
+          WardrobeBrain.phaseStart = now;
+          WardrobeBrain.phaseDuration = CONFIG.outfitLeaveMs;
+          speech.active = false;
+          speech.nextAt = now + rnd(6000, 12000);
+        }
+        return;
+      }
+
+      const p = clamp((now - WardrobeBrain.phaseStart) / Math.max(1, WardrobeBrain.phaseDuration), 0, 1);
+      const e = ease(p);
+
+      if (WardrobeBrain.phase === 'leaving') {
+        WardrobeBrain.opacity = 1 - e;
+        WardrobeBrain.offsetY = e * 46;
+        if (p >= 1) {
+          WardrobeBrain.current = {...WardrobeBrain.pending};
+          WardrobeBrain.target = {...WardrobeBrain.current};
+          MemoryBrain.recentOutfit = WardrobeBrain.current.outfit;
+          WardrobeBrain.phase = 'away';
+          WardrobeBrain.phaseStart = now;
+          WardrobeBrain.phaseDuration = CONFIG.outfitAwayMs;
+          WardrobeBrain.opacity = 0;
+          WardrobeBrain.offsetY = 46;
+        }
+        return;
+      }
+
+      if (WardrobeBrain.phase === 'away') {
+        WardrobeBrain.opacity = 0;
+        WardrobeBrain.offsetY = 46;
+        if (p >= 1) {
+          WardrobeBrain.phase = 'returning';
+          WardrobeBrain.phaseStart = now;
+          WardrobeBrain.phaseDuration = CONFIG.outfitReturnMs;
+        }
+        return;
+      }
+
+      if (WardrobeBrain.phase === 'returning') {
+        WardrobeBrain.opacity = e;
+        WardrobeBrain.offsetY = (1 - e) * -24;
+        if (p >= 1) {
+          WardrobeBrain.phase = 'present';
+          WardrobeBrain.opacity = 1;
+          WardrobeBrain.offsetY = 0;
+          WardrobeBrain.nextChangeAt = now + rnd(CONFIG.outfitDepartureMinMs, CONFIG.outfitDepartureMaxMs);
+          speech.nextAt = Math.max(speech.nextAt, now + rnd(5000, 11000));
+        }
+      }
     }
 
     function updateBlink(now){
@@ -828,6 +934,11 @@
     }
 
     function updateSpeech(now){
+      if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') {
+        speech.active = false;
+        speech.nextAt = Math.max(speech.nextAt, now + 5000);
+        return;
+      }
       const mood = dominantMood();
       if (!speech.active && now > speech.nextAt) {
         const data = generateSpeechText(mood);
@@ -1073,14 +1184,16 @@
     }
 
     function drawMoodAura(now){
+      const entityAlpha = WardrobeBrain.opacity == null ? 1 : WardrobeBrain.opacity;
+      if (entityAlpha <= .02) return;
       const p = expr;
       const auraColor = p.anger > .35 ? C.red : p.sad > .35 ? C.cyan4 : p.blush > .35 ? C.magenta : C.green1;
       const pulse = .5 + .5 * Math.sin(now * .0017);
       ctx.save();
-      ctx.globalAlpha = .045 + p.accent * .05 + pulse * .018;
+      ctx.globalAlpha = (.045 + p.accent * .05 + pulse * .018) * entityAlpha;
       ctx.fillStyle = auraColor;
       ctx.beginPath();
-      ctx.ellipse(181, 124, 96 + pulse * 4, 112 + pulse * 3, 0, 0, Math.PI * 2);
+      ctx.ellipse(181, 124 + (WardrobeBrain.offsetY || 0), 96 + pulse * 4, 112 + pulse * 3, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -1425,12 +1538,15 @@
     }
 
     function drawEntity(now){
+      const entityAlpha = WardrobeBrain.opacity == null ? 1 : WardrobeBrain.opacity;
+      if (entityAlpha <= .01) return;
       const t=now*.001, p=expr;
       const breath=1+Math.sin(t*1.12)*.003;
       const driftX=motion.x+Math.sin(t*.37)*.55+Math.sin(t*.19+1.2)*.35;
-      const driftY=motion.y+Math.sin(t*.43+.8)*.45;
+      const driftY=motion.y+Math.sin(t*.43+.8)*.45 + (WardrobeBrain.offsetY || 0);
       const tilt=motion.tilt+Math.sin(t*.31)*.004;
       ctx.save();
+      ctx.globalAlpha *= entityAlpha;
       ctx.translate(W/2+driftX,H/2+driftY);
       ctx.rotate(tilt);
       ctx.scale(breath,1+(breath-1)*.25);
@@ -1461,12 +1577,12 @@
       if (!DEBUG || !dbgEl) return;
       const w = WorldBrain.weather.visual;
       dbgEl.textContent = [
-        'Wandering Art v5',
+        'Wandering Art v6',
         'mood ' + dominantMood() + '  val ' + emotion.valence.toFixed(2) + '  cur ' + emotion.curiosity.toFixed(2),
         'weather ' + WorldBrain.weather.status + ' / ' + (WorldBrain.weather.mood || 'clear') + '  t ' + Math.round(WorldBrain.weather.temperature) + 'c',
         'rain ' + w.rain.toFixed(2) + ' storm ' + w.storm.toFixed(2) + ' fog ' + w.fog.toFixed(2) + ' wind ' + w.wind.toFixed(2),
         'ships ' + ShipBrain.ships.length + ' glyphs ' + DriftGlyphBrain.glyphs.length + ' news ' + NewsBrain.keywords.length,
-        'outfit ' + ((WardrobeBrain.current && WardrobeBrain.current.outfit) || '...')
+        'outfit ' + ((WardrobeBrain.current && WardrobeBrain.current.outfit) || '...') + ' / ' + WardrobeBrain.phase + ' ' + (WardrobeBrain.opacity || 0).toFixed(2)
       ].join('\n');
     }
 
