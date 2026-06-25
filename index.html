@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — Living Pixel World v4</title>
+  <title>Wandering Art — Living Pixel World v5</title>
   <style>
     :root{ --bg:#020207; }
     *{ box-sizing:border-box; margin:0; padding:0; }
@@ -85,9 +85,9 @@
 
     const CONFIG = {
       locationDelayMs: 12000,
-      shipDensity: 0.92,
+      shipDensity: 0.42,
       ambientGlyphs: true,
-      ambientGlyphChance: 0.014,
+      ambientGlyphChance: 0.010,
       clothingChangeMinMs: 65000,
       clothingChangeMaxMs: 190000,
       speechFrequency: 0.82,
@@ -95,7 +95,10 @@
       weatherIntensity: 0.86,
       speechAboveGlitch: true,
       attentionToEvents: true,
-      iconicShips: true
+      iconicShips: true,
+      freightTraffic: true,
+      hugeShipMinMs: 240000,
+      hugeShipMaxMs: 520000
     };
 
     const canvas = document.getElementById('entity');
@@ -171,7 +174,9 @@
 
     const MemoryBrain = {
       trace:{ neutral:1, interested:0, surprised:0, happy:0, laugh:0, cry:0, angry:0, shy:0 },
-      lastDominant:'neutral', lastSpeechAt:0, pressure:0, silence:1, recentWeather:'clear', recentOutfit:'cloak'
+      bias:{ valence:0, curiosity:0 },
+      lastDominant:'neutral', lastSpeechAt:0, pressure:0, silence:1, recentWeather:'clear', recentOutfit:'cloak',
+      visits:1, lastSave:0
     };
 
     const WardrobeBrain = {
@@ -181,9 +186,17 @@
     };
 
     const ShipBrain = {
-      ships:[], nextSpawnAt:performance.now() + rnd(1800, 4800), seed:1000,
-      maxShips:REDUCED ? 4 : 7, rareAt:performance.now() + rnd(32000, 68000)
+      ships:[], nextSpawnAt:performance.now() + rnd(16000, 32000), seed:1000,
+      maxShips:REDUCED ? 2 : 3,
+      rareAt:performance.now() + rnd(65000, 135000),
+      majorAt:performance.now() + rnd(CONFIG.hugeShipMinMs, CONFIG.hugeShipMaxMs)
     };
+
+    const FREIGHT_ROUTES = [
+      { name:'upper freight lane', y:38, wobble:2.5, depth:.16, speedMul:.62, alphaMul:.70 },
+      { name:'middle freight lane', y:72, wobble:3.0, depth:.28, speedMul:.72, alphaMul:.82 },
+      { name:'distant freight lane', y:106, wobble:2.0, depth:.12, speedMul:.52, alphaMul:.58 }
+    ];
 
     const speech = {
       active:false, start:0, duration:0, nextAt:performance.now() + rnd(4500, 9000),
@@ -253,17 +266,7 @@
       const A=hexToRgb(a), B=hexToRgb(b);
       return rgbToHex(lerp(A.r,B.r,t), lerp(A.g,B.g,t), lerp(A.b,B.b,t));
     }
-    function hslHex(h, s, l){
-      h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
-      const c = (1 - Math.abs(2*l - 1)) * s;
-      const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-      const m = l - c / 2;
-      let r=0, g=0, b=0;
-      if (h < 60) { r=c; g=x; } else if (h < 120) { r=x; g=c; }
-      else if (h < 180) { g=c; b=x; } else if (h < 240) { g=x; b=c; }
-      else if (h < 300) { r=x; b=c; } else { r=c; b=x; }
-      return rgbToHex((r+m)*255, (g+m)*255, (b+m)*255);
-    }
+
 
     function rect(x,y,w,h,color){ ctx.fillStyle=color; ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); }
     function poly(points,color){
@@ -650,15 +653,30 @@
       MemoryBrain.lastSave = MemoryBrain.lastSave || 0;
     }
 
+    function computeMemoryBias(){
+      let best = 'neutral';
+      let bestScore = -1;
+      for (const k in MemoryBrain.trace) {
+        if (MemoryBrain.trace[k] > bestScore) { bestScore = MemoryBrain.trace[k]; best = k; }
+      }
+      MemoryBrain.bias = { valence:0, curiosity:0 };
+      if (best === 'happy' || best === 'laugh') MemoryBrain.bias.valence = .10;
+      else if (best === 'cry') MemoryBrain.bias.valence = -.05;
+      else if (best === 'interested') MemoryBrain.bias.curiosity = .12;
+      else if (best === 'shy') MemoryBrain.bias.curiosity = .04;
+    }
+
     function loadMemory(){
       try {
         const raw = safeStorage.get('wandering_art_memory_v3');
-        if (!raw) return;
+        if (!raw) { computeMemoryBias(); return; }
         const data = JSON.parse(raw);
         if (data && data.trace) Object.assign(MemoryBrain.trace, data.trace);
         if (data && data.recentOutfit) MemoryBrain.recentOutfit = data.recentOutfit;
+        if (data && data.recentWeather) MemoryBrain.recentWeather = data.recentWeather;
         MemoryBrain.visits = (data.visits || 0) + 1;
       } catch(e) {}
+      computeMemoryBias();
     }
 
     function saveMemory(now){
@@ -844,12 +862,12 @@
       return a * rhythm * .72;
     }
 
-    function createShip(seed, archetype, depth){
+    function createShip(seed, archetype, depth, route=null){
       const rng = mulberry32(seed);
       const specs = {
-        needle:[15,5], freighter:[19,7], drone:[9,7], saucer:[17,5], organic:[15,9], broken:[17,7], carrier:[29,9]
+        needle:[13,5], freighter:[19,7], drone:[9,7], saucer:[15,5], organic:[15,9], broken:[17,7], carrier:[42,11]
       };
-      const [gw, gh] = specs[archetype] || specs.needle;
+      const [gw, gh] = specs[archetype] || specs.freighter;
       const grid = Array.from({length:gh},()=>Array(gw).fill(0));
       const midY = Math.floor(gh/2), midX = Math.floor(gw/2);
       const cell = (x,y,v) => { if (x>=0 && x<gw && y>=0 && y<gh) grid[y][x] = Math.max(grid[y][x], v); };
@@ -857,9 +875,8 @@
 
       if (archetype === 'needle') {
         for (let x=1; x<gw-2; x++) cell(x, midY, 2);
-        for (let x=4; x<gw-5; x++) if (rng()>.35) { cell(x, midY-1, 1); cell(x, midY+1, 1); }
-        cell(gw-2, midY, 3); cell(gw-3, midY-1, 3); cell(gw-3, midY+1, 3);
-        cell(0, midY, 5); cell(1, midY-1, 4); cell(1, midY+1, 4);
+        for (let x=4; x<gw-5; x++) if (rng()>.45) { cell(x, midY-1, 1); cell(x, midY+1, 1); }
+        cell(gw-2, midY, 3); cell(0, midY, 5);
       }
 
       if (archetype === 'freighter' || archetype === 'carrier') {
@@ -867,12 +884,15 @@
         for (let x=margin; x<gw-margin; x++) {
           cell(x, midY, 2);
           if (x > 3 && x < gw-4) { cell(x, midY-1, 1); cell(x, midY+1, 1); }
-          if (archetype === 'carrier' && x > 5 && x < gw-6 && x % 2 === 0) { cell(x, midY-2, 1); cell(x, midY+2, 1); }
+          if (archetype === 'carrier' && x > 7 && x < gw-8 && x % 3 !== 0) { cell(x, midY-2, 1); cell(x, midY+2, 1); }
         }
-        for (let x=4; x<gw-4; x+=3) { cell(x, 1, 1); cell(x, gh-2, 1); }
-        cell(gw-3, midY-1, 3); cell(gw-3, midY, 3);
+        for (let x=5; x<gw-5; x+=4) { cell(x, 1, 1); cell(x, gh-2, 1); }
+        cell(gw-4, midY-1, 3); cell(gw-4, midY, 3);
         cell(1, midY-1, 5); cell(1, midY+1, 5);
-        if (archetype === 'carrier') { cell(0, midY, 5); cell(2, 1, 4); cell(2, gh-2, 4); }
+        if (archetype === 'carrier') {
+          for (let x=8; x<gw-8; x+=6) { cell(x, midY-3, 6); cell(x, midY+3, 6); }
+          cell(0, midY, 5); cell(2, 1, 4); cell(2, gh-2, 4);
+        }
       }
 
       if (archetype === 'drone') {
@@ -880,7 +900,6 @@
         for (let x=1;x<gw-1;x++) cell(x, midY, 2);
         cell(midX, midY, 3); cell(midX-2, midY-2, 4); cell(midX+2, midY+2, 4);
         cell(1, midY, 5); cell(gw-2, midY, 5);
-        cell(midX, 0, 6); cell(midX, gh-1, 6);
       }
 
       if (archetype === 'saucer') {
@@ -888,7 +907,6 @@
         for (let x=4;x<gw-4;x++) { cell(x, midY-1, 1); cell(x, midY+1, 1); }
         for (let x=6;x<gw-6;x++) cell(x, midY-2, 3);
         cell(2, midY, 5); cell(gw-3, midY, 5);
-        cell(midX-3, midY+1, 4); cell(midX, midY+1, 4); cell(midX+3, midY+1, 4);
       }
 
       if (archetype === 'organic') {
@@ -897,64 +915,87 @@
           const half = 1 + Math.floor(rng()*2);
           for (let d=-half; d<=half; d++) cell(x, clamp(midY + wave + d, 0, gh-1), rng()>.55 ? 2 : 1);
         }
-        for (let i=0;i<5;i++) cell(2 + Math.floor(rng()*(gw-4)), Math.floor(rng()*gh), 4);
+        for (let i=0;i<4;i++) cell(2 + Math.floor(rng()*(gw-4)), Math.floor(rng()*gh), 4);
         cell(gw-3, midY, 3); cell(1, midY, 5);
       }
 
       if (archetype === 'broken') {
-        for (let x=1; x<gw-1; x++) { cell(x, midY, 2); if (rng()>.45) cell(x, midY-1, 1); if (rng()>.45) cell(x, midY+1, 1); }
+        for (let x=1; x<gw-1; x++) { cell(x, midY, 2); if (rng()>.50) cell(x, midY-1, 1); if (rng()>.50) cell(x, midY+1, 1); }
         cell(gw-2, midY, 3); cell(1, midY, 5);
-        for(let i=0;i<Math.floor(gw*gh*.16);i++) erase(Math.floor(rng()*gw), Math.floor(rng()*gh));
-        for(let i=0;i<4;i++) cell(Math.floor(rng()*gw), Math.floor(rng()*gh), 6);
+        for(let i=0;i<Math.floor(gw*gh*.18);i++) erase(Math.floor(rng()*gw), Math.floor(rng()*gh));
+        for(let i=0;i<3;i++) cell(Math.floor(rng()*gw), Math.floor(rng()*gh), 6);
       }
 
-      // Algemene kleine details, maar niet te random: elk schip krijgt een herkenbare kern.
-      if (rng()>.45) cell(midX, Math.max(0, midY-1), 3);
-      if (rng()>.55) cell(midX + Math.floor(rng()*4)-2, 0, 6);
-      if (rng()>.62) cell(midX + Math.floor(rng()*4)-2, gh-1, 6);
+      if (rng()>.52) cell(midX, Math.max(0, midY-1), 3);
+      if (rng()>.68 && archetype !== 'carrier') cell(midX + Math.floor(rng()*4)-2, 0, 6);
 
       const dir = rng() > .5 ? 1 : -1;
-      const y = archetype === 'carrier' ? rnd(24, 82) : rnd(18, 126);
-      const speedBase = archetype === 'carrier' ? .004 : archetype === 'freighter' ? .008 : archetype === 'needle' ? .022 : archetype === 'drone' ? .014 : .012;
+      const y = route ? route.y + rnd(-route.wobble, route.wobble) : (archetype === 'carrier' ? rnd(28, 62) : rnd(18, 126));
+      const speedBase = archetype === 'carrier' ? .00115 : archetype === 'freighter' ? .0032 : archetype === 'needle' ? .0065 : archetype === 'drone' ? .0055 : .0048;
+      const routeDepth = route ? route.depth : depth;
       return {
-        seed, archetype, grid, gw, gh, depth, dir,
-        x:dir > 0 ? -gw*8 : W + gw*8,
-        y, scale:lerp(.70, 1.75, depth),
-        speed:speedBase * lerp(.38, 1.10, depth),
-        alpha:lerp(.22, .82, depth),
+        seed, archetype, grid, gw, gh, depth:routeDepth, dir,
+        routeName: route ? route.name : 'wander',
+        x:dir > 0 ? -gw*10 : W + gw*10,
+        y, baseY:y,
+        scale: archetype === 'carrier' ? lerp(1.65, 2.25, routeDepth) : lerp(.58, 1.28, routeDepth),
+        speed:speedBase * (route ? route.speedMul : 1) * lerp(.55, 1.05, routeDepth),
+        alpha:lerp(.18, .70, routeDepth) * (route ? route.alphaMul : 1),
         phase:rng()*999,
-        behavior:archetype === 'saucer' ? 'hover' : archetype === 'broken' ? 'glitch' : pick(['straight','hover','arc','burst','glitch'])
+        behavior: route ? 'route' : archetype === 'saucer' ? 'hover' : archetype === 'broken' ? 'glitch' : pick(['straight','hover','arc'])
       };
     }
 
-    function spawnShip(now, rare=false){
-      const night = WorldBrain.time.isNight;
-      const archetypes = rare ? ['carrier','organic','broken'] : night ? ['needle','freighter','drone','saucer','organic','broken'] : ['needle','freighter','drone','saucer'];
-      const archetype = pick(archetypes);
-      const depth = rare ? rnd(.44,.74) : Math.pow(rnd(.08, .92), 1.55);
-      ShipBrain.ships.push(createShip(++ShipBrain.seed, archetype, depth));
+    function spawnShip(now, rare=false, major=false){
+      if (major) {
+        const route = { name:'silent carrier route', y:rnd(32,58), wobble:1.2, depth:rnd(.18,.30), speedMul:.55, alphaMul:.52 };
+        ShipBrain.ships.push(createShip(++ShipBrain.seed, 'carrier', route.depth, route));
+        return;
+      }
+
+      if (!rare) {
+        const route = pick(FREIGHT_ROUTES);
+        const archetype = Math.random() < .82 ? 'freighter' : 'needle';
+        ShipBrain.ships.push(createShip(++ShipBrain.seed, archetype, route.depth, route));
+        return;
+      }
+
+      const archetype = pick(WorldBrain.time.isNight ? ['drone','saucer','organic','broken'] : ['drone','saucer','needle','organic']);
+      const depth = Math.pow(rnd(.12, .74), 1.35);
+      ShipBrain.ships.push(createShip(++ShipBrain.seed, archetype, depth, null));
     }
 
     function updateShips(now, dt){
-      const quietness = WorldBrain.weather.visual.fog * 1800 + WorldBrain.time.isNight * -900;
+      const fogPause = WorldBrain.weather.visual.fog * 4500;
+      const nightEase = WorldBrain.time.isNight ? -3000 : 0;
       if (now > ShipBrain.nextSpawnAt && ShipBrain.ships.length < ShipBrain.maxShips) {
-        spawnShip(now, false);
-        ShipBrain.nextSpawnAt = now + rnd(12000, 36000) / CONFIG.shipDensity + quietness;
+        spawnShip(now, false, false);
+        ShipBrain.nextSpawnAt = now + rnd(22000, 52000) / Math.max(.2, CONFIG.shipDensity) + fogPause + nightEase;
       }
-      if (now > ShipBrain.rareAt) {
-        spawnShip(now, true);
-        ShipBrain.rareAt = now + rnd(80000, 170000);
+      if (now > ShipBrain.rareAt && ShipBrain.ships.length < ShipBrain.maxShips + 1) {
+        spawnShip(now, true, false);
+        ShipBrain.rareAt = now + rnd(90000, 190000);
       }
+      if (now > ShipBrain.majorAt) {
+        spawnShip(now, true, true);
+        ShipBrain.majorAt = now + rnd(CONFIG.hugeShipMinMs, CONFIG.hugeShipMaxMs);
+      }
+
       const wind = WorldBrain.weather.visual.wind;
       for (const s of ShipBrain.ships) {
-        let factor = 1 + wind * .42;
-        if (s.behavior === 'burst') factor += .45 * (0.5 + 0.5*Math.sin(now*.003 + s.phase));
+        let factor = 1 + wind * .16;
         s.x += s.dir * s.speed * 1000 * dt * factor;
-        if (s.behavior === 'arc') s.y += Math.sin(now*.0015 + s.phase) * dt * 10;
-        if (s.behavior === 'hover') s.y += Math.sin(now*.004 + s.phase) * dt * 6;
-        if (s.behavior === 'glitch' && hash(Math.floor(now/180) + s.seed) > .985) s.x += s.dir * rnd(8,18);
+        if (s.behavior === 'route') {
+          s.y = s.baseY + Math.sin(now*.00045 + s.phase) * (s.archetype === 'carrier' ? .6 : 1.2);
+        } else if (s.behavior === 'arc') {
+          s.y += Math.sin(now*.0011 + s.phase) * dt * 4;
+        } else if (s.behavior === 'hover') {
+          s.y += Math.sin(now*.002 + s.phase) * dt * 3;
+        } else if (s.behavior === 'glitch' && hash(Math.floor(now/320) + s.seed) > .992) {
+          s.x += s.dir * rnd(2,6);
+        }
       }
-      ShipBrain.ships = ShipBrain.ships.filter(s => s.dir > 0 ? s.x < W + 120 : s.x > -120);
+      ShipBrain.ships = ShipBrain.ships.filter(s => s.dir > 0 ? s.x < W + 180 : s.x > -180);
     }
 
     function updateBackgroundEvents(now){
@@ -973,7 +1014,7 @@
     }
 
     function maybeGlitch(now){
-      if (speech.active) return;
+      if (speech.active || REDUCED) return;
       const stormBoost = WorldBrain.weather.visual.storm * 3000;
       if (now > glitchAt - stormBoost) {
         glitchUntil = now + rnd(70, 170 + WorldBrain.weather.visual.storm * 150);
@@ -1076,8 +1117,8 @@
         const fogFade = WorldBrain.weather.visual.fog > .5 ? .70 : 1;
         const clarity = .52 + WorldBrain.weather.visual.clarity * .48;
         ctx.globalAlpha = s.alpha * fogFade * clarity;
-        const bob = Math.sin(now*.002 + s.phase) * (s.behavior === 'hover' ? 2.8 : .7);
-        const tremble = s.archetype === 'broken' ? Math.sin(now*.035 + s.seed) * .8 : 0;
+        const bob = Math.sin(now*.0012 + s.phase) * (s.behavior === 'hover' ? 1.8 : .35);
+        const tremble = s.archetype === 'broken' ? Math.sin(now*.018 + s.seed) * .45 : 0;
         ctx.translate(Math.round(s.x + tremble), Math.round(s.y + bob));
         if (s.dir < 0) ctx.scale(-1,1);
         ctx.scale(s.scale, s.scale);
@@ -1088,42 +1129,41 @@
         const pal = [C.black, C.cyan1, C.cyan3, C.white, wp.accent, C.amber, C.magenta];
 
         if (s.archetype === 'carrier') {
-          ctx.globalAlpha *= .55;
-          rect(offX - 3, offY + 2, s.gw * cellSize + 6, s.gh * cellSize - 4, C.black);
-          ctx.globalAlpha *= 1.55;
+          ctx.globalAlpha *= .48;
+          rect(offX - 6, offY + 1, s.gw * cellSize + 12, s.gh * cellSize - 2, C.black);
+          ctx.globalAlpha *= 1.35;
         }
 
         for (let y=0;y<s.gh;y++) {
           for (let x=0;x<s.gw;x++) {
             const v = s.grid[y][x];
             if (!v) continue;
-            const flicker = (s.archetype === 'broken' && hash(Math.floor(now/120) + x*13 + y*7 + s.seed) > .92);
+            const flicker = (s.archetype === 'broken' && hash(Math.floor(now/240) + x*13 + y*7 + s.seed) > .95);
             const col = flicker ? C.magenta : (pal[v] || C.cyan4);
             rect(offX + x*cellSize, offY + y*cellSize, cellSize, cellSize, col);
           }
         }
 
-        if (s.archetype === 'probe') {
-          ctx.globalAlpha *= .28;
-          line(0, offY + s.gh * cellSize, 0, offY + s.gh * cellSize + 18, 1, C.green2);
-          rect(-1, offY + s.gh * cellSize + 18, 3, 1, C.green2);
+        if (s.archetype === 'drone') {
+          ctx.globalAlpha *= .18;
+          line(0, offY + s.gh * cellSize, 0, offY + s.gh * cellSize + 14, 1, C.green2);
+          rect(-1, offY + s.gh * cellSize + 14, 3, 1, C.green2);
         }
 
-        if (s.archetype === 'saucer' && Math.sin(now*.004+s.phase) > .12) {
-          ctx.globalAlpha *= .22;
-          path(C.cyan4,[['M',-6,offY+s.gh*cellSize],['L',6,offY+s.gh*cellSize],['L',14,offY+s.gh*cellSize+22],['L',-14,offY+s.gh*cellSize+22]]);
+        if (s.archetype === 'saucer' && Math.sin(now*.002+s.phase) > .36) {
+          ctx.globalAlpha *= .16;
+          path(C.cyan4,[['M',-6,offY+s.gh*cellSize],['L',6,offY+s.gh*cellSize],['L',11,offY+s.gh*cellSize+16],['L',-11,offY+s.gh*cellSize+16]]);
         }
 
         if (s.archetype === 'organic') {
-          ctx.globalAlpha *= .28;
-          line(offX - 5, 0, offX - 13, -4 + Math.sin(now*.004+s.phase)*3, 1, C.magenta);
-          line(offX - 4, 2, offX - 12, 7 + Math.cos(now*.004+s.phase)*3, 1, C.green2);
+          ctx.globalAlpha *= .20;
+          line(offX - 5, 0, offX - 11, -3 + Math.sin(now*.003+s.phase)*2, 1, C.magenta);
+          line(offX - 4, 2, offX - 10, 6 + Math.cos(now*.003+s.phase)*2, 1, C.green2);
         }
 
-        if (s.depth > .55) {
-          ctx.globalAlpha *= .35;
-          rect(offX - 8, -1, 7, 1, C.cyan4);
-          rect(offX - 13, 0, 4, 1, C.magenta);
+        if (s.routeName && s.routeName.includes('freight') && s.depth < .32) {
+          ctx.globalAlpha *= .18;
+          rect(offX - 7, -1, 5, 1, C.cyan4);
         }
         ctx.restore();
         ctx.globalAlpha = 1;
@@ -1235,52 +1275,50 @@
       path(C.black,[['M',115,255],['C',126,214,137,198,152,191],['C',167,186,194,187,210,194],['C',230,202,244,219,254,255],['L',115,255]]);
       path(wp.base,[['M',126,255],['C',135,219,146,203,159,198],['C',174,194,194,195,206,201],['C',223,209,235,226,244,255],['L',126,255]]);
       path(wp.shade,[['M',154,196],['C',166,207,181,211,199,201],['L',205,255],['L',148,255]]);
-      line(151,198,143,244,3,C.black); line(210,201,226,246,3,C.black);
-      rect(162,206,29,5,C.black); rect(166,205,23,3,wp.line);
+      line(151,198,143,244,3,C.black);
+      line(210,201,226,246,3,C.black);
+
+      // Halslijn en ketting: kleiner en duidelijker dan losse accessoires.
+      rect(162,206,29,5,C.black);
+      rect(166,205,23,2,wp.line);
+      ctx.globalAlpha = .82;
+      line(164,211,177,221,1,wp.line);
+      line(196,211,183,221,1,wp.line);
+      rect(179,220,4,4,wp.accent);
+      ctx.globalAlpha = 1;
 
       if (outfit === 'cloak') {
-        ctx.globalAlpha=.58;
-        path(wp.shade,[['M',122,255],['C',132,224,146,207,162,199],['L',144,255]]);
-        path(wp.shade,[['M',238,255],['C',228,224,214,207,199,200],['L',218,255]]);
+        ctx.globalAlpha=.42;
+        path(wp.shade,[['M',124,255],['C',134,224,147,208,162,200],['L',146,255]]);
+        path(wp.shade,[['M',236,255],['C',226,224,213,208,199,201],['L',216,255]]);
         ctx.globalAlpha=1;
-        rect(176,213,8,23,wp.accent);
       }
       if (outfit === 'armor') {
-        rect(128,221,24,7,C.black); rect(132,224,18,5,wp.line);
-        rect(208,221,26,7,C.black); rect(213,224,18,5,wp.line);
-        rect(169,218,22,6,C.black); rect(172,220,16,4,wp.accent);
-        rect(156,232,48,3,wp.line);
+        rect(130,222,20,4,C.black); rect(133,224,14,2,wp.line);
+        rect(211,222,21,4,C.black); rect(216,224,13,2,wp.line);
+        rect(174,218,13,3,wp.accent);
       }
       if (outfit === 'nightdress') {
-        ctx.globalAlpha=.75;
-        rect(139,233,2,2,wp.accent); rect(203,228,1,1,wp.line); rect(188,244,2,2,wp.accent);
-        rect(162,229,1,1,wp.line); rect(222,241,2,2,wp.accent);
+        ctx.globalAlpha=.55;
+        rect(139,233,1,1,wp.accent); rect(203,228,1,1,wp.line); rect(188,244,1,1,wp.accent);
         ctx.globalAlpha=1;
-        line(151,215,134,255,1,wp.accent); line(210,215,229,255,1,wp.accent);
       }
       if (outfit === 'ceremonial') {
-        rect(158,216,8,23,wp.accent); rect(195,216,8,23,wp.accent); rect(174,211,12,4,wp.line);
-        rect(168,225,25,2,wp.line); rect(171,236,19,2,wp.accent);
+        ctx.globalAlpha=.84;
+        rect(161,218,4,18,wp.accent); rect(196,218,4,18,wp.accent); rect(174,211,12,3,wp.line);
+        ctx.globalAlpha=1;
       }
       if (outfit === 'raincoat') {
-        ctx.globalAlpha=.62;
+        ctx.globalAlpha=.48;
         line(139,211,130,248,1,wp.line); line(222,211,237,249,1,wp.line);
-        rect(145,210,70,2,wp.line); rect(155,222,5,22,wp.accent); rect(202,222,5,22,wp.accent);
+        rect(153,222,3,18,wp.accent); rect(205,222,3,18,wp.accent);
         ctx.globalAlpha=1;
       }
       if (outfit === 'storm-jacket') {
-        rect(126,215,25,6,C.black); rect(128,217,20,3,wp.accent);
-        rect(210,215,27,6,C.black); rect(213,217,22,3,wp.accent);
-        line(154,214,135,255,2,wp.line); line(207,214,230,255,2,wp.line);
-      }
-      if (outfit === 'robe') {
-        path(wp.shade,[['M',146,210],['C',164,221,173,236,179,255],['L',142,255]]);
-        path(wp.shade,[['M',216,210],['C',198,221,189,236,183,255],['L',220,255]]);
-        rect(178,213,5,40,wp.accent);
-      }
-      if (outfit === 'suit') {
-        rect(144,218,20,4,wp.line); rect(198,218,20,4,wp.line);
-        rect(170,216,22,3,wp.accent); rect(176,226,10,21,wp.line);
+        ctx.globalAlpha=.72;
+        rect(129,217,18,2,wp.accent); rect(214,217,19,2,wp.accent);
+        line(154,214,137,255,1,wp.line); line(207,214,228,255,1,wp.line);
+        ctx.globalAlpha=1;
       }
     }
 
@@ -1404,7 +1442,7 @@
     }
 
     function applyGlitch(now){
-      if(now>glitchUntil) return;
+      if(REDUCED || now>glitchUntil) return;
       const intensity=clamp((glitchUntil-now)/200,.15,1);
       const src=ctx.getImageData(0,0,W,H);
       for(let i=0;i<6;i++){
@@ -1413,14 +1451,17 @@
         const shift=Math.floor((hash(now*.02+i*99)-.5)*14*intensity);
         ctx.putImageData(src,shift,0,0,y,W,h);
       }
-      ctx.globalAlpha=.35*intensity; rect(73+hash(now)*200,73+hash(now*.2)*92,30,2,C.green1); rect(82+hash(now*.4)*190,100+hash(now*.6)*72,18,1,C.magenta); ctx.globalAlpha=1;
+      ctx.globalAlpha=.35*intensity;
+      rect(73+hash(now)*200,73+hash(now*.2)*92,30,2,C.green1);
+      rect(82+hash(now*.4)*190,100+hash(now*.6)*72,18,1,C.magenta);
+      ctx.globalAlpha=1;
     }
 
     function drawDebug(now){
       if (!DEBUG || !dbgEl) return;
       const w = WorldBrain.weather.visual;
       dbgEl.textContent = [
-        'Wandering Art v4',
+        'Wandering Art v5',
         'mood ' + dominantMood() + '  val ' + emotion.valence.toFixed(2) + '  cur ' + emotion.curiosity.toFixed(2),
         'weather ' + WorldBrain.weather.status + ' / ' + (WorldBrain.weather.mood || 'clear') + '  t ' + Math.round(WorldBrain.weather.temperature) + 'c',
         'rain ' + w.rain.toFixed(2) + ' storm ' + w.storm.toFixed(2) + ' fog ' + w.fog.toFixed(2) + ' wind ' + w.wind.toFixed(2),
@@ -1457,8 +1498,16 @@
       applyGlitch(now);
       drawSpeechBubble(now);
       drawDebug(now);
-      if(!STATIC_PREVIEW) requestAnimationFrame(render);
     }
+
+    let rafId = null;
+    function frame(now){ render(now); rafId = requestAnimationFrame(frame); }
+    function startLoop(){ if (rafId == null) { lastNow = performance.now(); rafId = requestAnimationFrame(frame); } }
+    function stopLoop(){ if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopLoop();
+      else startLoop();
+    });
 
     loadMemory();
     initWardrobe();
@@ -1466,7 +1515,7 @@
     setInterval(() => fetchNewsKeywords(false), 1000 * 60 * 5);
 
     if (STATIC_PREVIEW) render(performance.now() + 1600);
-    else requestAnimationFrame(render);
+    else startLoop();
   })();
   </script>
 </body>
