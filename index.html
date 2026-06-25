@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — Living World</title>
+  <title>Wandering Art — GPT Living Pixel World</title>
   <style>
     :root{ --bg:#020207; }
     *{ box-sizing:border-box; margin:0; padding:0; }
@@ -57,6 +57,12 @@
         linear-gradient(90deg, rgba(255,0,170,.028), transparent 18%, transparent 82%, rgba(0,255,180,.035)),
         radial-gradient(circle at center, transparent 0 62%, rgba(0,0,0,.72) 100%);
     }
+    #dbg{
+      position:fixed; left:8px; top:8px; z-index:5;
+      display:none; white-space:pre; pointer-events:none;
+      font:10px/1.35 monospace; color:#69fff3; opacity:.72;
+      text-shadow:0 0 4px #000;
+    }
     @media (prefers-reduced-motion: reduce){
       canvas{ filter:contrast(1.06) saturate(1.08) drop-shadow(0 0 18px rgba(0,255,214,.12)); }
     }
@@ -66,14 +72,33 @@
   <main id="stage" aria-label="Wandering Art — autonomous pixel entity">
     <canvas id="entity" width="360" height="260"></canvas>
   </main>
+  <pre id="dbg"></pre>
 
   <script>
   (() => {
     'use strict';
 
-    const STATIC_PREVIEW = new URLSearchParams(location.search).has('static');
+    const PARAMS = new URLSearchParams(location.search);
+    const STATIC_PREVIEW = PARAMS.has('static');
+    const DEBUG = PARAMS.has('debug');
+    const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const CONFIG = {
+      locationDelayMs: 9000,
+      shipDensity: 1.05,
+      ambientGlyphs: true,
+      ambientGlyphChance: 0.018,
+      clothingChangeMinMs: 65000,
+      clothingChangeMaxMs: 190000,
+      speechFrequency: 0.90,
+      newsMoodInfluence: 0.28,
+      weatherIntensity: 0.86
+    };
+
     const canvas = document.getElementById('entity');
     const ctx = canvas.getContext('2d', { alpha:false });
+    const dbgEl = document.getElementById('dbg');
+    if (DEBUG && dbgEl) dbgEl.style.display = 'block';
     const W = canvas.width;
     const H = canvas.height;
     ctx.imageSmoothingEnabled = false;
@@ -86,6 +111,21 @@
       magenta:'#ff2bd6', magentaSoft:'#ff7bea', red:'#ff3159', amber:'#ffd35d',
       bubble:'#d9fff9', bubbleFill:'#06161a', fog:'#b8fff8', storm:'#8a9cff'
     };
+
+    const safeStorage = (() => {
+      let memory = {};
+      let ok = false;
+      try {
+        const k = '__wa_probe__';
+        localStorage.setItem(k, '1');
+        localStorage.removeItem(k);
+        ok = true;
+      } catch (e) {}
+      return {
+        get(key){ try { return ok ? localStorage.getItem(key) : (memory[key] || null); } catch(e){ return memory[key] || null; } },
+        set(key, value){ try { if (ok) localStorage.setItem(key, value); else memory[key] = value; } catch(e){ memory[key] = value; } }
+      };
+    })();
 
     const PROTO = {
       neutral:    { eye:.84, smile:.05, open:.04, brow:.05, anger:0,    sad:0,    blush:0,    tear:0,    gazeX:0,     gazeY:0,     accent:0 },
@@ -118,7 +158,7 @@
       requestStarted:false,
       lastWeatherAt:0,
       fallbackSeed:rnd(1,9999),
-      locationDelayAt:performance.now() + 1800
+      locationDelayAt:performance.now() + CONFIG.locationDelayMs
     };
 
     const NewsBrain = {
@@ -133,13 +173,13 @@
 
     const WardrobeBrain = {
       current:null, from:null, target:null, blend:1,
-      nextChangeAt:performance.now() + rnd(25000, 52000),
+      nextChangeAt:performance.now() + rnd(18000, 42000),
       outfits:['cloak','suit','robe','armor','raincoat','nightdress','storm-jacket','ceremonial']
     };
 
     const ShipBrain = {
       ships:[], nextSpawnAt:performance.now() + rnd(1800, 4800), seed:1000,
-      maxShips:5, rareAt:performance.now() + rnd(35000, 70000)
+      maxShips:REDUCED ? 4 : 7, rareAt:performance.now() + rnd(32000, 68000)
     };
 
     const speech = {
@@ -166,6 +206,12 @@
 
     const rainDrops = Array.from({length:46}, (_,i)=>({x:hash(i*13.1)*W, y:hash(i*19.9)*H, s:.4+hash(i*2.1)*1.4}));
     const snowFlakes = Array.from({length:38}, (_,i)=>({x:hash(i*31.7)*W, y:hash(i*7.9)*H, s:.4+hash(i*4.4)*1.3, p:hash(i*11.3)*9}));
+
+    const DriftGlyphBrain = {
+      glyphs: [],
+      nextAt: performance.now() + rnd(3500, 9000),
+      max: REDUCED ? 5 : 12
+    };
 
     let glitchUntil = 0;
     let glitchAt = performance.now() + rnd(9000, 18000);
@@ -203,6 +249,17 @@
     function mixHex(a,b,t){
       const A=hexToRgb(a), B=hexToRgb(b);
       return rgbToHex(lerp(A.r,B.r,t), lerp(A.g,B.g,t), lerp(A.b,B.b,t));
+    }
+    function hslHex(h, s, l){
+      h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
+      const c = (1 - Math.abs(2*l - 1)) * s;
+      const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+      const m = l - c / 2;
+      let r=0, g=0, b=0;
+      if (h < 60) { r=c; g=x; } else if (h < 120) { r=x; g=c; }
+      else if (h < 180) { g=c; b=x; } else if (h < 240) { g=x; b=c; }
+      else if (h < 300) { r=x; b=c; } else { r=c; b=x; }
+      return rgbToHex((r+m)*255, (g+m)*255, (b+m)*255);
     }
 
     function rect(x,y,w,h,color){ ctx.fillStyle=color; ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); }
@@ -452,11 +509,6 @@
       return best;
     }
 
-    const emotion = {
-      valence:.06, arousal:.36, tension:.14, curiosity:.52, sadness:.08, shyness:.10,
-      impulseKind:'neutral', impulseStrength:0, impulseDecay:.985, nextImpulseAt:performance.now() + rnd(8000,16000)
-    };
-
     function spawnImpulse(now){
       const kinds = ['curious','joy','surprise','sadness','anger','shy'];
       let kind = pick(kinds);
@@ -469,6 +521,11 @@
       emotion.impulseDecay = rnd(.982, .991);
       emotion.nextImpulseAt = now + rnd(12000, 26000);
     }
+
+    const emotion = {
+      valence:.06, arousal:.36, tension:.14, curiosity:.52, sadness:.08, shyness:.10,
+      impulseKind:'neutral', impulseStrength:0, impulseDecay:.985, nextImpulseAt:performance.now() + rnd(8000,16000)
+    };
 
     function updateEmotion(now, dt){
       const t = now * .001;
@@ -535,6 +592,34 @@
       MemoryBrain.pressure = damp(MemoryBrain.pressure, weights.angry*.45 + WorldBrain.weather.visual.storm*.20 + Math.max(0, -NewsBrain.tone)*.12, .08, dt);
       MemoryBrain.silence = speech.active ? 0 : clamp(MemoryBrain.silence + dt * .05, 0, 1);
       MemoryBrain.recentWeather = WorldBrain.weather.mood || 'clear';
+      MemoryBrain.visits = MemoryBrain.visits || 1;
+      MemoryBrain.lastSave = MemoryBrain.lastSave || 0;
+    }
+
+    function loadMemory(){
+      try {
+        const raw = safeStorage.get('wandering_art_memory_v3');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (data && data.trace) Object.assign(MemoryBrain.trace, data.trace);
+        if (data && data.recentOutfit) MemoryBrain.recentOutfit = data.recentOutfit;
+        MemoryBrain.visits = (data.visits || 0) + 1;
+      } catch(e) {}
+    }
+
+    function saveMemory(now){
+      if (!MemoryBrain.lastSave) MemoryBrain.lastSave = 0;
+      if (now - MemoryBrain.lastSave < 12000) return;
+      MemoryBrain.lastSave = now;
+      try {
+        safeStorage.set('wandering_art_memory_v3', JSON.stringify({
+          trace: MemoryBrain.trace,
+          recentWeather: MemoryBrain.recentWeather,
+          recentOutfit: MemoryBrain.recentOutfit,
+          visits: MemoryBrain.visits || 1,
+          savedAt: Date.now()
+        }));
+      } catch(e) {}
     }
 
     function chooseWardrobeTarget(){
@@ -575,7 +660,7 @@
         WardrobeBrain.from = {...WardrobeBrain.current};
         WardrobeBrain.target = chooseWardrobeTarget();
         WardrobeBrain.blend = 0;
-        WardrobeBrain.nextChangeAt = now + rnd(65000, 190000);
+        WardrobeBrain.nextChangeAt = now + rnd(CONFIG.clothingChangeMinMs, CONFIG.clothingChangeMaxMs);
         MemoryBrain.recentOutfit = WardrobeBrain.target.outfit;
       }
       WardrobeBrain.blend = clamp(WardrobeBrain.blend + dt * .08, 0, 1);
@@ -645,7 +730,7 @@
       }
       if (speech.active && now > speech.start + speech.duration) {
         speech.active = false;
-        speech.nextAt = now + rnd(8500, 22000) - emotion.arousal * 1600;
+        speech.nextAt = now + (rnd(8500, 22000) - emotion.arousal * 1600) / CONFIG.speechFrequency;
       }
     }
 
@@ -769,6 +854,69 @@
       }
     }
 
+    function driftWord(){
+      const pool = [];
+      if (NewsBrain.keywords.length) pool.push(...NewsBrain.keywords.slice(0, 14));
+      pool.push(WorldBrain.weather.mood || 'clear', WorldBrain.time.phaseName || 'night', weatherWord(), 'signaal', 'ruimte');
+      return pick(pool.filter(Boolean));
+    }
+
+    function updateDriftGlyphs(now, dt){
+      if (!CONFIG.ambientGlyphs) return;
+      const weather = WorldBrain.weather.visual;
+      const urge = CONFIG.ambientGlyphChance + emotion.curiosity * .008 + weather.storm * .016 + WorldBrain.time.isNight * .006;
+      if (now > DriftGlyphBrain.nextAt && DriftGlyphBrain.glyphs.length < DriftGlyphBrain.max) {
+        const word = Math.random() < .62 ? driftWord() : glyphCluster(rndInt(3, 7));
+        DriftGlyphBrain.glyphs.push({
+          text: word,
+          x: rnd(8, W - 70),
+          y: rnd(12, 170),
+          vy: rnd(.006, .022) * (weather.wind > .35 ? 1.4 : 1),
+          vx: rnd(-.012, .012) + weather.wind * .012,
+          life: rnd(4500, 9500),
+          born: now,
+          color: Math.random() < .45 ? C.cyan4 : (Math.random() < .5 ? C.green2 : C.magenta),
+          size: Math.random() < .30 ? 10 : 9
+        });
+        DriftGlyphBrain.nextAt = now + rnd(1700, 6400) / (1 + urge * 20);
+      }
+      for (const g of DriftGlyphBrain.glyphs) {
+        g.x += g.vx * 1000 * dt;
+        g.y += g.vy * 1000 * dt;
+      }
+      DriftGlyphBrain.glyphs = DriftGlyphBrain.glyphs.filter(g => now - g.born < g.life && g.x > -80 && g.x < W + 80 && g.y < H + 20);
+    }
+
+    function drawDriftGlyphs(now){
+      if (!CONFIG.ambientGlyphs) return;
+      ctx.save();
+      ctx.font = '9px monospace';
+      ctx.textBaseline = 'top';
+      for (const g of DriftGlyphBrain.glyphs) {
+        const age = (now - g.born) / g.life;
+        const a = Math.sin(clamp(age, 0, 1) * Math.PI) * .28;
+        if (a <= .01) continue;
+        ctx.globalAlpha = a * (WorldBrain.weather.visual.fog > .4 ? .55 : 1);
+        ctx.fillStyle = g.color;
+        ctx.fillText(g.text, Math.round(g.x), Math.round(g.y));
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
+    function drawMoodAura(now){
+      const p = expr;
+      const auraColor = p.anger > .35 ? C.red : p.sad > .35 ? C.cyan4 : p.blush > .35 ? C.magenta : C.green1;
+      const pulse = .5 + .5 * Math.sin(now * .0017);
+      ctx.save();
+      ctx.globalAlpha = .045 + p.accent * .05 + pulse * .018;
+      ctx.fillStyle = auraColor;
+      ctx.beginPath();
+      ctx.ellipse(181, 124, 96 + pulse * 4, 112 + pulse * 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     function drawBackground(now){
       const light = WorldBrain.time.light;
       const phase = WorldBrain.time.phaseName;
@@ -789,6 +937,7 @@
       ctx.globalAlpha = 1;
 
       drawShips(now);
+      drawDriftGlyphs(now);
       drawShootingStar(now);
       drawSignal(now);
       drawWeather(now);
@@ -1044,6 +1193,19 @@
       ctx.globalAlpha=.35*intensity; rect(73+hash(now)*200,73+hash(now*.2)*92,30,2,C.green1); rect(82+hash(now*.4)*190,100+hash(now*.6)*72,18,1,C.magenta); ctx.globalAlpha=1;
     }
 
+    function drawDebug(now){
+      if (!DEBUG || !dbgEl) return;
+      const w = WorldBrain.weather.visual;
+      dbgEl.textContent = [
+        'Wandering Art v3',
+        'mood ' + dominantMood() + '  val ' + emotion.valence.toFixed(2) + '  cur ' + emotion.curiosity.toFixed(2),
+        'weather ' + WorldBrain.weather.status + ' / ' + (WorldBrain.weather.mood || 'clear') + '  t ' + Math.round(WorldBrain.weather.temperature) + 'c',
+        'rain ' + w.rain.toFixed(2) + ' storm ' + w.storm.toFixed(2) + ' fog ' + w.fog.toFixed(2) + ' wind ' + w.wind.toFixed(2),
+        'ships ' + ShipBrain.ships.length + ' glyphs ' + DriftGlyphBrain.glyphs.length + ' news ' + NewsBrain.keywords.length,
+        'outfit ' + ((WardrobeBrain.current && WardrobeBrain.current.outfit) || '...')
+      ].join('\n');
+    }
+
     function update(now){
       const dt=Math.min(.05,(now-lastNow)/1000 || .016);
       lastNow=now;
@@ -1058,8 +1220,10 @@
       updateMotion(now,dt);
       updateSpeech(now);
       updateShips(now,dt);
+      updateDriftGlyphs(now,dt);
       updateBackgroundEvents(now);
       maybeGlitch(now);
+      saveMemory(now);
     }
 
     function render(now){
@@ -1070,6 +1234,7 @@
       if(!STATIC_PREVIEW) requestAnimationFrame(render);
     }
 
+    loadMemory();
     initWardrobe();
     fetchNewsKeywords(true);
     setInterval(() => fetchNewsKeywords(false), 1000 * 60 * 5);
