@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — Living Pixel World v9</title>
+  <title>Wandering Art — Living Pixel World v10</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -412,6 +412,8 @@
         master.gain.setTargetAtTime(.42, t, 6);
         droneGain.gain.setTargetAtTime(.14, t, 8);
         padGain.gain.setTargetAtTime(.04, t, 10);
+        // Muzieklaag opstarten (na korte vertraging zodat drone eerst klinkt)
+        setTimeout(() => initMusic(), 1800);
       },
 
       setRoot(){
@@ -533,6 +535,77 @@
       startX: -80, targetX: 75, endX: -80,
       alpha: 0,
       gazeOverride: null,
+    };
+
+    // ════════════════════════════════════════════════════════════
+    //  MusicBrain — procedurele muziek als spiegel van de wereld
+    //  Toonladder, tempo, akkoorden en patronen lezen alle andere
+    //  brains. Lookahead-scheduler voor exacte timing.
+    // ════════════════════════════════════════════════════════════
+    const SEMI = Math.pow(2, 1/12);
+    const muf = (root, s) => root * Math.pow(SEMI, s);  // frequentie n halftonen boven root
+
+    // Modussen (halftonen t.o.v. root)
+    const MU_SCALES = {
+      aeolian:  [0,2,3,5,7,8,10],   // natuurlijk mineur — het hart van de nacht
+      dorian:   [0,2,3,5,7,9,10],   // dorian — mineur met een sprankje hoop
+      phrygian: [0,1,3,5,7,8,10],   // frygisch — donkerst, meest gespannen
+      penta:    [0,3,5,7,10],        // pentatonisch mineur — teruggetrokken, rustig
+    };
+
+    // Akkoorden (halftonen t.o.v. modale root)
+    const MU_CHORDS = {
+      i:   { n:'i',   t:[0,3,7]   },  // mineur tonica
+      III: { n:'III', t:[3,7,10]  },  // grote terts (licht)
+      VI:  { n:'VI',  t:[8,12,15] },  // grote sexte
+      VII: { n:'VII', t:[10,14,17]},  // grote septiem
+      iv:  { n:'iv',  t:[5,8,12]  },  // mineur kwart (donker)
+      II:  { n:'♭II', t:[1,5,8]   },  // neapolitaans (somberlst)
+    };
+
+    // Markov-keten voor akkoordkeuze — gewichten worden door mood aangepast
+    const MU_MARKOV = {
+      i:   [['VI',5],['iv',3],['VII',3],['III',2],['II',1]],
+      VI:  [['III',4],['VII',3],['i',2],['iv',1]],
+      VII: [['i',5],['VI',3],['III',2]],
+      iv:  [['i',3],['VII',3],['VI',2],['II',1]],
+      III: [['VI',3],['VII',3],['i',2],['iv',1]],
+      II:  [['i',4],['VII',3],['iv',2]],
+    };
+
+    // Arpeggio-patronen: [maatpositie, nootindex in noten-array]
+    const MU_PAT4 = {  // 4/4 — rustig, breed
+      gentle:  [[0,1],[.5,2],[1,3],[1.5,2],[2,1],[2.5,3],[3,0],[3.5,2]],
+      cascade: [[0,4],[.5,3],[1,2],[1.5,1],[2,0],[2.5,1],[3,2],[3.5,3]],
+      sparse:  [[0,0],[1,2],[1.5,3],[2.5,1],[3,0],[3.5,2]],
+      climb:   [[0,0],[.5,1],[1,2],[1.5,3],[2,4],[2.5,3],[3,2],[3.5,1]],
+      lift:    [[0,0],[.5,2],[1.5,4],[2,3],[2.5,2],[3,4],[3.5,5]],
+    };
+    const MU_PAT5 = {  // 5/4 — spanning, onregelmatig
+      drive:   [[0,1],[.33,2],[.67,3],[1,2],[1.33,1],[1.67,3],[2,4],[2.5,2],[3,3],[3.5,1],[4,0],[4.5,2]],
+      pulse:   [[0,0],[.5,2],[1,4],[1.5,2],[2,0],[2.5,3],[3,1],[3.5,3],[4,2],[4.5,4]],
+      breath:  [[0,1],[1,3],[1.5,2],[2.5,4],[3,2],[3.5,3],[4.5,1]],
+    };
+
+    const MusicBrain = {
+      initialized: false,
+      bus: null,            // master gain voor de muzieklaag
+      handle: null,         // setInterval-handle van de scheduler
+      // Timing
+      nextBeat: 0,
+      beat: 0, beatInBar: 0,
+      LOOK: 0.12,           // lookahead in seconden
+      TICK: 38,             // scheduler-interval in ms
+      // Muzikale staat
+      bpm: 72, bpb: 4,
+      chord: 'i', chordBeat: 0, chordDur: 8,
+      pattern: 'gentle', patNotes: [],
+      rootHz: 55,           // A1 default, wordt bijgewerkt
+      scale: 'aeolian',
+      section: 0, sectionBeat: 0, sectionLen: 32,
+      // Mood-vlaggen voor speciale events
+      forceChord: null,     // forceer volgend akkoord (bijv. bij fourthWall)
+      forceScale: null,     // forceer toonladder (bijv. bij worldShift)
     };
 
     let glitchUntil = 0;
@@ -1291,6 +1364,8 @@
       } else if (id === 4){
         EyeBrain.state='fourthWall'; EyeBrain.stateStart=now; EyeBrain.stateDur=rnd(3800,6500);
         emotion.curiosity = clamp(emotion.curiosity+.18, 0, 1);
+        // Muzikaal: forceer een helder akkoord (III) voor het fourth-wall-moment
+        if (MusicBrain.initialized) MusicBrain.forceChord='III';
       } else if (id === 5){
         weights.surprised = clamp(weights.surprised+.75, 0, 1);
         RarityBrain.cascadeQueue.push(
@@ -1321,6 +1396,8 @@
         WorldBrain.weather.visual.cloud = .92;
         emotion.tension = 1; emotion.arousal = .85;
         if (AudioBrain.started) AudioBrain.noiseBurst(2,{gain:.14,type:'lowpass',freq:300,send:.8});
+        // Muzikaal: forceer frygisch bij volgende sectie
+        if (MusicBrain.initialized) MusicBrain.forceScale='phrygian';
         RarityBrain.cascadeQueue.push(
           { at:now+9000,  fn:()=>{ WorldBrain.weather.visual.storm=Math.max(0,WorldBrain.weather.visual.storm-.5); }},
           { at:now+18000, fn:()=>{ WorldBrain.weather.visual.storm=Math.max(0,WorldBrain.weather.visual.storm-.35); emotion.tension=Math.max(0,emotion.tension-.6); }}
@@ -1394,6 +1471,245 @@
           if (t10) t10.lastAt = now;
         }
       }
+    }
+
+    // ── Muziek-synthese (deelt AudioBrain's context en routing) ──────
+
+    function mu_bass(freq, time, dur){
+      if (!AudioBrain.ctx) return;
+      const ac=AudioBrain.ctx, bus=MusicBrain.bus;
+      const g=ac.createGain(); g.gain.value=0;
+      const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=340; lp.Q.value=.5;
+      [[freq*.5,'sine'],[freq,'triangle']].forEach(([fr,ty])=>{
+        const o=ac.createOscillator(); o.type=ty; o.frequency.value=fr;
+        o.connect(lp); o.start(time); o.stop(time+dur+2);
+      });
+      lp.connect(g); g.connect(bus); g.connect(AudioBrain.revSend);
+      g.gain.setValueAtTime(0,time);
+      g.gain.linearRampToValueAtTime(.20,time+.07);
+      g.gain.setTargetAtTime(.09,time+.5,.55);
+      g.gain.setTargetAtTime(0,time+dur*.85,.6);
+    }
+
+    function mu_pad(notes, time, dur, gain=.042){
+      if (!AudioBrain.ctx) return;
+      const ac=AudioBrain.ctx, bus=MusicBrain.bus;
+      notes.forEach(freq=>{
+        const lp=ac.createBiquadFilter(); lp.type='lowpass';
+        lp.frequency.value=Math.min(2000,500+freq*1.1); lp.Q.value=.5;
+        const g=ac.createGain(); g.gain.value=0;
+        // 3 detuned sawtooth per noot (super-saw lite)
+        [-8,0,8].forEach(c=>{
+          const o=ac.createOscillator(); o.type='sawtooth';
+          o.frequency.value=freq; o.detune.value=c;
+          o.connect(lp); o.start(time); o.stop(time+dur+5.5);
+        });
+        lp.connect(g); g.connect(bus); g.connect(AudioBrain.revSend);
+        g.gain.setValueAtTime(0,time);
+        g.gain.setTargetAtTime(gain/notes.length,time,2.5);   // trage aanslag
+        g.gain.setTargetAtTime(0,time+dur,2.0);               // trage uitgang
+      });
+    }
+
+    function mu_arp(freq, time, dur, vel=.082){
+      if (!AudioBrain.ctx) return;
+      const ac=AudioBrain.ctx, bus=MusicBrain.bus;
+      const o=ac.createOscillator(); o.type='triangle'; o.frequency.value=freq;
+      const lp=ac.createBiquadFilter(); lp.type='lowpass';
+      lp.frequency.value=Math.min(3600,1000+freq*1.5); lp.Q.value=.38;
+      const g=ac.createGain(); g.gain.value=0;
+      o.connect(lp).connect(g); g.connect(bus); g.connect(AudioBrain.revSend);
+      o.start(time); o.stop(time+dur+.3);
+      g.gain.setValueAtTime(0,time);
+      g.gain.linearRampToValueAtTime(vel,time+.016);
+      g.gain.setTargetAtTime(vel*.5,time+.04,.052);
+      g.gain.setTargetAtTime(0,time+dur*.6,.08);
+    }
+
+    function mu_melo(freq, time, dur){
+      if (!AudioBrain.ctx) return;
+      const ac=AudioBrain.ctx, bus=MusicBrain.bus;
+      const g=ac.createGain(); g.gain.value=0;
+      [[freq,1],[freq*2,.25]].forEach(([fr,amp])=>{
+        const o=ac.createOscillator(); o.type='sine'; o.frequency.value=fr;
+        const og=ac.createGain(); og.gain.value=amp;
+        o.connect(og).connect(g); o.start(time); o.stop(time+dur+1.2);
+      });
+      g.connect(bus); g.connect(AudioBrain.revSend);
+      g.gain.setValueAtTime(0,time);
+      g.gain.setTargetAtTime(.065,time,.20);
+      g.gain.setTargetAtTime(0,time+dur,.35);
+    }
+
+    // ── Muzieklogica: mood → muziekparameters ────────────────────
+
+    function mu_selectScale(){
+      const w=WorldBrain.weather.visual;
+      // Frygisch: boosheid, storm, crisis
+      if (w.storm>.55||weights.angry>.38) return 'phrygian';
+      // Pentatonisch: verlegen/introvert
+      if (weights.shy>.45) return 'penta';
+      // Dorian: nieuwsgierigheid, blijdschap, dag
+      if (weights.happy>.35||weights.laugh>.25||emotion.curiosity>.60||
+          weights.interested>.40) return 'dorian';
+      // Aeolisch: neutraal, verdrietig, nacht
+      return 'aeolian';
+    }
+
+    function mu_selectRoot(){
+      const h=WorldBrain.time.hour;
+      if (h>=6&&h<10)  return muf(55,7);   // E2 - ochtend
+      if (h>=10&&h<17) return muf(55,10);  // G2 - dag
+      if (h>=17&&h<21) return muf(55,5);   // D2 - avond
+      if (h>=21||h<2)  return 55;           // A1 - nacht
+      return muf(55,-2);                    // G♯1 - diepnacht
+    }
+
+    function mu_selectBPM(){
+      return Math.round(clamp(
+        66
+        + emotion.arousal*22
+        + emotion.curiosity*8
+        + weights.laugh*10
+        - emotion.sadness*12
+        - weights.cry*8
+        + WorldBrain.weather.visual.storm*10,
+        54, 100
+      ));
+    }
+
+    function mu_selectBPB(){
+      // 5/4 bij spanning of energie
+      return (emotion.tension>.40||emotion.arousal>.55||weights.angry>.25) ? 5 : 4;
+    }
+
+    function mu_chordNotes(chordKey){
+      const ch=MU_CHORDS[chordKey]; if (!ch) return [];
+      const root=MusicBrain.rootHz*4;  // 2 oktaven boven bas-root
+      const notes=[];
+      [0,12,24].forEach(oct=>{
+        ch.t.forEach(s=>{ const fr=muf(root,s+oct); if(fr>140&&fr<4000) notes.push(fr); });
+      });
+      return notes.sort((a,b)=>a-b);
+    }
+
+    function mu_pickChord(){
+      if (MusicBrain.forceChord){ const c=MusicBrain.forceChord; MusicBrain.forceChord=null; return c; }
+      // Pas Markov-gewichten aan op mood
+      const base=MU_MARKOV[MusicBrain.chord]||MU_MARKOV.i;
+      const adj=base.map(([d,w])=>{
+        let m=w;
+        if ((d==='iv'||d==='II')&&emotion.sadness>.28) m*=1+emotion.sadness*.8;
+        if ((d==='III'||d==='VI')&&emotion.valence>.2) m*=1+emotion.valence*.6;
+        if (d==='II'&&(emotion.tension>.45||weights.angry>.2)) m*=1.8;
+        if ((d==='III'||d==='VI')&&emotion.sadness>.4) m*=.6;
+        return [d, Math.max(.05,m)];
+      });
+      const tot=adj.reduce((s,[,w])=>s+w,0);
+      let r=Math.random()*tot;
+      for (const [item,w] of adj){ r-=w; if(r<=0) return item; }
+      return adj[0][0];
+    }
+
+    function mu_selectPattern(){
+      const bpb=MusicBrain.bpb;
+      if (bpb===5){
+        if (emotion.sadness>.4||weights.cry>.2) return 'breath';
+        if (emotion.arousal>.5||weights.angry>.25) return 'drive';
+        return 'pulse';
+      }
+      if (weights.cry>.3||emotion.sadness>.55) return pick(['sparse','lift']);
+      if (weights.laugh>.25||weights.happy>.35) return pick(['climb','lift','climb']);
+      if (emotion.arousal>.55||weights.angry>.25||WorldBrain.weather.visual.storm>.3)
+        return pick(['cascade','climb','cascade']);
+      if (emotion.curiosity>.5||weights.interested>.3) return pick(['climb','cascade','lift']);
+      return pick(['gentle','gentle','sparse','lift']); // gentle meest waarschijnlijk
+    }
+
+    function mu_newChord(time){
+      const M=MusicBrain;
+      M.chord=mu_pickChord();
+      M.chordBeat=0;
+      M.chordDur=Math.random()<.28?4:Math.random()<.62?8:12;
+      M.patNotes=mu_chordNotes(M.chord);
+      M.pattern=mu_selectPattern();
+      // Bas op akkoordwisseling
+      const bassHz=muf(M.rootHz*2, MU_CHORDS[M.chord].t[0]);
+      mu_bass(bassHz, time, (M.chordDur*60)/M.bpm);
+      // Pad: laagste 2 noten
+      const padGain=.038+emotion.valence*.016+(VisitorBrain.phase==='present'?.010:0);
+      mu_pad(M.patNotes.slice(0,2), time, (M.chordDur*60)/M.bpm, padGain);
+    }
+
+    function mu_syncToMood(){
+      const M=MusicBrain;
+      // BPM en maatsoort kunnen frequent bijwerken (geen klikken)
+      M.bpm=mu_selectBPM();
+      M.bpb=mu_selectBPB();
+      // Scale/root alleen aan sectiestart bijwerken (vermijdt abrupte klankverschuivingen)
+      if (M.sectionBeat===0){
+        M.scale=MusicBrain.forceScale||mu_selectScale();
+        MusicBrain.forceScale=null;
+        M.rootHz=mu_selectRoot();
+        // Pas AudioBrain drone-root aan voor coherentie
+        if (AudioBrain.started) AudioBrain.root=M.rootHz;
+      }
+    }
+
+    function mu_scheduleBeat(beatInBar, time){
+      const M=MusicBrain;
+      const pats=M.bpb===5?MU_PAT5:MU_PAT4;
+      const pat=pats[M.pattern]||Object.values(pats)[0];
+      const beatDur=60/M.bpm;
+      const notes=M.patNotes; if (!notes.length) return;
+
+      pat.forEach(([pos,ni])=>{
+        if (Math.floor(pos)!==beatInBar) return;
+        const t=time+(pos-beatInBar)*beatDur;
+        if (t<AudioBrain.ctx.currentTime) return;
+        const idx=Math.min(Math.max(0,ni),notes.length-1);
+        const vel=.055+Math.random()*.028+emotion.arousal*.030+emotion.curiosity*.012;
+        mu_arp(notes[idx], t+(Math.random()-.5)*.009, beatDur*.44, vel);
+      });
+
+      // Melodie: zeldzaam, alleen op beat 0, hoog register
+      if (beatInBar===0&&M.beat>4&&Math.random()<.08+(emotion.curiosity*.06)){
+        const hi=Math.floor(notes.length*.62+Math.random()*notes.length*.3);
+        const mf=notes[Math.min(hi,notes.length-1)]*2;
+        if (mf<3000) mu_melo(mf, time+.22, (60/M.bpm)*2.8);
+      }
+    }
+
+    function mu_tick(){
+      const M=MusicBrain;
+      if (!M.initialized||!AudioBrain.ctx) return;
+      const beatDur=60/M.bpm;
+      while (M.nextBeat<AudioBrain.ctx.currentTime+M.LOOK){
+        if (M.chordBeat>=M.chordDur) mu_newChord(M.nextBeat);
+        mu_scheduleBeat(M.beatInBar, M.nextBeat);
+        M.beat++; M.chordBeat++; M.sectionBeat++;
+        M.beatInBar=(M.beatInBar+1)%M.bpb;
+        M.nextBeat+=beatDur;
+        if (M.sectionBeat>=M.sectionLen){
+          M.sectionBeat=0; M.section++;
+          mu_syncToMood(); // toonladder/root bijwerken op sectieovergang
+        }
+      }
+    }
+
+    function initMusic(){
+      const M=MusicBrain, ac=AudioBrain.ctx;
+      M.bus=ac.createGain(); M.bus.gain.value=.0001;
+      M.bus.connect(AudioBrain.master);
+      M.bus.gain.setTargetAtTime(.82, ac.currentTime, 4);
+      M.rootHz=mu_selectRoot();
+      M.scale=mu_selectScale();
+      M.bpm=mu_selectBPM();
+      M.bpb=mu_selectBPB();
+      M.nextBeat=ac.currentTime+.35;
+      M.beat=0; M.beatInBar=0; M.chordBeat=999; M.sectionBeat=0;
+      M.initialized=true;
+      M.handle=setInterval(mu_tick, M.TICK);
     }
 
     function attentionTarget(){
@@ -2436,14 +2752,14 @@
       if (!DEBUG || !dbgEl) return;
       const w = WorldBrain.weather.visual;
       dbgEl.textContent = [
-        'Wandering Art v9',
+        'Wandering Art v10',
         'mood ' + dominantMood() + '  val ' + emotion.valence.toFixed(2) + '  cur ' + emotion.curiosity.toFixed(2),
         'weather ' + WorldBrain.weather.status + ' / ' + (WorldBrain.weather.mood || 'clear') + '  t ' + Math.round(WorldBrain.weather.temperature) + 'c',
-        'rain ' + w.rain.toFixed(2) + ' storm ' + w.storm.toFixed(2) + ' fog ' + w.fog.toFixed(2) + ' wind ' + w.wind.toFixed(2),
+        'eye ' + EyeBrain.state + '  pupL ' + PupilBrain.left.toFixed(2) + '  pupR ' + PupilBrain.right.toFixed(2),
         'ships ' + ShipBrain.ships.length + ' cosmic ' + CosmicBrain.events.length + ' news ' + NewsBrain.keywords.length,
         'audio ' + (AudioBrain.enabled ? (AudioBrain.started ? ('on root ' + AudioBrain.root.toFixed(1) + 'Hz') : 'wacht op gesture') : 'uit'),
-        'eye ' + EyeBrain.state + '  pupL ' + PupilBrain.left.toFixed(2) + '  pupR ' + PupilBrain.right.toFixed(2),
-        'visitor ' + VisitorBrain.phase + ' ' + VisitorBrain.archetype + '  rarity cascades ' + RarityBrain.cascadeQueue.length,
+        'music ' + (MusicBrain.initialized ? (MusicBrain.scale + ' ' + (MU_CHORDS[MusicBrain.chord]?.n||'—') + ' ' + MusicBrain.bpm + 'bpm ' + MusicBrain.bpb + '/4 pat:' + MusicBrain.pattern) : 'init...'),
+        'visitor ' + VisitorBrain.phase + ' ' + VisitorBrain.archetype,
       ].join('\n');
     }
 
@@ -2469,6 +2785,7 @@
       updateCosmic(now);
       maybeGlitch(now);
       AudioBrain.tick(now);
+      if (MusicBrain.initialized) mu_syncToMood();
       saveMemory(now);
     }
 
@@ -2502,8 +2819,16 @@
     function startLoop(){ if (rafId == null) { lastNow = performance.now(); rafId = requestAnimationFrame(frame); } }
     function stopLoop(){ if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) { stopLoop(); AudioBrain.suspend(); }
-      else { startLoop(); AudioBrain.resume(); }
+      if (document.hidden) {
+        stopLoop(); AudioBrain.suspend();
+        if (MusicBrain.initialized){ clearInterval(MusicBrain.handle); MusicBrain.handle=null; }
+      } else {
+        startLoop(); AudioBrain.resume();
+        if (MusicBrain.initialized && !MusicBrain.handle){
+          MusicBrain.nextBeat = AudioBrain.ctx.currentTime + .3;
+          MusicBrain.handle = setInterval(mu_tick, MusicBrain.TICK);
+        }
+      }
     });
 
     loadMemory();
