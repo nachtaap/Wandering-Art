@@ -86,8 +86,9 @@
     }
     canvas{
       display:block;
-      width:min(100vw, calc(100vh * 1.384615));
-      height:min(100vh, calc(100vw / 1.384615));
+      /* Fullscreen portrait compositie: 9:16, met ruimte rondom het personage. */
+      width:min(100vw, calc(100vh * 0.5625));
+      height:min(100vh, calc(100vw / 0.5625));
       image-rendering:pixelated;
       image-rendering:crisp-edges;
       filter:
@@ -136,7 +137,7 @@
 </head>
 <body>
   <main id="stage" aria-label="Wandering Art — autonomous pixel entity">
-    <canvas id="entity" width="360" height="260"></canvas>
+    <canvas id="entity" width="360" height="640"></canvas>
   </main>
   <div id="enter" aria-hidden="true">binnentreden</div>
   <pre id="dbg"></pre>
@@ -2541,13 +2542,74 @@
       const wp = WardrobeBrain.current || { base:C.cyan2, shade:C.cyan0, accent:C.green1, line:C.cyan4, outfit:'cloak' };
       const outfit = wp.outfit || 'cloak';
 
-      path(C.black,[['M',115,285],['C',126,214,137,198,152,191],['C',167,186,194,187,210,194],['C',230,202,244,219,254,285],['L',115,285]]);
-      path(wp.base,[['M',126,285],['C',135,219,146,203,159,198],['C',174,194,194,195,206,201],['C',223,209,235,226,244,285],['L',126,285]]);
-      path(wp.shade,[['M',154,196],['C',166,207,181,211,199,201],['L',205,285],['L',148,285]]);
-      line(151,198,143,244,3,C.black);
-      line(210,201,226,246,3,C.black);
+      // Full-body uitbreiding van het bestaande HTML-personage.
+      // Het hoofd/gezicht blijft exact dezelfde code; alleen de romp, armen,
+      // handen, benen en voeten zijn doorgetrokken in dezelfde vlakke neonstijl.
+      ctx.globalAlpha = .16;
+      ellipse(180,610,58,10,C.cyan4);
+      ctx.globalAlpha = .08;
+      ellipse(180,306,96,238,C.cyan4);
+      ctx.globalAlpha = 1;
 
-      // Halslijn en ketting: kleiner en duidelijker dan losse accessoires.
+      // Benen achter de mantelopening.
+      path(C.black,[['M',158,398],['L',174,398],['L',178,586],['L',168,586],['C',164,520,160,457,158,398]]);
+      path(C.black,[['M',186,398],['L',202,398],['C',200,457,196,520,192,586],['L',182,586],['L',186,398]]);
+      path(C.cyan0,[['M',166,408],['L',174,408],['L',176,582],['L',169,582],['C',167,520,165,458,166,408]]);
+      path(C.cyan0,[['M',186,408],['L',194,408],['C',195,458,193,520,191,582],['L',184,582],['L',186,408]]);
+      ctx.globalAlpha=.36;
+      line(172,432,173,560,1,C.cyan2);
+      line(188,432,187,560,1,C.cyan2);
+      ctx.globalAlpha=1;
+
+      // Voeten/laarzen: klein en grafisch, met cyan accenten.
+      path(C.black,[['M',166,574],['C',159,586,154,600,158,608],['C',166,615,179,610,180,596],['L',177,574]]);
+      path(C.black,[['M',194,574],['L',183,574],['L',180,596],['C',181,610,194,615,202,608],['C',206,600,201,586,194,574]]);
+      path(C.ink,[['M',168,582],['C',163,591,160,600,162,605],['C',168,608,176,604,176,595],['L',175,582]]);
+      path(C.ink,[['M',192,582],['L',185,582],['L',184,595],['C',184,604,192,608,198,605],['C',200,600,197,591,192,582]]);
+      line(164,600,170,587,2,C.cyan4);
+      line(196,600,190,587,2,C.cyan4);
+      line(170,606,176,604,1,C.green1);
+      line(190,604,196,606,1,C.green1);
+
+      // Achterste mantel: houdt de oorspronkelijke schoudervorm maar laat haar
+      // nu als lange, rustige silhouet tot bijna de vloer vallen.
+      path(C.black,[['M',111,219],['C',126,207,151,201,180,203],['C',209,201,234,207,249,219],['C',263,300,268,461,266,586],['C',248,601,224,607,202,600],['C',198,531,193,468,188,421],['L',180,397],['L',172,421],['C',167,468,162,531,158,600],['C',136,607,112,601,94,586],['C',92,461,97,300,111,219]]);
+      path(wp.shade,[['M',124,227],['C',139,214,157,209,180,210],['C',203,209,221,214,236,227],['C',246,310,251,460,249,573],['C',235,586,217,591,198,588],['C',195,524,190,468,185,426],['L',180,411],['L',175,426],['C',170,468,165,524,162,588],['C',143,591,125,586,111,573],['C',109,460,114,310,124,227]]);
+      path(wp.base,[['M',132,224],['C',146,212,163,207,180,208],['C',197,207,214,212,228,224],['C',239,309,243,446,240,558],['C',227,572,211,578,194,576],['C',190,522,186,468,183,427],['L',180,414],['L',177,427],['C',174,468,170,522,166,576],['C',149,578,133,572,120,558],['C',117,446,121,309,132,224]]);
+
+      // Voorpand met subtiel vrouwelijker vorm: smaller in de taille,
+      // zachtere borstlijn en iets vollere heupen, zonder de stijl te breken.
+      path(C.black,[['M',141,214],['C',153,203,166,199,180,200],['C',194,199,207,203,219,214],['C',227,258,225,322,220,391],['L',180,447],['L',140,391],['C',135,322,133,258,141,214]]);
+      path(wp.base,[['M',148,216],['C',157,208,168,204,180,205],['C',192,204,203,208,212,216],['C',221,261,219,324,214,386],['L',180,432],['L',146,386],['C',141,324,139,261,148,216]]);
+      path(wp.shade,[['M',160,218],['C',166,245,167,281,162,320],['C',158,351,155,375,149,393],['L',180,427],['L',211,393],['C',205,375,202,351,198,320],['C',193,281,194,245,200,218],['C',188,213,172,213,160,218]]);
+      ctx.globalAlpha=.24;
+      path(C.black,[['M',151,238],['C',160,254,169,257,180,251],['C',191,257,200,254,209,238],['C',198,247,190,249,180,247],['C',170,249,162,247,151,238]]);
+      ctx.globalAlpha=.34;
+      line(154,255,145,318,2,C.cyan1);
+      line(206,255,215,318,2,C.cyan1);
+      ctx.globalAlpha=1;
+
+      // Lange mouwen/armen, achter de handen.
+      path(C.black,[['M',128,219],['C',113,261,105,330,96,389],['L',120,402],['C',132,342,140,277,150,224]]);
+      path(C.black,[['M',232,219],['C',247,261,255,330,264,389],['L',240,402],['C',228,342,220,277,210,224]]);
+      path(wp.base,[['M',130,226],['C',119,266,111,330,104,384],['L',119,393],['C',129,336,136,277,147,229]]);
+      path(wp.base,[['M',230,226],['C',241,266,249,330,256,384],['L',241,393],['C',231,336,224,277,213,229]]);
+      ctx.globalAlpha=.38;
+      line(139,239,126,365,3,C.cyan0);
+      line(221,239,234,365,3,C.cyan0);
+      ctx.globalAlpha=1;
+
+      // Handen: dezelfde cyan huid als het gezicht, simpel en leesbaar.
+      path(C.black,[['M',105,385],['L',124,394],['L',120,434],['L',113,447],['L',108,430],['L',102,438],['L',98,420],['L',101,398]]);
+      path(C.black,[['M',255,385],['L',236,394],['L',240,434],['L',247,447],['L',252,430],['L',258,438],['L',262,420],['L',259,398]]);
+      path(C.cyan3,[['M',108,390],['L',122,397],['L',117,428],['L',113,438],['L',109,421],['L',104,431],['L',101,418],['L',104,399]]);
+      path(C.cyan3,[['M',252,390],['L',238,397],['L',243,428],['L',247,438],['L',251,421],['L',256,431],['L',259,418],['L',256,399]]);
+      line(113,403,111,428,1,C.black);
+      line(118,404,117,426,1,C.black);
+      line(247,403,249,428,1,C.black);
+      line(242,404,243,426,1,C.black);
+
+      // Halslijn en ketting: klein, stabiel accessoire.
       rect(162,206,29,5,C.black);
       rect(166,205,23,2,wp.line);
       ctx.globalAlpha = .82;
@@ -2556,37 +2618,48 @@
       rect(179,220,4,4,wp.accent);
       ctx.globalAlpha = 1;
 
+      // Outfit-variaties blijven bestaan, maar zijn subtieler en volgen de full body.
+      if (outfit === 'suit') {
+        ctx.globalAlpha=.34;
+        line(153,226,168,282,1,wp.line); line(207,226,192,282,1,wp.line);
+        rect(176,227,8,3,wp.accent);
+        ctx.globalAlpha=1;
+      }
       if (outfit === 'cloak') {
-        ctx.globalAlpha=.42;
-        path(wp.shade,[['M',124,285],['C',134,224,147,208,162,200],['L',146,285]]);
-        path(wp.shade,[['M',236,285],['C',226,224,213,208,199,201],['L',216,285]]);
+        ctx.globalAlpha=.26;
+        path(wp.shade,[['M',116,246],['C',127,326,134,456,131,570],['C',121,566,116,562,111,556],['C',109,446,113,316,116,246]]);
+        path(wp.shade,[['M',244,246],['C',233,326,226,456,229,570],['C',239,566,244,562,249,556],['C',251,446,247,316,244,246]]);
         ctx.globalAlpha=1;
       }
       if (outfit === 'armor') {
-        rect(130,222,20,4,C.black); rect(133,224,14,2,wp.line);
-        rect(211,222,21,4,C.black); rect(216,224,13,2,wp.line);
-        rect(174,218,13,3,wp.accent);
+        rect(141,240,24,4,C.black); rect(145,241,16,2,wp.line);
+        rect(195,240,24,4,C.black); rect(199,241,16,2,wp.line);
+        rect(174,232,13,3,wp.accent);
+        ctx.globalAlpha=.34; line(180,250,180,420,1,wp.line); ctx.globalAlpha=1;
       }
       if (outfit === 'nightdress') {
-        ctx.globalAlpha=.55;
-        rect(139,233,1,1,wp.accent); rect(203,228,1,1,wp.line); rect(188,244,1,1,wp.accent);
+        ctx.globalAlpha=.48;
+        rect(143,308,1,1,wp.accent); rect(211,331,1,1,wp.line); rect(188,374,1,1,wp.accent);
+        rect(161,478,1,1,wp.line); rect(222,525,1,1,wp.accent);
         ctx.globalAlpha=1;
       }
       if (outfit === 'ceremonial') {
-        ctx.globalAlpha=.84;
-        rect(161,218,4,18,wp.accent); rect(196,218,4,18,wp.accent); rect(174,211,12,3,wp.line);
+        ctx.globalAlpha=.72;
+        rect(164,232,3,64,wp.accent); rect(193,232,3,64,wp.accent);
+        line(180,230,180,430,1,wp.line);
+        rect(176,312,8,3,wp.line);
         ctx.globalAlpha=1;
       }
       if (outfit === 'raincoat') {
-        ctx.globalAlpha=.48;
-        line(139,211,130,248,1,wp.line); line(222,211,237,249,1,wp.line);
-        rect(153,222,3,18,wp.accent); rect(205,222,3,18,wp.accent);
+        ctx.globalAlpha=.42;
+        line(134,242,121,382,1,wp.line); line(226,242,239,382,1,wp.line);
+        rect(154,232,3,90,wp.accent); rect(203,232,3,90,wp.accent);
         ctx.globalAlpha=1;
       }
       if (outfit === 'storm-jacket') {
-        ctx.globalAlpha=.72;
-        rect(129,217,18,2,wp.accent); rect(214,217,19,2,wp.accent);
-        line(154,214,137,255,1,wp.line); line(207,214,228,255,1,wp.line);
+        ctx.globalAlpha=.62;
+        rect(128,229,22,2,wp.accent); rect(210,229,22,2,wp.accent);
+        line(154,226,140,360,1,wp.line); line(206,226,220,360,1,wp.line);
         ctx.globalAlpha=1;
       }
     }
