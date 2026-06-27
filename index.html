@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — Living Pixel World v12 — Feminine Oracle Paper Puppet</title>
+  <title>Wandering Art — Living Pixel World v13 — Ethereal Oracle</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -2539,108 +2539,53 @@
     }
 
     function drawShouldersAndNeck(now = performance.now()){
-      const wp = WardrobeBrain.current || { base:C.cyan2, shade:C.cyan0, accent:C.green1, line:C.cyan4, outfit:'oracle-traveler' };
+      const wp = WardrobeBrain.current || { base:C.cyan2, shade:C.cyan0, accent:C.green1, line:C.cyan4, outfit:'ethereal-oracle' };
       const t = now * .001;
 
-      // ORAKEL REIZIGER — FEMININE PAPER CUT-OUT BODY RIG
-      // Hoofd/gezicht blijft de bestaande verfijnde laag. Deze functie tekent de paper body,
-      // plus een statische paper-framing achter het hoofd zodat lichaam en hoofd één object worden.
-      const reducedMul = REDUCED ? .22 : 1;
-      const brass      = '#c99a35';
-      const brassHi    = '#ffe7a6';
-      const brassLo    = '#60400a';
+      // ETHEREAL ORACLE — adult, feminine, space-oracle paper couture.
+      // Het bestaande hoofd/gezicht wordt NIET overschreven. Deze laag tekent:
+      // 1) een paper/halo frame achter het hoofd, zodat de digitale kop in dezelfde wereld zit;
+      // 2) een vloeiend, vrouwelijk paper-cutout lichaam met verborgen/rituele scharnieren.
+      const rm = REDUCED ? .22 : 1;
+      const bob       = Math.sin(t * 1.02) * .90 * rm;
+      const sway      = Math.sin(t * .42) * .018 * rm;
+      const breath    = Math.sin(t * 1.20) * .85 * rm;
+      const walk      = Math.sin(t * .76) * .13 * rm;
+      const oracleDip = Math.sin(t * .31 + 1.1) * .07 * rm;
+
+      const ink        = '#02040a';
       const edge       = C.black;
-      const ink        = '#02070b';
-      const card       = '#b49268';
-      const cardDark   = '#72543a';
-      const cardLite   = '#dac494';
-      const robeBase   = mixHex('#0b3140', wp.base || C.cyan2, .15);
-      const robeDeep   = mixHex('#06121d', wp.shade || C.cyan0, .20);
-      const robeLit    = mixHex(robeBase, C.cyan4, .22);
-      const velvet     = mixHex('#201037', C.magenta, .16);
-      const oraclePink = mixHex('#8b385d', C.magenta, .35);
-      const oracleGold = '#d8aa45';
-      const cosmicBlue = mixHex(C.cyan4, '#6f5cff', .32);
-      const stitch     = mixHex(C.cyan4, C.white, .38);
-      const skinPaper  = mixHex(cardLite, C.cyan3, .07);
-      const shoePaper  = '#1a1722';
-
-      const puppetBob  = Math.sin(t * 1.05) * 1.00 * reducedMul;
-      const puppetSway = Math.sin(t * .45) * .022 * reducedMul;
-      const walk       = Math.sin(t * .78) * .18 * reducedMul;
-      const reach      = Math.sin(t * .35 + 1.9) * .10 * reducedMul;
-      const breathe    = Math.sin(t * 1.28) * .85 * reducedMul;
-
-      function roundedRectPath(x,y,w,h,r){
-        const rr = Math.min(r, Math.abs(w)/2, Math.abs(h)/2);
-        ctx.beginPath();
-        ctx.moveTo(x+rr,y);
-        ctx.lineTo(x+w-rr,y);
-        ctx.quadraticCurveTo(x+w,y,x+w,y+rr);
-        ctx.lineTo(x+w,y+h-rr);
-        ctx.quadraticCurveTo(x+w,y+h,x+w-rr,y+h);
-        ctx.lineTo(x+rr,y+h);
-        ctx.quadraticCurveTo(x,y+h,x,y+h-rr);
-        ctx.lineTo(x,y+rr);
-        ctx.quadraticCurveTo(x,y,x+rr,y);
-        ctx.closePath();
-      }
+      const voidBlue   = '#050814';
+      const deepTeal   = mixHex('#071a26', wp.shade || C.cyan0, .24);
+      const teal       = mixHex('#0a3141', wp.base || C.cyan2, .18);
+      const tealLit    = mixHex(teal, C.cyan4, .25);
+      const nightViolet= mixHex('#190f2a', C.magenta, .14);
+      const violetLit  = mixHex(nightViolet, C.magenta, .22);
+      const vellum     = '#c9b48a';
+      const vellumLite = '#ead9ad';
+      const vellumDark = '#7d6645';
+      const skinPaper  = mixHex('#d8bd93', C.cyan4, .05);
+      const gold       = '#d5a64d';
+      const goldHi     = '#fff0b8';
+      const goldLo     = '#57370a';
+      const roseGold   = mixHex('#c87592', gold, .30);
+      const pearl      = mixHex(vellumLite, C.white, .30);
+      const starBlue   = mixHex(C.cyan4, '#7b62ff', .30);
+      const stitch     = mixHex(C.cyan4, C.white, .42);
+      const shadow     = 'rgba(0,0,10,.72)';
 
       function drawCommands(commands){
         ctx.beginPath();
         for(const c of commands){
-          if(c[0]==='M') ctx.moveTo(c[1],c[2]);
-          if(c[0]==='L') ctx.lineTo(c[1],c[2]);
-          if(c[0]==='Q') ctx.quadraticCurveTo(c[1],c[2],c[3],c[4]);
-          if(c[0]==='C') ctx.bezierCurveTo(c[1],c[2],c[3],c[4],c[5],c[6]);
+          if(c[0] === 'M') ctx.moveTo(c[1], c[2]);
+          if(c[0] === 'L') ctx.lineTo(c[1], c[2]);
+          if(c[0] === 'Q') ctx.quadraticCurveTo(c[1], c[2], c[3], c[4]);
+          if(c[0] === 'C') ctx.bezierCurveTo(c[1], c[2], c[3], c[4], c[5], c[6]);
         }
         ctx.closePath();
       }
 
-      function boundsFromCommands(commands){
-        let minX=9999,minY=9999,maxX=-9999,maxY=-9999;
-        for(const c of commands){
-          for(let i=1;i<c.length;i+=2){
-            const x=c[i], y=c[i+1];
-            if(typeof x === 'number' && typeof y === 'number'){
-              minX=Math.min(minX,x); minY=Math.min(minY,y);
-              maxX=Math.max(maxX,x); maxY=Math.max(maxY,y);
-            }
-          }
-        }
-        return {x:minX,y:minY,w:Math.max(1,maxX-minX),h:Math.max(1,maxY-minY)};
-      }
-
-      function paperFibersBox(x,y,w,h,key,color=stitch,amount=8){
-        ctx.save();
-        ctx.globalAlpha = .14;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        for(let i=0;i<amount;i++){
-          const hx = x + 4 + hash(key + i * 17.1) * Math.max(1,w-8);
-          const hy = y + 4 + hash(key + i * 29.7) * Math.max(1,h-8);
-          const len = 3 + hash(key + i * 7.3) * 10;
-          ctx.beginPath();
-          ctx.moveTo(hx, hy);
-          ctx.lineTo(hx + len, hy + (hash(key+i*.31)-.5)*3);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-
-      function stitchPath(commands,alpha=.22){
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.strokeStyle = stitch;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3,5]);
-        drawCommands(commands);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.restore();
-      }
-
-      function strokeOpen(commands,color,width=1,alpha=.35,dash=false){
+      function strokeCommands(commands, color, width=1, alpha=.35, dash=false){
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = color;
@@ -2650,358 +2595,392 @@
         if(dash) ctx.setLineDash([3,5]);
         ctx.beginPath();
         for(const c of commands){
-          if(c[0]==='M') ctx.moveTo(c[1],c[2]);
-          if(c[0]==='L') ctx.lineTo(c[1],c[2]);
-          if(c[0]==='Q') ctx.quadraticCurveTo(c[1],c[2],c[3],c[4]);
-          if(c[0]==='C') ctx.bezierCurveTo(c[1],c[2],c[3],c[4],c[5],c[6]);
+          if(c[0] === 'M') ctx.moveTo(c[1], c[2]);
+          if(c[0] === 'L') ctx.lineTo(c[1], c[2]);
+          if(c[0] === 'Q') ctx.quadraticCurveTo(c[1], c[2], c[3], c[4]);
+          if(c[0] === 'C') ctx.bezierCurveTo(c[1], c[2], c[3], c[4], c[5], c[6]);
         }
         ctx.stroke();
         if(dash) ctx.setLineDash([]);
         ctx.restore();
       }
 
-      function cutPath(commands,fill,key=1,opts={}){
-        const b = boundsFromCommands(commands);
-        ctx.save();
-        ctx.translate(3,3);
-        ctx.globalAlpha = opts.shadowAlpha ?? .58;
-        drawCommands(commands);
-        ctx.fillStyle = C.black;
-        ctx.fill();
-        ctx.restore();
+      function bounds(commands){
+        let minX=9999, minY=9999, maxX=-9999, maxY=-9999;
+        for(const c of commands){
+          for(let i=1;i<c.length;i+=2){
+            const x=c[i], y=c[i+1];
+            if(typeof x === 'number' && typeof y === 'number'){
+              minX=Math.min(minX,x); minY=Math.min(minY,y);
+              maxX=Math.max(maxX,x); maxY=Math.max(maxY,y);
+            }
+          }
+        }
+        return { x:minX, y:minY, w:Math.max(1,maxX-minX), h:Math.max(1,maxY-minY) };
+      }
 
-        drawCommands(commands);
-        ctx.fillStyle = fill;
-        ctx.fill();
-        ctx.lineWidth = opts.lineWidth || 3;
-        ctx.strokeStyle = edge;
-        ctx.stroke();
-
+      function paperFibers(commands, key, color=stitch, amount=9, alpha=.13){
+        const b = bounds(commands);
         ctx.save();
         drawCommands(commands);
         ctx.clip();
-        ctx.globalAlpha = opts.topAlpha ?? .11;
-        rect(b.x+2,b.y+2,Math.max(1,b.w-4),Math.max(1,b.h*.32),opts.highlight || robeLit);
-        ctx.globalAlpha = opts.bottomAlpha ?? .08;
-        rect(b.x+2,b.y+b.h*.70,Math.max(1,b.w-4),Math.max(1,b.h*.30),C.black);
-        ctx.globalAlpha = 1;
-        paperFibersBox(b.x,b.y,b.w,b.h,key,opts.fiberColor || stitch,opts.fibers || 10);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        for(let i=0;i<amount;i++){
+          const hx = b.x + 4 + hash(key + i*19.37) * Math.max(1, b.w-8);
+          const hy = b.y + 4 + hash(key + i*31.11) * Math.max(1, b.h-8);
+          const len = 4 + hash(key + i*7.71) * 13;
+          const dy = (hash(key + i*.41) - .5) * 4;
+          ctx.beginPath();
+          ctx.moveTo(hx, hy);
+          ctx.lineTo(hx + len, hy + dy);
+          ctx.stroke();
+        }
         ctx.restore();
-
-        if(opts.stitch !== false) stitchPath(commands, opts.stitchAlpha || .18);
       }
 
-      function stitchRoundRect(x,y,w,h,r,alpha=.20){
+      function paper(commands, fill, key=1, opts={}){
+        const lineCol = opts.line || edge;
+        const lw = opts.lw == null ? 2 : opts.lw;
+        const alpha = opts.alpha == null ? 1 : opts.alpha;
+        const hi = opts.hi || mixHex(fill, C.white, .10);
+        const b = bounds(commands);
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.strokeStyle = stitch;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3,4]);
-        roundedRectPath(x,y,w,h,r);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.restore();
-      }
-
-      function cutRoundRect(x,y,w,h,r,fill,key=1,opts={}){
-        ctx.save();
-        ctx.translate(3,3);
-        ctx.globalAlpha = .58;
-        roundedRectPath(x,y,w,h,r);
-        ctx.fillStyle = C.black;
+        ctx.translate(opts.shadowX == null ? 2 : opts.shadowX, opts.shadowY == null ? 3 : opts.shadowY);
+        drawCommands(commands);
+        ctx.fillStyle = shadow;
         ctx.fill();
         ctx.restore();
 
-        roundedRectPath(x,y,w,h,r);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        drawCommands(commands);
         ctx.fillStyle = fill;
         ctx.fill();
-        ctx.lineWidth = opts.lineWidth || 3;
-        ctx.strokeStyle = edge;
-        ctx.stroke();
-
-        ctx.save();
-        roundedRectPath(x,y,w,h,r);
-        ctx.clip();
-        ctx.globalAlpha=.10; rect(x+2,y+2,Math.max(1,w-4),Math.max(1,h*.30),opts.highlight || robeLit);
-        ctx.globalAlpha=.08; rect(x+2,y+h*.70,Math.max(1,w-4),Math.max(1,h*.28),C.black);
-        ctx.globalAlpha=1;
-        paperFibersBox(x,y,w,h,key,opts.fiberColor || stitch,opts.fibers || 8);
         ctx.restore();
 
-        if(opts.stitch !== false) stitchRoundRect(x+4,y+4,w-8,h-8,Math.max(1,r-4),.15);
+        if(hi){
+          const g = ctx.createLinearGradient(b.x, b.y, b.x+b.w, b.y+b.h);
+          g.addColorStop(0, hi);
+          g.addColorStop(.45, 'rgba(255,255,255,0)');
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.save();
+          ctx.globalAlpha = opts.hiAlpha == null ? .20 : opts.hiAlpha;
+          drawCommands(commands);
+          ctx.fillStyle = g;
+          ctx.fill();
+          ctx.restore();
+        }
+
+        paperFibers(commands, key, opts.fiber || stitch, opts.fibers == null ? 8 : opts.fibers, opts.fiberAlpha == null ? .12 : opts.fiberAlpha);
+
+        ctx.save();
+        ctx.globalAlpha = opts.strokeAlpha == null ? .86 : opts.strokeAlpha;
+        ctx.strokeStyle = lineCol;
+        ctx.lineWidth = lw;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        drawCommands(commands);
+        ctx.stroke();
+        ctx.restore();
+
+        if(opts.stitch !== false){
+          strokeCommands(commands, opts.stitchColor || stitch, 1, opts.stitchAlpha == null ? .20 : opts.stitchAlpha, true);
+        }
       }
 
-      function drawBoneBetween(a,b,w,fill,key,opts={}){
+      function star(cx,cy,r,color=gold,alpha=.75){
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        for(let i=0;i<10;i++){
+          const a = -Math.PI/2 + i*Math.PI/5;
+          const rr = i%2 ? r*.38 : r;
+          const x = cx + Math.cos(a)*rr;
+          const y = cy + Math.sin(a)*rr;
+          if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function crescent(cx,cy,r,cutColor,alpha=.85){
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ellipse(cx,cy,r,r,gold);
+        ctx.globalAlpha = alpha;
+        ellipse(cx+r*.42,cy-r*.08,r*.84,r*.84,cutColor);
+        ctx.restore();
+      }
+
+      function joint(x,y,r=6,alpha=1){
+        ctx.save();
+        ctx.globalAlpha = .20 * alpha;
+        ellipse(x,y,r+7,r+7,C.cyan4);
+        ctx.globalAlpha = .18 * alpha;
+        ellipse(x,y,r+4,r+4,C.magenta);
+        ctx.globalAlpha = alpha;
+        ellipse(x+2,y+3,r+3,r+3,edge);
+        ellipse(x,y,r+2,r+2,goldLo);
+        ellipse(x,y,r,r,gold);
+        ctx.globalAlpha = .75 * alpha;
+        ellipse(x-r*.35,y-r*.42,Math.max(1,r*.32),Math.max(1,r*.25),goldHi);
+        ctx.restore();
+      }
+
+      function localPaper(commands, fill, key, opts={}){
+        paper(commands, fill, key, opts);
+      }
+
+      function segment(a,b,w1,w2,fill,key,opts={}){
         const dx=b.x-a.x, dy=b.y-a.y;
-        const len=Math.hypot(dx,dy);
+        const len=Math.max(1,Math.hypot(dx,dy));
         const ang=Math.atan2(dy,dx);
         ctx.save();
-        ctx.translate((a.x+b.x)/2,(a.y+b.y)/2);
+        ctx.translate(a.x,a.y);
         ctx.rotate(ang);
-        cutRoundRect(-len/2,-w/2,len,w,w*.48,fill,key,opts);
+        const cmds=[
+          ['M',0,-w1*.56],
+          ['C',len*.18,-w1*.72,len*.76,-w2*.62,len,-w2*.44],
+          ['Q',len+7,0,len,w2*.46],
+          ['C',len*.74,w2*.64,len*.18,w1*.72,0,w1*.56],
+          ['Q',-7,0,0,-w1*.56]
+        ];
+        localPaper(cmds, fill, key, opts);
         ctx.restore();
       }
 
-      function joint(x,y,r=7){
-        ctx.save();
-        ctx.globalAlpha=.60;
-        ellipse(x+2,y+3,r+3,r+3,C.black);
-        ctx.globalAlpha=1;
-        ellipse(x,y,r+2,r+2,'#231600');
-        ellipse(x,y,r,r,brass);
-        ctx.globalAlpha=.47;
-        ellipse(x-2,y-2,r*.38,r*.32,brassHi);
-        ctx.globalAlpha=.48;
-        ellipse(x+2,y+3,r*.42,r*.36,brassLo);
-        ctx.globalAlpha=1;
-        ellipse(x,y,Math.max(2,r*.22),Math.max(2,r*.22),'#f7d783');
-        ctx.restore();
-      }
-
-      function limbEnd(start,side,ang,len){
-        return {
-          x:start.x + side * Math.sin(ang) * len,
-          y:start.y + Math.cos(ang) * len
-        };
-      }
-
-      function hand(x,y,side,rot){
+      function hand(x,y,side=1,rot=0){
         ctx.save();
         ctx.translate(x,y);
-        ctx.rotate(rot);
         ctx.scale(side,1);
-        const h=[
-          ['M',-6,-5],['C',-12,1,-12,13,-7,19],['L',-4,17],['L',-3,25],['C',-2,28,1,28,1,25],['L',1,18],
-          ['L',5,24],['C',7,27,10,25,8,22],['L',5,16],['L',11,20],['C',14,22,17,19,14,16],['L',8,10],
-          ['L',15,10],['C',18,10,19,6,16,5],['C',10,4,5,1,0,-2],['C',-2,-4,-4,-5,-6,-5]
+        ctx.rotate(rot);
+        const palm=[
+          ['M',-8,-2],['C',-9,-14,1,-18,9,-10],['C',12,-1,9,11,1,15],['C',-6,13,-9,6,-8,-2]
         ];
-        cutPath(h,skinPaper,61,{stitch:false,fibers:5,lineWidth:2,highlight:mixHex(skinPaper,C.white,.18)});
-        ctx.globalAlpha=.25;
-        line(-4,5,-4,17,1,C.black);
-        line(1,6,1,18,1,C.black);
-        line(5,7,6,16,1,C.black);
+        paper(palm, skinPaper, 200+x+y, {fibers:4, stitch:false, lw:2, hi:pearl, strokeAlpha:.82});
+        for(let i=0;i<4;i++){
+          const fx=-6+i*4.2;
+          ctx.globalAlpha=.95;
+          line(fx,9,fx+1,22-i*.9,2,edge);
+          line(fx,9,fx+1,22-i*.9,1,skinPaper);
+        }
         ctx.globalAlpha=1;
+        line(8,2,16,11,2,edge); line(8,2,16,11,1,skinPaper);
         ctx.restore();
       }
 
-      function foot(x,y,side,rot){
+      function foot(x,y,side=1,rot=0){
         ctx.save();
         ctx.translate(x,y);
-        ctx.rotate(rot);
         ctx.scale(side,1);
-        const f=[
-          ['M',-9,-11],['L',7,-10],['C',14,-7,20,-1,22,6],['C',15,13,1,14,-16,12],['C',-19,5,-17,-7,-9,-11]
+        ctx.rotate(rot);
+        const boot=[
+          ['M',-12,-8],['C',-7,-15,8,-16,14,-8],['L',20,7],['C',10,14,-10,14,-23,8],['C',-22,0,-18,-5,-12,-8]
         ];
-        cutPath(f,shoePaper,83,{stitch:false,fibers:4,lineWidth:2,highlight:mixHex(shoePaper,C.cyan4,.16)});
-        ctx.globalAlpha=.65;
-        line(-9,4,17,4,2,C.black);
-        line(1,-4,11,-2,1,stitch);
-        line(1,1,12,1,1,stitch);
+        paper(boot, mixHex(voidBlue,vellumDark,.24), 260+x+y, {fibers:5, stitch:false, lw:2, hi:mixHex(tealLit, C.white, .10)});
+        ctx.globalAlpha=.26;
+        line(-16,6,17,7,1,stitch);
+        line(-7,-8,11,-6,1,gold);
         ctx.globalAlpha=1;
         ctx.restore();
       }
 
-      function star(x,y,r=5,color=oracleGold,alpha=.75){
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        line(x-r,y,x+r,y,1,color);
-        line(x,y-r,x,y+r,1,color);
-        line(x-r*.62,y-r*.62,x+r*.62,y+r*.62,1,color);
-        line(x+r*.62,y-r*.62,x-r*.62,y+r*.62,1,color);
-        ctx.restore();
-      }
-
-      function crescent(x,y,r=6,back=robeBase){
-        ctx.save();
-        ctx.globalAlpha=.80;
-        ellipse(x,y,r,r,oracleGold);
-        ctx.globalAlpha=1;
-        ellipse(x+3,y-1,r*.82,r*.82,back);
-        ctx.restore();
-      }
-
-      // 1) Statische paper-framing achter het bestaande hoofd: niet over de ogen/mond heen.
-      // Hierdoor voelt het hoofd minder digitaal-los en meer als een levend gezicht in een papieren poppenkop.
-      const headBacking=[
-        ['M',100,231],['C',95,190,94,151,105,110],['C',118,61,144,34,180,31],['C',216,34,242,61,255,110],
-        ['C',266,151,265,190,260,231],['C',236,218,213,211,180,211],['C',147,211,124,218,100,231]
-      ];
-      cutPath(headBacking,mixHex(robeDeep,'#29204a',.28),101,{fibers:18,stitchAlpha:.10,lineWidth:3,highlight:mixHex(C.magenta,C.cyan4,.38),topAlpha:.07,bottomAlpha:.06});
-      ctx.globalAlpha=.18;
-      ellipse(180,126,71,93,C.cyan4);
-      ctx.globalAlpha=.10;
-      ellipse(180,126,84,104,C.magenta);
-      ctx.globalAlpha=1;
-      strokeOpen([['M',111,220],['C',132,205,153,199,180,200],['C',207,199,228,205,249,220]],oracleGold,1,.22,true);
-
-      // 2) Lichaam als eigen puppetlaag met heel subtiele grove motoriek.
+      // 1) Paper/digital bridge behind the existing head: halo, hood edge, and floating veil.
+      // Dit frame maakt het hoofd onderdeel van dezelfde paper-couture zonder ogen/mond te veranderen.
       ctx.save();
-      ctx.translate(180, 330 + puppetBob);
-      ctx.rotate(puppetSway);
-      ctx.translate(-180, -330);
-
-      // Gedeelde kosmische lichtbron en contactschaduw.
-      ctx.globalAlpha = .20;
-      ellipse(180,605,60,9,C.cyan4);
-      ctx.globalAlpha = .070;
-      ellipse(180,372,102,234,cosmicBlue);
-      ctx.globalAlpha = .050;
-      ellipse(180,248,82,74,C.magenta);
+      ctx.globalAlpha = .18;
+      ellipse(180,132,110,122,starBlue);
+      ctx.globalAlpha = .12;
+      ellipse(180,132,92,104,C.magenta);
       ctx.globalAlpha = 1;
 
-      const hipL      = {x:154, y:411};
-      const hipR      = {x:206, y:411};
-      const shoulderL = {x:126, y:229 + breathe*.15};
-      const shoulderR = {x:234, y:229 + breathe*.15};
-
-      const kneeL  = limbEnd(hipL,-1,.11 + walk*.20,78);
-      const kneeR  = limbEnd(hipR, 1,.11 - walk*.20,78);
-      const ankleL = limbEnd(kneeL,-1,.045 - walk*.12,80);
-      const ankleR = limbEnd(kneeR, 1,.045 + walk*.12,80);
-      const elbowL = limbEnd(shoulderL,-1,.35 + walk*.15 + reach*.30,60);
-      const elbowR = limbEnd(shoulderR, 1,.35 - walk*.15 - reach*.30,60);
-      const wristL = limbEnd(elbowL,-1,.15 - walk*.13,56);
-      const wristR = limbEnd(elbowR, 1,.15 + walk*.13,56);
-
-      // Lange, slankere benen. Rondingen zitten in de cut-out panelen, niet in realistische anatomie.
-      drawBoneBetween(hipL,kneeL,22,mixHex(cardDark,velvet,.14),21,{fibers:7,highlight:mixHex(card,oraclePink,.12)});
-      drawBoneBetween(kneeL,ankleL,19,mixHex(card,robeDeep,.16),22,{fibers:7,highlight:mixHex(card,C.cyan4,.08)});
-      drawBoneBetween(hipR,kneeR,22,mixHex(cardDark,velvet,.14),23,{fibers:7,highlight:mixHex(card,oraclePink,.12)});
-      drawBoneBetween(kneeR,ankleR,19,mixHex(card,robeDeep,.16),24,{fibers:7,highlight:mixHex(card,C.cyan4,.08)});
-      foot(ankleL.x-7,ankleL.y+17,-1,-.035 + walk*.11);
-      foot(ankleR.x+7,ankleR.y+17, 1, .035 - walk*.11);
-
-      // Elegantere armen: slanker, iets meer sierlijk, nog steeds mechanisch/papier.
-      drawBoneBetween(shoulderL,elbowL,20,mixHex(robeBase,card,.08),31,{fibers:7});
-      drawBoneBetween(elbowL,wristL,17,mixHex(card,robeBase,.15),32,{fibers:6});
-      drawBoneBetween(shoulderR,elbowR,20,mixHex(robeBase,card,.08),33,{fibers:7});
-      drawBoneBetween(elbowR,wristR,17,mixHex(card,robeBase,.15),34,{fibers:6});
-      hand(wristL.x-3,wristL.y+15,-1,-.08 + walk*.09);
-      hand(wristR.x+3,wristR.y+15, 1, .08 - walk*.09);
-
-      // Rondere heupplaat: dit maakt haar silhouet meteen vrouwelijker.
-      const pelvis=[
-        ['M',132,394],['C',146,381,165,379,180,383],['C',195,379,214,381,228,394],
-        ['C',226,414,214,426,195,431],['C',185,434,175,434,165,431],['C',146,426,134,414,132,394]
+      const halo=[
+        ['M',84,223],['C',65,166,78,82,120,38],['C',150,7,214,7,244,38],
+        ['C',286,82,295,166,276,223],['C',250,204,222,193,180,194],
+        ['C',138,193,110,204,84,223]
       ];
-      cutPath(pelvis,mixHex(ink,oraclePink,.22),41,{stitch:false,fibers:7,highlight:mixHex(oraclePink,C.cyan4,.08)});
-      ctx.globalAlpha=.24;
-      strokeOpen([['M',145,407],['C',162,413,198,413,215,407]],stitch,1,.35,true);
-      ctx.globalAlpha=1;
+      paper(halo, mixHex(vellum,'#182638',.28), 501, {fibers:16, fiber:mixHex(stitch,gold,.30), fiberAlpha:.10, stitchAlpha:.16, hi:mixHex(pearl,C.cyan4,.08), hiAlpha:.18, lw:2});
 
-      // Fitted bodice: smaller waist, soft bust curve, volwassen maar niet expliciet.
-      const bodice=[
-        ['M',136,216],['C',150,201,168,200,180,210],['C',192,200,210,201,224,216],
-        ['C',222,254,215,293,205,318],['C',198,329,162,329,155,318],
-        ['C',145,293,138,254,136,216]
+      const innerHalo=[
+        ['M',103,214],['C',91,165,100,94,132,56],['C',156,28,206,28,229,56],
+        ['C',260,94,269,165,257,214],['C',237,199,214,189,180,190],
+        ['C',146,189,123,199,103,214]
       ];
-      cutPath(bodice,robeBase,11,{fibers:12,stitchAlpha:.12,highlight:robeLit});
+      strokeCommands(innerHalo, gold, 1, .36, true);
+      strokeCommands([['M',92,222],['C',119,232,148,237,180,237],['C',212,237,241,232,268,222]], C.cyan4, 1, .16, true);
 
-      // Corset/panelen: suggereert rondingen via lijnen en vorm, zonder realistische details.
-      const corset=[
-        ['M',151,230],['C',162,216,173,217,180,234],['C',187,217,198,216,209,230],
-        ['C',204,258,199,289,195,313],['C',187,318,173,318,165,313],['C',161,289,156,258,151,230]
-      ];
-      cutPath(corset,mixHex(velvet,robeBase,.28),12,{fibers:8,stitchAlpha:.14,lineWidth:2,highlight:mixHex(oraclePink,C.cyan4,.08)});
-      strokeOpen([['M',180,233],['C',177,260,177,289,180,315]],oracleGold,1,.38,true);
-      strokeOpen([['M',162,236],['C',170,249,174,265,174,310]],stitch,1,.20,true);
-      strokeOpen([['M',198,236],['C',190,249,186,265,186,310]],stitch,1,.20,true);
+      // Soft side veils: verbinden hoofd-silhouet met mantel en halen de toy-look weg.
+      const veilL=[['M',105,195],['C',82,259,91,355,118,452],['C',132,393,139,308,137,226],['C',126,211,116,201,105,195]];
+      const veilR=[['M',255,195],['C',278,259,269,355,242,452],['C',228,393,221,308,223,226],['C',234,211,244,201,255,195]];
+      paper(veilL, mixHex(vellumLite,teal,.32), 511, {alpha:.80, fibers:9, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.15), hiAlpha:.10, lw:1.5});
+      paper(veilR, mixHex(vellumLite,nightViolet,.28), 512, {alpha:.80, fibers:9, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.magenta,C.white,.15), hiAlpha:.10, lw:1.5});
 
-      // Gelaagde rok/tuniek: bredere heupcurve + asymmetrische split, space traveler/orakel.
-      const skirt=[
-        ['M',154,314],['C',145,329,134,360,130,414],['C',146,433,214,433,230,414],
-        ['C',226,360,215,329,206,314],['C',196,324,164,324,154,314]
-      ];
-      cutPath(skirt,mixHex(robeDeep,robeBase,.45),13,{fibers:13,stitchAlpha:.13,highlight:mixHex(robeLit,oraclePink,.10)});
-
-      const leftPanel=[
-        ['M',151,321],['C',141,345,137,382,141,412],['C',151,420,166,421,178,414],['C',170,384,165,351,166,321]
-      ];
-      cutPath(leftPanel,mixHex(robeBase,'#25345f',.24),14,{fibers:7,stitchAlpha:.12,lineWidth:2});
-      const rightPanel=[
-        ['M',194,321],['C',198,350,196,384,190,415],['C',203,423,219,420,228,412],['C',224,379,216,344,207,321]
-      ];
-      cutPath(rightPanel,mixHex(velvet,robeDeep,.18),15,{fibers:7,stitchAlpha:.12,lineWidth:2,highlight:mixHex(oraclePink,C.cyan4,.05)});
-
-      // Slanke schoudermantel en hoge kraag: de brug tussen het bestaande hoofd en het lichaam.
-      const mantle=[
-        ['M',118,216],['C',136,195,160,188,180,191],['C',200,188,224,195,242,216],
-        ['C',236,237,223,255,205,263],['C',194,253,186,246,180,239],
-        ['C',174,246,166,253,155,263],['C',137,255,124,237,118,216]
-      ];
-      cutPath(mantle,mixHex(robeDeep,'#2d3450',.30),71,{fibers:10,stitchAlpha:.12,highlight:mixHex(C.cyan4,C.magenta,.16)});
-      strokeOpen([['M',123,219],['C',145,221,165,226,180,239],['C',195,226,215,221,237,219]],oracleGold,1,.26,true);
-
-      const neck=[
-        ['M',158,197],['C',164,190,173,187,180,187],['C',187,187,196,190,202,197],
-        ['L',199,226],['C',190,232,170,232,161,226],['L',158,197]
-      ];
-      cutPath(neck,skinPaper,51,{stitch:false,fibers:5,lineWidth:2,highlight:mixHex(skinPaper,C.white,.18)});
-
-      const collar=[
-        ['M',138,210],['C',149,202,164,200,180,216],['C',196,200,211,202,222,210],
-        ['C',214,234,198,247,180,250],['C',162,247,146,234,138,210]
-      ];
-      cutPath(collar,mixHex(cardLite,oraclePink,.22),52,{stitch:false,fibers:6,lineWidth:2,highlight:mixHex(oraclePink,C.white,.10)});
-      joint(180,233,5);
-
-      // Talisman/sjerp: sexy silhouet + orakel-identiteit zonder te druk te worden.
-      const sash=[
-        ['M',221,225],['L',234,236],['C',211,285,181,336,140,394],['L',129,384],['C',169,328,199,276,221,225]
-      ];
-      cutPath(sash,mixHex('#3b2a22',oracleGold,.16),57,{stitch:false,fibers:7,lineWidth:2,highlight:mixHex(oracleGold,C.white,.10)});
-      ctx.globalAlpha=.36;
-      line(223,235,137,385,1,oracleGold);
-      ctx.globalAlpha=1;
-
-      crescent(180,258,7,robeBase);
-      star(180,286,7,oracleGold,.62);
-      star(159,309,4,cosmicBlue,.58);
-      star(207,337,4,C.magenta,.50);
-      ctx.globalAlpha=.26;
-      strokeOpen([['M',145,351],['C',165,359,196,359,215,351]],stitch,1,.30,true);
-      strokeOpen([['M',140,411],['C',161,422,199,422,220,411]],stitch,1,.30,true);
-      ctx.globalAlpha=1;
-
-      // Kleine reizigerstas / talisman-pocket langs de heup.
-      const bag=[
-        ['M',215,330],['L',239,337],['L',235,377],['C',226,385,212,379,209,367],['L',215,330]
-      ];
-      cutPath(bag,mixHex('#3b2430',oraclePink,.26),91,{stitch:false,fibers:5,lineWidth:2,highlight:mixHex(oraclePink,C.white,.08)});
-      ctx.globalAlpha=.34;
-      ctx.setLineDash([3,4]);
-      ctx.strokeStyle=stitch;
-      ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(219,339); ctx.lineTo(234,343); ctx.lineTo(231,365); ctx.quadraticCurveTo(223,373,215,365); ctx.lineTo(219,339); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha=1;
-      star(224,355,5,oracleGold,.78);
-
-      // Splitpennen bovenop: zichtbaar paper puppet, maar door de ronde vormen zachter/vrouwelijker.
-      joint(shoulderL.x,shoulderL.y,8); joint(shoulderR.x,shoulderR.y,8);
-      joint(elbowL.x,elbowL.y,6);     joint(elbowR.x,elbowR.y,6);
-      joint(wristL.x,wristL.y,5);     joint(wristR.x,wristR.y,5);
-      joint(hipL.x,hipL.y,7);         joint(hipR.x,hipR.y,7);
-      joint(kneeL.x,kneeL.y,7);       joint(kneeR.x,kneeR.y,7);
-      joint(ankleL.x,ankleL.y,6);     joint(ankleR.x,ankleR.y,6);
-      joint(148,409,4);               joint(212,409,4);
-      joint(180,258,3);
-
-      // Hoofd/lichaam lichtbrug: randlicht en kin-schaduw op kraag.
-      ctx.globalAlpha=.24;
-      ellipse(180,207,38,10,C.black);
+      // small celestial ornaments around the head frame
+      star(112,76,6,gold,.52); star(247,89,5,C.cyan4,.38); star(264,178,4,C.magenta,.40);
+      crescent(180,48,8,mixHex(vellum,'#182638',.28),.55);
       ctx.globalAlpha=.20;
-      line(124,226,106,300,1,C.magenta);
-      line(236,226,254,300,1,C.cyan4);
-      line(134,417,226,417,1,C.cyan4);
+      line(180,56,180,205,1,gold);
+      ctx.globalAlpha=1;
+      ctx.restore();
+
+      // 2) Volwassen vrouwelijke body rig: flowing paper layers, hourglass silhouette, jewelry-like joints.
+      ctx.save();
+      ctx.translate(180, 332 + bob);
+      ctx.rotate(sway);
+      ctx.translate(-180, -332);
+
+      // shared glow / shadow
+      ctx.globalAlpha=.22; ellipse(180,604,70,10,C.cyan4);
+      ctx.globalAlpha=.09; ellipse(180,392,118,230,starBlue);
+      ctx.globalAlpha=.08; ellipse(180,285,82,72,C.magenta);
       ctx.globalAlpha=1;
 
-      // Zeer subtiele marionetdraden: handgemaakt, maar nog steeds autonome space-oracle.
-      ctx.globalAlpha=.09;
-      line(shoulderL.x,216,shoulderL.x,102,1,C.cyan4);
-      line(shoulderR.x,216,shoulderR.x,102,1,C.cyan4);
-      line(hipL.x,394,hipL.x,300,1,C.magenta);
-      line(hipR.x,394,hipR.x,300,1,C.magenta);
+      const shoulderL={x:125,y:246 + breath*.22};
+      const shoulderR={x:235,y:246 + breath*.22};
+      const elbowL={x:101 + walk*8, y:336 + oracleDip*12};
+      const elbowR={x:259 - walk*8, y:336 - oracleDip*12};
+      const wristL={x:100 + walk*10, y:425};
+      const wristR={x:260 - walk*10, y:425};
+      const hipL={x:151,y:405};
+      const hipR={x:209,y:405};
+      const kneeL={x:143 + walk*8,y:492};
+      const kneeR={x:217 - walk*8,y:492};
+      const ankleL={x:135 + walk*7,y:566};
+      const ankleR={x:225 - walk*7,y:566};
+
+      // Back cape: a long, ethereal paper silhouette rather than a wooden puppet body.
+      const cape=[
+        ['M',111,238],['C',134,214,163,207,180,214],['C',197,207,226,214,249,238],
+        ['C',274,315,263,471,236,589],['C',216,602,195,590,180,565],
+        ['C',165,590,144,602,124,589],['C',97,471,86,315,111,238]
+      ];
+      paper(cape, mixHex(deepTeal,nightViolet,.16), 601, {alpha:.72, fibers:18, fiberAlpha:.075, stitchAlpha:.10, hi:mixHex(tealLit,C.white,.05), hiAlpha:.10, lw:2});
+
+      // Legs: long and elegant, visible through high split paper panels.
+      segment(hipL,kneeL,17,14,mixHex(skinPaper,vellumDark,.08),701,{fibers:6, stitchAlpha:.10, hi:mixHex(skinPaper,C.white,.10), lw:2});
+      segment(kneeL,ankleL,14,11,mixHex(skinPaper,teal,.07),702,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
+      segment(hipR,kneeR,17,14,mixHex(skinPaper,vellumDark,.08),703,{fibers:6, stitchAlpha:.10, hi:mixHex(skinPaper,C.white,.10), lw:2});
+      segment(kneeR,ankleR,14,11,mixHex(skinPaper,teal,.07),704,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
+      foot(ankleL.x-4,ankleL.y+18,-1,-.06 + walk*.08);
+      foot(ankleR.x+4,ankleR.y+18, 1, .06 - walk*.08);
+
+      // Arms: slimmer and more elegant; joints are ornaments, not toy screws.
+      segment(shoulderL,elbowL,16,13,mixHex(vellumLite,teal,.30),711,{fibers:6, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.12), lw:2});
+      segment(elbowL,wristL,13,10,mixHex(skinPaper,vellum,.08),712,{fibers:5, stitchAlpha:.08, hi:mixHex(skinPaper,C.white,.12), lw:2});
+      segment(shoulderR,elbowR,16,13,mixHex(vellumLite,nightViolet,.22),713,{fibers:6, stitchAlpha:.10, hi:mixHex(C.magenta,C.white,.08), lw:2});
+      segment(elbowR,wristR,13,10,mixHex(skinPaper,vellum,.08),714,{fibers:5, stitchAlpha:.08, hi:mixHex(skinPaper,C.white,.12), lw:2});
+      hand(wristL.x-2,wristL.y+13,-1,-.10 + walk*.06);
+      hand(wristR.x+2,wristR.y+13, 1, .10 - walk*.06);
+
+      // Off-shoulder collar and bust line: adult, sensual, but abstract/paper-couture.
+      const neck=[
+        ['M',162,199],['C',168,192,174,190,180,190],['C',186,190,192,192,198,199],
+        ['L',200,229],['C',192,235,168,235,160,229],['L',162,199]
+      ];
+      paper(neck, skinPaper, 801, {fibers:4, stitch:false, hi:pearl, hiAlpha:.16, lw:2});
+
+      const choker=[
+        ['M',148,213],['C',159,207,170,209,180,222],['C',190,209,201,207,212,213],
+        ['C',205,235,195,247,180,249],['C',165,247,155,235,148,213]
+      ];
+      paper(choker, mixHex(vellumLite,roseGold,.24), 802, {fibers:6, stitchAlpha:.10, hi:mixHex(goldHi,C.magenta,.06), hiAlpha:.18, lw:2});
+
+      const shoulderWrap=[
+        ['M',112,238],['C',130,218,154,215,180,226],['C',206,215,230,218,248,238],
+        ['C',241,260,224,274,205,278],['C',194,263,187,254,180,247],
+        ['C',173,254,166,263,155,278],['C',136,274,119,260,112,238]
+      ];
+      paper(shoulderWrap, mixHex(vellumLite,teal,.36), 803, {fibers:10, fiberAlpha:.09, stitchAlpha:.12, hi:mixHex(C.cyan4,C.white,.11), hiAlpha:.13, lw:2});
+      strokeCommands([['M',119,241],['C',145,245,166,250,180,266],['C',194,250,215,245,241,241]], gold, 1, .30, true);
+
+      // Hourglass bodice: narrow waist, wider hips, soft curves. This is the anti-Pinocchio shape.
+      const bodice=[
+        ['M',137,242],['C',151,224,168,225,180,245],['C',192,225,209,224,223,242],
+        ['C',218,281,205,319,196,342],['C',190,350,170,350,164,342],
+        ['C',155,319,142,281,137,242]
+      ];
+      paper(bodice, mixHex(teal,nightViolet,.14), 811, {fibers:12, fiberAlpha:.10, stitchAlpha:.10, hi:mixHex(tealLit,C.white,.08), hiAlpha:.16, lw:2});
+
+      const centerSkin=[
+        ['M',169,248],['C',174,239,186,239,191,248],['C',189,278,187,306,184,333],
+        ['C',181,337,179,337,176,333],['C',173,306,171,278,169,248]
+      ];
+      paper(centerSkin, mixHex(skinPaper,vellumLite,.24), 812, {fibers:5, stitch:false, hi:pearl, hiAlpha:.12, lw:1.5, alpha:.92});
+
+      const corsetLeft=[
+        ['M',146,253],['C',154,240,166,240,176,254],['C',172,281,168,312,166,338],['C',154,326,147,292,146,253]
+      ];
+      const corsetRight=[
+        ['M',214,253],['C',206,240,194,240,184,254],['C',188,281,192,312,194,338],['C',206,326,213,292,214,253]
+      ];
+      paper(corsetLeft, mixHex(nightViolet,teal,.18), 813, {fibers:5, stitchAlpha:.08, hi:mixHex(violetLit,C.white,.08), lw:1.5});
+      paper(corsetRight, mixHex(nightViolet,teal,.18), 814, {fibers:5, stitchAlpha:.08, hi:mixHex(violetLit,C.white,.08), lw:1.5});
+      strokeCommands([['M',180,248],['C',177,278,177,309,180,340]], gold, 1, .34, true);
+
+      // Pelvis / hips: rounded and ornamental, mostly integrated under flowing panels.
+      const pelvis=[
+        ['M',130,372],['C',146,353,166,350,180,358],['C',194,350,214,353,230,372],
+        ['C',226,400,209,421,185,426],['C',181,427,179,427,175,426],
+        ['C',151,421,134,400,130,372]
+      ];
+      paper(pelvis, mixHex(vellumDark,nightViolet,.18), 821, {fibers:7, stitchAlpha:.08, hi:mixHex(roseGold,C.cyan4,.06), hiAlpha:.10, lw:2});
+
+      // Flowing skirt strips with high side slits: sexy space-oracle instead of wooden puppet.
+      const skirtCenter=[
+        ['M',160,338],['C',173,349,187,349,200,338],['C',207,389,204,471,190,555],
+        ['C',184,565,176,565,170,555],['C',156,471,153,389,160,338]
+      ];
+      const skirtL=[
+        ['M',145,337],['C',132,373,121,462,113,571],['C',130,584,153,571,165,548],
+        ['C',159,476,157,391,164,344]
+      ];
+      const skirtR=[
+        ['M',215,337],['C',228,373,239,462,247,571],['C',230,584,207,571,195,548],
+        ['C',201,476,203,391,196,344]
+      ];
+      paper(skirtL, mixHex(vellumLite,teal,.33), 831, {alpha:.86, fibers:13, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.08), hiAlpha:.10, lw:2});
+      paper(skirtR, mixHex(vellumLite,nightViolet,.26), 832, {alpha:.86, fibers:13, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.magenta,C.white,.06), hiAlpha:.10, lw:2});
+      paper(skirtCenter, mixHex(deepTeal,teal,.34), 833, {fibers:12, fiberAlpha:.08, stitchAlpha:.12, hi:mixHex(tealLit,C.white,.07), hiAlpha:.12, lw:2});
+
+      // Extra floating ribbons / paper tails for ethereal motion.
+      const ribbonL=[['M',126,319],['C',103,389,97,493,99,602],['C',112,592,124,552,130,491],['C',134,419,136,360,126,319]];
+      const ribbonR=[['M',234,319],['C',257,389,263,493,261,602],['C',248,592,236,552,230,491],['C',226,419,224,360,234,319]];
+      paper(ribbonL, mixHex(vellumLite,C.cyan4,.14), 841, {alpha:.44, fibers:8, fiberAlpha:.05, stitchAlpha:.06, hi:mixHex(C.cyan4,C.white,.16), hiAlpha:.06, lw:1.5});
+      paper(ribbonR, mixHex(vellumLite,C.magenta,.10), 842, {alpha:.44, fibers:8, fiberAlpha:.05, stitchAlpha:.06, hi:mixHex(C.magenta,C.white,.16), hiAlpha:.06, lw:1.5});
+
+      // Celestial markings and couture seams.
+      crescent(180,272,7,mixHex(skinPaper,vellumLite,.24),.78);
+      star(180,308,6,gold,.62);
+      star(160,357,4,starBlue,.55); star(203,383,4,C.magenta,.45); star(181,430,4,gold,.40);
+      strokeCommands([['M',143,377],['C',160,389,200,389,217,377]], stitch, 1, .25, true);
+      strokeCommands([['M',134,533],['C',159,548,201,548,226,533]], stitch, 1, .18, true);
+      strokeCommands([['M',151,235],['C',158,249,168,257,180,258],['C',192,257,202,249,209,235]], roseGold, 1, .42, false);
+
+      // Jewelry-like hinges: fewer and more intentional, to avoid Pinocchio.
+      joint(shoulderL.x,shoulderL.y,6,.92); joint(shoulderR.x,shoulderR.y,6,.92);
+      joint(elbowL.x,elbowL.y,5,.80);       joint(elbowR.x,elbowR.y,5,.80);
+      joint(wristL.x,wristL.y,4,.75);       joint(wristR.x,wristR.y,4,.75);
+      joint(hipL.x,hipL.y,5,.82);           joint(hipR.x,hipR.y,5,.82);
+      joint(kneeL.x,kneeL.y,5,.70);         joint(kneeR.x,kneeR.y,5,.70);
+      joint(ankleL.x,ankleL.y,4,.65);       joint(ankleR.x,ankleR.y,4,.65);
+      joint(180,227,5,.96);
+      joint(180,346,4,.65);
+
+      // Contact shadow from head to collar + rimlight to unify material/light.
+      ctx.globalAlpha=.30; ellipse(180,208,42,10,edge);
+      ctx.globalAlpha=.18; line(117,242,94,383,1,C.magenta); line(243,242,266,383,1,C.cyan4);
+      ctx.globalAlpha=.14; line(124,570,236,570,1,C.cyan4);
+      ctx.globalAlpha=1;
+
+      // very faint marionette/constellation lines: ritual, not toy.
+      ctx.globalAlpha=.07;
+      line(shoulderL.x,239,103,91,1,C.cyan4); line(shoulderR.x,239,257,91,1,C.magenta);
+      line(180,227,180,55,1,gold);
       ctx.globalAlpha=1;
 
       ctx.restore();
@@ -3167,7 +3146,7 @@
       if (!DEBUG || !dbgEl) return;
       const w = WorldBrain.weather.visual;
       dbgEl.textContent = [
-        'Wandering Art v11 paper puppet',
+        'Wandering Art v13 ethereal oracle',
         'mood ' + dominantMood() + '  val ' + emotion.valence.toFixed(2) + '  cur ' + emotion.curiosity.toFixed(2),
         'weather ' + WorldBrain.weather.status + ' / ' + (WorldBrain.weather.mood || 'clear') + '  t ' + Math.round(WorldBrain.weather.temperature) + 'c',
         'eye ' + EyeBrain.state + '  pupL ' + PupilBrain.left.toFixed(2) + '  pupR ' + PupilBrain.right.toFixed(2),
