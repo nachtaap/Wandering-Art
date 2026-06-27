@@ -2447,9 +2447,18 @@
     }
 
     function drawHairBack(){
+      const h0 = '#05030b';
+      const h1 = '#160b1f';
+      const h2 = '#3b1f3c';
+      const hi = '#8d5b75';
       path(C.black,[['M',79,235],['C',75,182,82,123,96,78],['C',110,31,143,15,184,17],['C',244,20,282,63,286,132],['C',290,184,268,222,248,250],['L',78,250]]);
-      path(C.hair0,[['M',86,238],['C',87,181,89,124,104,76],['C',121,30,151,21,185,24],['C',236,28,271,66,275,130],['C',279,178,260,213,239,242],['L',86,242]]);
+      path(h0,[['M',86,238],['C',87,181,89,124,104,76],['C',121,30,151,21,185,24],['C',236,28,271,66,275,130],['C',279,178,260,213,239,242],['L',86,242]]);
+      path(h1,[['M',92,232],['C',94,180,98,124,112,78],['C',129,40,154,29,186,31],['C',226,34,260,69,265,132],['C',267,174,249,211,232,235],['L',92,239]]);
+      ctx.globalAlpha=.34;
       line(270,73,283,132,3,C.black); line(96,104,84,169,4,C.black);
+      line(111,62,97,150,2,h2); line(243,56,263,128,2,h2); line(207,31,236,84,2,hi);
+      ctx.globalAlpha=.20; line(101,213,258,217,1,'#d5a64d');
+      ctx.globalAlpha=1;
     }
 
     function getVisitorPalette(archetype){
@@ -2561,10 +2570,14 @@
       const tealLit    = mixHex(teal, C.cyan4, .25);
       const nightViolet= mixHex('#190f2a', C.magenta, .14);
       const violetLit  = mixHex(nightViolet, C.magenta, .22);
-      const vellum     = '#c9b48a';
-      const vellumLite = '#ead9ad';
-      const vellumDark = '#7d6645';
-      const skinPaper  = mixHex('#d8bd93', C.cyan4, .05);
+      // Shared skin palette: same warm parchment/peach family as the face.
+      // Body stays matte/paper; face becomes the living version of this tone.
+      const vellum     = '#c9a976';
+      const vellumLite = '#f0d3a1';
+      const vellumDark = '#8a6541';
+      const skinPaper  = '#d9aa78';
+      const skinShade  = '#a76d4e';
+      const skinGlow   = '#ffd2a0';
       const gold       = '#d5a64d';
       const goldHi     = '#fff0b8';
       const goldLo     = '#57370a';
@@ -2870,10 +2883,10 @@
       foot(ankleR.x+4,ankleR.y+18, 1, .06 - walk*.08);
 
       // Arms: slimmer and more elegant; joints are ornaments, not toy screws.
-      segment(shoulderL,elbowL,16,13,mixHex(vellumLite,teal,.30),711,{fibers:6, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.12), lw:2});
-      segment(elbowL,wristL,13,10,mixHex(skinPaper,vellum,.08),712,{fibers:5, stitchAlpha:.08, hi:mixHex(skinPaper,C.white,.12), lw:2});
-      segment(shoulderR,elbowR,16,13,mixHex(vellumLite,nightViolet,.22),713,{fibers:6, stitchAlpha:.10, hi:mixHex(C.magenta,C.white,.08), lw:2});
-      segment(elbowR,wristR,13,10,mixHex(skinPaper,vellum,.08),714,{fibers:5, stitchAlpha:.08, hi:mixHex(skinPaper,C.white,.12), lw:2});
+      segment(shoulderL,elbowL,15,12,mixHex(skinPaper,vellum,.06),711,{fibers:5, stitchAlpha:.07, hi:skinGlow, hiAlpha:.13, lw:2});
+      segment(elbowL,wristL,12,9,mixHex(skinPaper,skinShade,.06),712,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
+      segment(shoulderR,elbowR,15,12,mixHex(skinPaper,vellum,.06),713,{fibers:5, stitchAlpha:.07, hi:skinGlow, hiAlpha:.13, lw:2});
+      segment(elbowR,wristR,12,9,mixHex(skinPaper,skinShade,.06),714,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
       hand(wristL.x-2,wristL.y+13,-1,-.10 + walk*.06);
       hand(wristR.x+2,wristR.y+13, 1, .10 - walk*.06);
 
@@ -2891,36 +2904,45 @@
       paper(choker, mixHex(vellumLite,roseGold,.24), 802, {fibers:6, stitchAlpha:.10, hi:mixHex(goldHi,C.magenta,.06), hiAlpha:.18, lw:2});
 
       const shoulderWrap=[
-        ['M',112,238],['C',130,218,154,215,180,226],['C',206,215,230,218,248,238],
-        ['C',241,260,224,274,205,278],['C',194,263,187,254,180,247],
-        ['C',173,254,166,263,155,278],['C',136,274,119,260,112,238]
+        ['M',104,236],['C',126,215,154,211,180,225],['C',206,211,234,215,256,236],
+        ['C',250,254,234,264,213,264],['C',200,250,190,242,180,238],
+        ['C',170,242,160,250,147,264],['C',126,264,110,254,104,236]
       ];
-      paper(shoulderWrap, mixHex(vellumLite,teal,.36), 803, {fibers:10, fiberAlpha:.09, stitchAlpha:.12, hi:mixHex(C.cyan4,C.white,.11), hiAlpha:.13, lw:2});
-      strokeCommands([['M',119,241],['C',145,245,166,250,180,266],['C',194,250,215,245,241,241]], gold, 1, .30, true);
+      paper(shoulderWrap, mixHex(vellumLite,teal,.32), 803, {fibers:10, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.11), hiAlpha:.13, lw:2});
+      strokeCommands([['M',113,240],['C',143,243,166,250,180,266],['C',194,250,217,243,247,240]], gold, 1, .28, true);
 
-      // Hourglass bodice: narrow waist, wider hips, soft curves. This is the anti-Pinocchio shape.
-      const bodice=[
-        ['M',137,242],['C',151,224,168,225,180,245],['C',192,225,209,224,223,242],
-        ['C',218,281,205,319,196,342],['C',190,350,170,350,164,342],
-        ['C',155,319,142,281,137,242]
+      // Shared skin chest/shoulder area: same color family as the face, but matte and paper-like.
+      const upperSkin=[
+        ['M',135,244],['C',150,230,168,229,180,246],['C',192,229,210,230,225,244],
+        ['C',218,274,203,294,184,298],['C',181,299,179,299,176,298],
+        ['C',157,294,142,274,135,244]
       ];
-      paper(bodice, mixHex(teal,nightViolet,.14), 811, {fibers:12, fiberAlpha:.10, stitchAlpha:.10, hi:mixHex(tealLit,C.white,.08), hiAlpha:.16, lw:2});
+      paper(upperSkin, mixHex(skinPaper,vellumLite,.10), 804, {fibers:6, stitch:false, hi:skinGlow, hiAlpha:.14, lw:1.5, alpha:.96});
+      ctx.globalAlpha=.20; ellipse(160,269,19,14,skinShade); ellipse(200,269,19,14,skinShade); ctx.globalAlpha=1;
+
+      // Hourglass bodice: more haute-couture/corset, less wooden puppet.
+      const bodice=[
+        ['M',141,274],['C',153,252,168,254,180,279],['C',192,254,207,252,219,274],
+        ['C',216,306,205,335,195,354],['C',188,363,172,363,165,354],
+        ['C',155,335,144,306,141,274]
+      ];
+      paper(bodice, mixHex(teal,nightViolet,.16), 811, {fibers:12, fiberAlpha:.10, stitchAlpha:.09, hi:mixHex(tealLit,C.white,.08), hiAlpha:.16, lw:2});
 
       const centerSkin=[
-        ['M',169,248],['C',174,239,186,239,191,248],['C',189,278,187,306,184,333],
-        ['C',181,337,179,337,176,333],['C',173,306,171,278,169,248]
+        ['M',172,259],['C',175,252,185,252,188,259],['C',187,287,185,319,183,346],
+        ['C',181,350,179,350,177,346],['C',175,319,173,287,172,259]
       ];
-      paper(centerSkin, mixHex(skinPaper,vellumLite,.24), 812, {fibers:5, stitch:false, hi:pearl, hiAlpha:.12, lw:1.5, alpha:.92});
+      paper(centerSkin, mixHex(skinPaper,vellumLite,.18), 812, {fibers:5, stitch:false, hi:skinGlow, hiAlpha:.12, lw:1.5, alpha:.92});
 
       const corsetLeft=[
-        ['M',146,253],['C',154,240,166,240,176,254],['C',172,281,168,312,166,338],['C',154,326,147,292,146,253]
+        ['M',147,282],['C',156,262,168,262,177,282],['C',173,306,170,334,167,352],['C',156,339,149,310,147,282]
       ];
       const corsetRight=[
-        ['M',214,253],['C',206,240,194,240,184,254],['C',188,281,192,312,194,338],['C',206,326,213,292,214,253]
+        ['M',213,282],['C',204,262,192,262,183,282],['C',187,306,190,334,193,352],['C',204,339,211,310,213,282]
       ];
-      paper(corsetLeft, mixHex(nightViolet,teal,.18), 813, {fibers:5, stitchAlpha:.08, hi:mixHex(violetLit,C.white,.08), lw:1.5});
-      paper(corsetRight, mixHex(nightViolet,teal,.18), 814, {fibers:5, stitchAlpha:.08, hi:mixHex(violetLit,C.white,.08), lw:1.5});
-      strokeCommands([['M',180,248],['C',177,278,177,309,180,340]], gold, 1, .34, true);
+      paper(corsetLeft, mixHex(nightViolet,teal,.18), 813, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
+      paper(corsetRight, mixHex(nightViolet,teal,.18), 814, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
+      strokeCommands([['M',180,258],['C',177,286,177,319,180,350]], gold, 1, .32, true);
 
       // Pelvis / hips: rounded and ornamental, mostly integrated under flowing panels.
       const pelvis=[
@@ -2963,11 +2985,11 @@
 
       // Jewelry-like hinges: fewer and more intentional, to avoid Pinocchio.
       joint(shoulderL.x,shoulderL.y,6,.92); joint(shoulderR.x,shoulderR.y,6,.92);
-      joint(elbowL.x,elbowL.y,5,.80);       joint(elbowR.x,elbowR.y,5,.80);
-      joint(wristL.x,wristL.y,4,.75);       joint(wristR.x,wristR.y,4,.75);
-      joint(hipL.x,hipL.y,5,.82);           joint(hipR.x,hipR.y,5,.82);
-      joint(kneeL.x,kneeL.y,5,.70);         joint(kneeR.x,kneeR.y,5,.70);
-      joint(ankleL.x,ankleL.y,4,.65);       joint(ankleR.x,ankleR.y,4,.65);
+      joint(elbowL.x,elbowL.y,4,.56);       joint(elbowR.x,elbowR.y,4,.56);
+      joint(wristL.x,wristL.y,3,.46);       joint(wristR.x,wristR.y,3,.46);
+      joint(hipL.x,hipL.y,4,.58);           joint(hipR.x,hipR.y,4,.58);
+      joint(kneeL.x,kneeL.y,4,.44);         joint(kneeR.x,kneeR.y,4,.44);
+      joint(ankleL.x,ankleL.y,3,.38);       joint(ankleR.x,ankleR.y,3,.38);
       joint(180,227,5,.96);
       joint(180,346,4,.65);
 
@@ -2988,19 +3010,54 @@
 
 
     function drawFaceBase(){
+      // Living version of the same parchment/peach skin used by the paper body.
+      const skinBase = '#d9aa78';
+      const skinLight = '#ffd2a0';
+      const skinMid = '#c98a63';
+      const skinShade = '#8f513a';
+      const blush = '#e4867d';
+      const paperLine = '#3a1d22';
+
       path(C.black,[['M',117,120],['C',115,72,141,39,183,38],['C',228,39,253,73,253,125],['C',253,178,221,207,181,209],['C',139,207,116,174,117,120]]);
-      path(C.cyan3,[['M',125,120],['C',123,78,145,47,184,47],['C',223,48,245,78,245,126],['C',244,172,217,199,181,201],['C',145,199,124,169,125,120]]);
-      path(C.cyan2,[['M',207,49],['C',238,66,249,97,244,135],['C',240,173,221,196,183,201],['C',222,166,223,101,207,49]]);
-      path(C.cyan1,[['M',216,68],['C',239,85,247,123,238,157],['C',231,178,217,192,195,199],['C',218,164,224,111,216,68]]);
-      rect(202,190,16,5,C.black); rect(134,150,13,4,C.cyan4);
+      path(skinBase,[['M',125,120],['C',123,78,145,47,184,47],['C',223,48,245,78,245,126],['C',244,172,217,199,181,201],['C',145,199,124,169,125,120]]);
+      path(skinLight,[['M',132,115],['C',133,80,152,55,184,54],['C',207,55,225,75,231,108],['C',229,146,210,179,182,192],['C',152,187,132,157,132,115]]);
+      path(skinMid,[['M',207,49],['C',238,66,249,97,244,135],['C',240,173,221,196,183,201],['C',222,166,223,101,207,49]]);
+      path(skinShade,[['M',216,68],['C',239,85,247,123,238,157],['C',231,178,217,192,195,199],['C',218,164,224,111,216,68]]);
+
+      ctx.save();
+      ctx.globalAlpha=.16;
+      ellipse(149,151,16,8,blush); ellipse(214,151,16,8,blush);
+      ctx.globalAlpha=.18;
+      line(131,76,150,58,1,skinLight); line(224,69,238,101,1,'#f0bd8e');
+      line(138,184,166,196,1,paperLine); line(198,197,224,180,1,paperLine);
+      ctx.globalAlpha=.10;
+      for(let i=0;i<12;i++){
+        const x = 130 + hash(910+i*7.3)*95;
+        const y = 66 + hash(913+i*11.9)*118;
+        line(x,y,x+3,y+(hash(921+i)-.5)*2,1,'#3a1d22');
+      }
+      ctx.restore();
+
+      // small old digital accents remain, but warmer/subtler so the face no longer fights the body.
+      rect(202,190,16,5,C.black);
+      ctx.globalAlpha=.42; rect(134,150,13,4,'#fff0b8'); ctx.globalAlpha=1;
     }
 
     function drawHairFront(){
+      const h0 = '#05030b';
+      const h1 = '#160b1f';
+      const h2 = '#2b1430';
+      const hi = '#8d5b75';
+      const gold = '#d5a64d';
       path(C.black,[['M',89,230],['C',89,181,95,137,111,91],['C',124,54,139,29,170,18],['C',158,54,143,83,131,110],['C',120,139,116,179,122,224],['L',89,230]]);
-      path(C.white,[['M',96,230],['C',96,182,102,139,117,94],['C',130,58,143,37,164,27],['C',153,60,139,86,128,114],['C',119,140,116,177,122,220],['L',96,230]]);
-      path(C.white,[['M',120,47],['C',140,18,188,15,222,34],['C',194,35,169,46,151,71],['C',139,88,132,111,128,132],['C',116,98,111,68,120,47]]);
-      path(C.hair1,[['M',204,29],['C',239,36,264,68,268,113],['C',260,87,246,67,225,53],['C',231,79,230,97,222,117],['C',218,80,213,52,204,29]]);
+      path(h0,[['M',96,230],['C',96,182,102,139,117,94],['C',130,58,143,37,164,27],['C',153,60,139,86,128,114],['C',119,140,116,177,122,220],['L',96,230]]);
+      path(h1,[['M',120,47],['C',140,18,188,15,222,34],['C',194,35,169,46,151,71],['C',139,88,132,111,128,132],['C',116,98,111,68,120,47]]);
+      path(h2,[['M',204,29],['C',239,36,264,68,268,113],['C',260,87,246,67,225,53],['C',231,79,230,97,222,117],['C',218,80,213,52,204,29]]);
+      ctx.globalAlpha=.42;
       line(108,72,101,134,3,C.black); line(154,34,136,76,3,C.black); line(228,55,236,106,3,C.black);
+      line(128,43,113,116,2,hi); line(183,28,157,65,2,hi); line(220,39,242,91,2,hi);
+      ctx.globalAlpha=.25; line(119,217,241,214,1,gold);
+      ctx.globalAlpha=1;
     }
 
     function drawBrows(p){
