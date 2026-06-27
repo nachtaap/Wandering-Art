@@ -167,9 +167,6 @@
     // URL-param wint; anders wordt de onthouden keuze (of 'full') later hersteld. Dubbel-tap wisselt live.
     let RIG_JOINTS = ((v) => (v === 'off' || v === 'min' || v === 'full') ? v : null)(PARAMS.get('joints'));
     const JOINTS_FROM_URL = RIG_JOINTS != null;
-    // Palet: standaard strak/gestript (vlakke donkere achtergrond, geen extra cape/veil-panelen,
-    // beperkt kostuum-palet). ?palette=rich herstelt de oude rijke versie met alle lagen.
-    const RICH_PALETTE = PARAMS.get('palette') === 'rich';
     // Audio standaard aan (na de drempel-gesture). ?audio=off of ?mute = pure stille versie.
     // Bij reduced-motion standaard uit, tenzij ?audio=on.
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
@@ -303,12 +300,7 @@
       { name:'high freight lane', y:58, wobble:3.0, depth:.46, speedMul:.78, alphaMul:1.0 },
       { name:'middle freight lane', y:88, wobble:3.2, depth:.40, speedMul:.74, alphaMul:.96 },
       { name:'low freight lane', y:120, wobble:2.6, depth:.28, speedMul:.62, alphaMul:.86 },
-      { name:'distant freight lane', y:150, wobble:2.0, depth:.20, speedMul:.54, alphaMul:.74 },
-      // Verre lanes lager in het doek: dim en klein, lezen als diepe ruimte-traffic achter de oracle.
-      { name:'deep drift lane', y:236, wobble:2.2, depth:.16, speedMul:.50, alphaMul:.60 },
-      { name:'far orbit lane', y:352, wobble:2.6, depth:.14, speedMul:.46, alphaMul:.54 },
-      { name:'low orbit lane', y:466, wobble:2.4, depth:.13, speedMul:.44, alphaMul:.50 },
-      { name:'horizon drift lane', y:560, wobble:1.8, depth:.12, speedMul:.40, alphaMul:.46 }
+      { name:'distant freight lane', y:150, wobble:2.0, depth:.20, speedMul:.54, alphaMul:.74 }
     ];
 
     const speech = {
@@ -1845,9 +1837,9 @@
       const mood = dominantMood();
       const wind = WorldBrain.weather.visual.wind;
       if (now > motion.nextAt) {
-        let rangeX = 4.4 + wind * 2.6;
-        let rangeY = 2.6 + WorldBrain.weather.visual.fog * 1.0;
-        let rangeTilt = .012 + wind * .008;
+        let rangeX = 2.8 + wind * 2.2;
+        let rangeY = 1.6 + WorldBrain.weather.visual.fog * .8;
+        let rangeTilt = .007 + wind * .007;
         if (mood === 'laugh' || mood === 'happy') rangeX += 1.3;
         if (mood === 'angry') rangeTilt *= .65;
         if (mood === 'shy') rangeX *= .65;
@@ -2088,7 +2080,7 @@
 
       const sig = bgEvents.signal;
       if (!sig.active && now > sig.nextAt) {
-        sig.active = true; sig.start = now; sig.duration = rnd(900, 1800); sig.x = rnd(30,330); sig.y = rnd(26, H - 60);
+        sig.active = true; sig.start = now; sig.duration = rnd(900, 1800); sig.x = rnd(30,330); sig.y = rnd(26,132);
       }
       if (sig.active && now > sig.start + sig.duration) { sig.active=false; sig.nextAt = now + rnd(16000, 36000); }
     }
@@ -2154,7 +2146,6 @@
     }
 
     function drawMoodAura(now){
-      if (!RICH_PALETTE) return;   // strak: geen gekleurde gloed achter het hoofd
       const entityAlpha = WardrobeBrain.opacity == null ? 1 : WardrobeBrain.opacity;
       if (entityAlpha <= .02) return;
       const p = expr;
@@ -2175,12 +2166,10 @@
       const wv = WorldBrain.weather.visual;
 
       rect(0,0,W,H,C.bg);
-      if (RICH_PALETTE){
-        const skyTint = phase === 'dawn' ? C.green0 : phase === 'dusk' ? C.magenta : phase.includes('night') ? C.cyan0 : C.cyan1;
-        ctx.globalAlpha = .08 + light * .06;
-        rect(0,0,W,H,skyTint);
-        ctx.globalAlpha = 1;
-      }
+      const skyTint = phase === 'dawn' ? C.green0 : phase === 'dusk' ? C.magenta : phase.includes('night') ? C.cyan0 : C.cyan1;
+      ctx.globalAlpha = .08 + light * .06;
+      rect(0,0,W,H,skyTint);
+      ctx.globalAlpha = 1;
 
       const starAlpha = clamp((1-light) * .65 + wv.clarity * .20, .06, .72);
       for (const s of stars) {
@@ -2278,13 +2267,13 @@
         ev.blink = rnd(.006, .012);
       } else if (type === 'flash'){
         ev.dur = rnd(1400, 2300);
-        ev.x = rnd(30, W - 30); ev.y = rnd(14, H - 40); ev.color = Math.random()<.6 ? C.white : accent;
+        ev.x = rnd(30, W - 30); ev.y = rnd(14, 150); ev.color = Math.random()<.6 ? C.white : accent;
       } else if (type === 'debris'){
         ev.dur = rnd(5200, 9000);
         const n = REDUCED ? 3 : rndInt(4, 7);
         ev.bits = Array.from({length:n}, (_,i)=>({
           x: fromLeft ? rnd(-30,-4) : rnd(W+4, W+30),
-          y: rnd(20, H - 30),
+          y: rnd(20, 170),
           vx: (fromLeft ? 1 : -1) * rnd(6, 16),
           vy: rnd(-3, 3),
           s: rndInt(1, 3),
@@ -2293,10 +2282,10 @@
         ev.color = Math.random()<.5 ? C.cyan2 : C.green0;
       } else if (type === 'ripple'){
         ev.dur = rnd(2200, 3600);
-        ev.x = rnd(40, W - 40); ev.y = rnd(20, H - 50); ev.color = accent;
+        ev.x = rnd(40, W - 40); ev.y = rnd(20, 150); ev.color = accent;
       } else if (type === 'pulsar'){
         ev.dur = rnd(5000, 9000);
-        ev.x = rnd(36, W - 36); ev.y = rnd(16, H - 60); ev.period = rnd(620, 1100); ev.color = accent;
+        ev.x = rnd(36, W - 36); ev.y = rnd(16, 70); ev.period = rnd(620, 1100); ev.color = accent;
       } else if (type === 'aurora'){
         ev.dur = rnd(7000, 13000);
         ev.y = rnd(20, 64); ev.amp = rnd(6, 16); ev.color = pick([C.green2, C.cyan4, C.magentaSoft]);
@@ -2310,7 +2299,7 @@
         }));
       } else if (type === 'riftGlow'){
         ev.dur = rnd(5000, 9000);
-        ev.x = rnd(50, W - 50); ev.y = rnd(20, H - 50);
+        ev.x = rnd(50, W - 50); ev.y = rnd(20, 150);
         ev.w = rnd(20, 50); ev.h = rnd(2, 5); ev.color = pick([C.magenta, C.cyan4, C.green1]);
       } else if (type === 'driftMoon'){
         ev.dur = rnd(24000, 42000);
@@ -2975,10 +2964,8 @@
       // Soft side veils: verbinden hoofd-silhouet met mantel en halen de toy-look weg.
       const veilL=[['M',105,195],['C',82,259,91,355,118,452],['C',132,393,139,308,137,226],['C',126,211,116,201,105,195]];
       const veilR=[['M',255,195],['C',278,259,269,355,242,452],['C',228,393,221,308,223,226],['C',234,211,244,201,255,195]];
-      if (RICH_PALETTE) {
       paper(veilL, mixHex(vellumLite,teal,.32), 511, {alpha:.80, fibers:9, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.15), hiAlpha:.10, lw:1.5});
       paper(veilR, mixHex(vellumLite,nightViolet,.28), 512, {alpha:.80, fibers:9, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.magenta,C.white,.15), hiAlpha:.10, lw:1.5});
-      }
 
       // small celestial ornaments around the head frame
       star(112,76,6,gold,.52); star(247,89,5,C.cyan4,.38); star(264,178,4,C.magenta,.40);
@@ -3015,14 +3002,12 @@
       const elbowR={x:shoulderR.x + Math.cos(aR1)*ARM.Rupper, y:shoulderR.y + Math.sin(aR1)*ARM.Rupper};
       const wristL={x:clamp(elbowL.x + Math.cos(aL2)*ARM.Lfore, 40, 320), y:clamp(elbowL.y + Math.sin(aL2)*ARM.Lfore, 300, 470)};
       const wristR={x:clamp(elbowR.x + Math.cos(aR2)*ARM.Rfore, 40, 320), y:clamp(elbowR.y + Math.sin(aR2)*ARM.Rfore, 300, 470)};
-      // Trage gewichtsverplaatsing (contrapposto) — onafhankelijk van de gedeelde sway, geeft de benen leven.
-      const wshift = Math.sin(t * .42 + .6) * rm;
-      const hipL={x:151 + wshift*1.8, y:405};
-      const hipR={x:209 + wshift*1.8, y:405};
-      const kneeL={x:143 + walk*8 + wshift*3.2, y:492};
-      const kneeR={x:217 - walk*8 + wshift*3.2, y:492};
-      const ankleL={x:135 + walk*7 + wshift*3.8, y:566};
-      const ankleR={x:225 - walk*7 + wshift*3.8, y:566};
+      const hipL={x:151,y:405};
+      const hipR={x:209,y:405};
+      const kneeL={x:143 + walk*8,y:492};
+      const kneeR={x:217 - walk*8,y:492};
+      const ankleL={x:135 + walk*7,y:566};
+      const ankleR={x:225 - walk*7,y:566};
 
       // Back cape: a long, ethereal paper silhouette rather than a wooden puppet body.
       const cape=[
@@ -3030,37 +3015,34 @@
         ['C',274,315,263,471,236,589],['C',216,602,195,590,180,565],
         ['C',165,590,144,602,124,589],['C',97,471,86,315,111,238]
       ];
-      if (RICH_PALETTE) {
       paper(cape, mixHex(deepTeal,nightViolet,.16), 601, {alpha:.72, fibers:18, fiberAlpha:.075, stitchAlpha:.10, hi:mixHex(tealLit,C.white,.05), hiAlpha:.10, lw:2});
-      }
 
       // Legs: long and elegant, visible through high split paper panels.
       segment(hipL,kneeL,17,14,mixHex(skinPaper,vellumDark,.08),701,{fibers:6, stitchAlpha:.10, hi:mixHex(skinPaper,C.white,.10), lw:2});
       segment(kneeL,ankleL,14,11,mixHex(skinPaper,teal,.07),702,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
       segment(hipR,kneeR,17,14,mixHex(skinPaper,vellumDark,.08),703,{fibers:6, stitchAlpha:.10, hi:mixHex(skinPaper,C.white,.10), lw:2});
       segment(kneeR,ankleR,14,11,mixHex(skinPaper,teal,.07),704,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
-      foot(ankleL.x-4,ankleL.y+18,-1,-.06 + walk*.08 + wshift*.05);
-      foot(ankleR.x+4,ankleR.y+18, 1, .06 - walk*.08 + wshift*.05);
+      foot(ankleL.x-4,ankleL.y+18,-1,-.06 + walk*.08);
+      foot(ankleR.x+4,ankleR.y+18, 1, .06 - walk*.08);
 
       // Arms: slimmer and more elegant; joints are ornaments, not toy screws.
       segment(shoulderL,elbowL,15,12,mixHex(skinPaper,vellum,.06),711,{fibers:5, stitchAlpha:.07, hi:skinGlow, hiAlpha:.13, lw:2});
       segment(elbowL,wristL,12,9,mixHex(skinPaper,skinShade,.06),712,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
       segment(shoulderR,elbowR,15,12,mixHex(skinPaper,vellum,.06),713,{fibers:5, stitchAlpha:.07, hi:skinGlow, hiAlpha:.13, lw:2});
       segment(elbowR,wristR,12,9,mixHex(skinPaper,skinShade,.06),714,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
-      const handLife = Math.sin(t * .9 + .3) * .035 * rm;
-      hand(wristL.x-2,wristL.y+12,-1,-.10 + (aL2-ARM.L2) + P.lh + handLife);
-      hand(wristR.x+2,wristR.y+12, 1, .10 + (aR2-ARM.R2) + P.rh - handLife);
+      hand(wristL.x-2,wristL.y+12,-1,-.10 + (aL2-ARM.L2) + P.lh);
+      hand(wristR.x+2,wristR.y+12, 1, .10 + (aR2-ARM.R2) + P.rh);
 
-      // Off-shoulder collar and bust line: adult, sensual, but abstract/paper-couture.
+      // Neck transition simplified so the neckline reads as one clear shape, not two stacked V-forms.
       const neck=[
-        ['M',162,199],['C',168,192,174,190,180,190],['C',186,190,192,192,198,199],
-        ['L',200,229],['C',192,235,168,235,160,229],['L',162,199]
+        ['M',166,198],['C',171,192,176,190,180,190],['C',184,190,189,192,194,198],
+        ['L',194,220],['C',190,224,170,224,166,220],['L',166,198]
       ];
-      paper(neck, skinPaper, 801, {fibers:4, stitch:false, hi:pearl, hiAlpha:.16, lw:2});
+      paper(neck, skinPaper, 801, {fibers:4, stitch:false, hi:pearl, hiAlpha:.14, lw:1.5});
 
       const choker=[
-        ['M',148,213],['C',159,207,170,209,180,222],['C',190,209,201,207,212,213],
-        ['C',205,235,195,247,180,249],['C',165,247,155,235,148,213]
+        ['M',149,211],['C',160,204,171,205,180,214],['C',189,205,200,204,211,211],
+        ['C',205,226,194,236,180,238],['C',166,236,155,226,149,211]
       ];
       paper(choker, mixHex(vellumLite,roseGold,.24), 802, {fibers:6, stitchAlpha:.10, hi:mixHex(goldHi,C.magenta,.06), hiAlpha:.18, lw:2});
 
@@ -3069,13 +3051,14 @@
         ['C',250,254,234,264,213,264],['C',200,250,190,242,180,238],
         ['C',170,242,160,250,147,264],['C',126,264,110,254,104,236]
       ];
-      // shoulderWrap verwijderd op verzoek: het rare stijve borst/schouderstuk. Bare shoulders.
+      paper(shoulderWrap, mixHex(vellumLite,teal,.32), 803, {fibers:10, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.11), hiAlpha:.13, lw:2});
+      strokeCommands([['M',113,240],['C',143,243,166,250,180,266],['C',194,250,217,243,247,240]], gold, 1, .28, true);
 
       // Shared skin chest/shoulder area: same color family as the face, but matte and paper-like.
       const upperSkin=[
-        ['M',135,244],['C',150,230,168,229,180,246],['C',192,229,210,230,225,244],
+        ['M',136,246],['C',150,236,168,235,180,243],['C',192,235,210,236,224,246],
         ['C',218,274,203,294,184,298],['C',181,299,179,299,176,298],
-        ['C',157,294,142,274,135,244]
+        ['C',157,294,142,274,136,246]
       ];
       paper(upperSkin, mixHex(skinPaper,vellumLite,.10), 804, {fibers:6, stitch:false, hi:skinGlow, hiAlpha:.14, lw:1.5, alpha:.96});
       ctx.globalAlpha=.20; ellipse(160,269,19,14,skinShade); ellipse(200,269,19,14,skinShade); ctx.globalAlpha=1;
@@ -3086,8 +3069,7 @@
         ['C',216,306,205,335,195,354],['C',188,363,172,363,165,354],
         ['C',155,335,144,306,141,274]
       ];
-      const INK = mixHex(deepTeal, nightViolet, .5);   // strak: één samenhangende diepe kostuumtoon
-      paper(bodice, RICH_PALETTE ? mixHex(teal,nightViolet,.16) : INK, 811, {fibers:12, fiberAlpha:.10, stitchAlpha:.09, hi:mixHex(tealLit,C.white,.08), hiAlpha:.16, lw:2});
+      paper(bodice, mixHex(teal,nightViolet,.16), 811, {fibers:12, fiberAlpha:.10, stitchAlpha:.09, hi:mixHex(tealLit,C.white,.08), hiAlpha:.16, lw:2});
 
       const centerSkin=[
         ['M',172,259],['C',175,252,185,252,188,259],['C',187,287,185,319,183,346],
@@ -3101,8 +3083,8 @@
       const corsetRight=[
         ['M',213,282],['C',204,262,192,262,183,282],['C',187,306,190,334,193,352],['C',204,339,211,310,213,282]
       ];
-      paper(corsetLeft, RICH_PALETTE ? mixHex(nightViolet,teal,.18) : mixHex(INK,C.black,.18), 813, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
-      paper(corsetRight, RICH_PALETTE ? mixHex(nightViolet,teal,.18) : mixHex(INK,C.black,.18), 814, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
+      paper(corsetLeft, mixHex(nightViolet,teal,.18), 813, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
+      paper(corsetRight, mixHex(nightViolet,teal,.18), 814, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
       strokeCommands([['M',180,258],['C',177,286,177,319,180,350]], gold, 1, .32, true);
 
       // Pelvis / hips: rounded and ornamental, mostly integrated under flowing panels.
@@ -3111,7 +3093,7 @@
         ['C',226,400,209,421,185,426],['C',181,427,179,427,175,426],
         ['C',151,421,134,400,130,372]
       ];
-      paper(pelvis, RICH_PALETTE ? mixHex(vellumDark,nightViolet,.18) : mixHex(INK,C.black,.10), 821, {fibers:7, stitchAlpha:.08, hi:mixHex(roseGold,C.cyan4,.06), hiAlpha:.10, lw:2});
+      paper(pelvis, mixHex(vellumDark,nightViolet,.18), 821, {fibers:7, stitchAlpha:.08, hi:mixHex(roseGold,C.cyan4,.06), hiAlpha:.10, lw:2});
 
       // Flowing skirt strips with high side slits: sexy space-oracle instead of wooden puppet.
       const skirtCenter=[
@@ -3126,19 +3108,15 @@
         ['M',215,337],['C',228,373,239,462,247,571],['C',230,584,207,571,195,548],
         ['C',201,476,203,391,196,344]
       ];
-      if (RICH_PALETTE) {
       paper(skirtL, mixHex(vellumLite,teal,.33), 831, {alpha:.86, fibers:13, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.08), hiAlpha:.10, lw:2});
       paper(skirtR, mixHex(vellumLite,nightViolet,.26), 832, {alpha:.86, fibers:13, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.magenta,C.white,.06), hiAlpha:.10, lw:2});
-      }
-      paper(skirtCenter, RICH_PALETTE ? mixHex(deepTeal,teal,.34) : INK, 833, {fibers:12, fiberAlpha:.08, stitchAlpha:.12, hi:mixHex(tealLit,C.white,.07), hiAlpha:.12, lw:2});
+      paper(skirtCenter, mixHex(deepTeal,teal,.34), 833, {fibers:12, fiberAlpha:.08, stitchAlpha:.12, hi:mixHex(tealLit,C.white,.07), hiAlpha:.12, lw:2});
 
       // Extra floating ribbons / paper tails for ethereal motion.
-      if (RICH_PALETTE) {
       const ribbonL=[['M',126,319],['C',103,389,97,493,99,602],['C',112,592,124,552,130,491],['C',134,419,136,360,126,319]];
       const ribbonR=[['M',234,319],['C',257,389,263,493,261,602],['C',248,592,236,552,230,491],['C',226,419,224,360,234,319]];
       paper(ribbonL, mixHex(vellumLite,C.cyan4,.14), 841, {alpha:.44, fibers:8, fiberAlpha:.05, stitchAlpha:.06, hi:mixHex(C.cyan4,C.white,.16), hiAlpha:.06, lw:1.5});
       paper(ribbonR, mixHex(vellumLite,C.magenta,.10), 842, {alpha:.44, fibers:8, fiberAlpha:.05, stitchAlpha:.06, hi:mixHex(C.magenta,C.white,.16), hiAlpha:.06, lw:1.5});
-      }
 
       // Celestial markings and couture seams.
       crescent(180,272,7,mixHex(skinPaper,vellumLite,.24),.78);
@@ -3348,9 +3326,9 @@
       if (entityAlpha <= .01) return;
       const t=now*.001, p=expr;
       const breath=1+Math.sin(t*1.12)*.003;
-      const driftX=motion.x+Math.sin(t*.37)*1.1+Math.sin(t*.19+1.2)*.7;
-      const driftY=motion.y+Math.sin(t*.43+.8)*.8 + (WardrobeBrain.offsetY || 0);
-      const tilt=motion.tilt+Math.sin(t*.31)*.009 + Math.sin(t*.12+.5)*.005;
+      const driftX=motion.x+Math.sin(t*.37)*.55+Math.sin(t*.19+1.2)*.35;
+      const driftY=motion.y+Math.sin(t*.43+.8)*.45 + (WardrobeBrain.offsetY || 0);
+      const tilt=motion.tilt+Math.sin(t*.31)*.004;
       ctx.save();
       ctx.globalAlpha *= entityAlpha;
       ctx.translate(W/2+driftX,H/2+driftY);
