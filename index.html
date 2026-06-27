@@ -121,24 +121,27 @@
       text-shadow:0 0 4px #000;
     }
     #enter{
-      position:fixed; left:0; right:0; bottom:7%; z-index:8;
-      text-align:center; pointer-events:none;
-      font:11px/1 monospace; letter-spacing:.32em; text-transform:lowercase;
-      color:#69fff3; opacity:0;
-      text-shadow:0 0 6px rgba(0,255,214,.4);
-      transition:opacity 2.4s ease;
+      position:fixed; inset:0; z-index:8;
+      display:flex; align-items:center; justify-content:center;
+      pointer-events:none; opacity:0;
+      transition:opacity 1.2s ease;
     }
-    #enter.show{ opacity:.16; }
-    #enter.gone{ opacity:0; transition:opacity 1.4s ease; }
-    #mode{
-      position:fixed; left:0; right:0; bottom:12%; z-index:9;
-      text-align:center; pointer-events:none;
-      font:11px/1 monospace; letter-spacing:.28em; text-transform:lowercase;
-      color:#69fff3; opacity:0;
-      text-shadow:0 0 6px rgba(0,255,214,.4);
-      transition:opacity .5s ease;
+    #enter .ring{
+      display:flex; align-items:center; justify-content:center;
+      width:136px; height:136px; border-radius:50%;
+      border:1.5px solid rgba(105,255,243,.6);
+      background:radial-gradient(circle at 50% 38%, rgba(105,255,243,.12), rgba(2,2,7,.32) 72%);
+      box-shadow:0 0 24px rgba(0,255,214,.22), inset 0 0 22px rgba(0,255,214,.10);
+      color:#9bfff5; font:12px/1.4 monospace; letter-spacing:.16em; text-transform:lowercase;
+      text-align:center; text-shadow:0 0 8px rgba(0,255,214,.45);
+      animation:enterPulse 2.6s ease-in-out infinite;
     }
-    #mode.show{ opacity:.55; }
+    @keyframes enterPulse{
+      0%,100%{ transform:scale(1); box-shadow:0 0 22px rgba(0,255,214,.18), inset 0 0 20px rgba(0,255,214,.09); }
+      50%{ transform:scale(1.05); box-shadow:0 0 36px rgba(0,255,214,.32), inset 0 0 26px rgba(0,255,214,.15); }
+    }
+    #enter.show{ opacity:.94; }
+    #enter.gone{ opacity:0; transition:opacity 1.2s ease; }
     @media (prefers-reduced-motion: reduce){
       canvas{ filter:contrast(1.06) saturate(1.08) drop-shadow(0 0 18px rgba(0,255,214,.12)); }
     }
@@ -148,8 +151,7 @@
   <main id="stage" aria-label="Wandering Art — autonomous pixel entity">
     <canvas id="entity" width="360" height="640"></canvas>
   </main>
-  <div id="enter" aria-hidden="true">binnentreden</div>
-  <div id="mode" aria-hidden="true"></div>
+  <div id="enter" aria-hidden="true"><span class="ring">binnentreden</span></div>
   <pre id="dbg"></pre>
 
   <script>
@@ -164,9 +166,11 @@
     const RIG_MOTION = PARAMS.get('rig') !== 'still';
     // Zichtbare scharnieren: 'full' = alles, 'min' = alleen kostuum-orbs (schouders/keel/borst),
     // 'off' = geen joints (puur vloeiend papier). Beweging is in alle standen identiek.
-    // URL-param wint; anders wordt de onthouden keuze (of 'full') later hersteld. Dubbel-tap wisselt live.
-    let RIG_JOINTS = ((v) => (v === 'off' || v === 'min' || v === 'full') ? v : null)(PARAMS.get('joints'));
-    const JOINTS_FROM_URL = RIG_JOINTS != null;
+    // Zichtbare scharnieren staan standaard uit (nooit getoond). ?joints=full of =min is enkel een dev-optie.
+    const RIG_JOINTS = ((v) => (v === 'full' || v === 'min') ? v : 'off')(PARAMS.get('joints'));
+    // Palet: standaard strak/gestript (vlakke donkere achtergrond, geen extra cape/veil-panelen,
+    // beperkt kostuum-palet). ?palette=rich herstelt de oude rijke versie met alle lagen.
+    const RICH_PALETTE = PARAMS.get('palette') === 'rich';
     // Audio standaard aan (na de drempel-gesture). ?audio=off of ?mute = pure stille versie.
     // Bij reduced-motion standaard uit, tenzij ?audio=on.
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
@@ -290,7 +294,7 @@
 
     const ShipBrain = {
       ships:[], nextSpawnAt:performance.now() + rnd(2500, 6000), seed:1000,
-      maxShips:REDUCED ? 3 : 5,
+      maxShips:REDUCED ? 6 : 11,
       rareAt:performance.now() + rnd(38000, 90000),
       majorAt:performance.now() + rnd(CONFIG.hugeShipMinMs, CONFIG.hugeShipMaxMs)
     };
@@ -300,7 +304,15 @@
       { name:'high freight lane', y:58, wobble:3.0, depth:.46, speedMul:.78, alphaMul:1.0 },
       { name:'middle freight lane', y:88, wobble:3.2, depth:.40, speedMul:.74, alphaMul:.96 },
       { name:'low freight lane', y:120, wobble:2.6, depth:.28, speedMul:.62, alphaMul:.86 },
-      { name:'distant freight lane', y:150, wobble:2.0, depth:.20, speedMul:.54, alphaMul:.74 }
+      { name:'distant freight lane', y:150, wobble:2.0, depth:.20, speedMul:.54, alphaMul:.76 },
+      // Volledige verticale dekking: traffic schuift ook achter torso & benen langs. Dim/distant = diepte.
+      { name:'drift lane a', y:205, wobble:2.2, depth:.17, speedMul:.50, alphaMul:.64 },
+      { name:'drift lane b', y:270, wobble:2.4, depth:.15, speedMul:.48, alphaMul:.60 },
+      { name:'orbit lane a', y:340, wobble:2.6, depth:.14, speedMul:.46, alphaMul:.58 },
+      { name:'orbit lane b', y:410, wobble:2.4, depth:.13, speedMul:.44, alphaMul:.56 },
+      { name:'low orbit lane', y:480, wobble:2.2, depth:.12, speedMul:.42, alphaMul:.54 },
+      { name:'deep lane', y:550, wobble:1.8, depth:.11, speedMul:.40, alphaMul:.50 },
+      { name:'horizon lane', y:610, wobble:1.5, depth:.10, speedMul:.38, alphaMul:.46 }
     ];
 
     const speech = {
@@ -1837,9 +1849,9 @@
       const mood = dominantMood();
       const wind = WorldBrain.weather.visual.wind;
       if (now > motion.nextAt) {
-        let rangeX = 2.8 + wind * 2.2;
-        let rangeY = 1.6 + WorldBrain.weather.visual.fog * .8;
-        let rangeTilt = .007 + wind * .007;
+        let rangeX = 4.4 + wind * 2.6;
+        let rangeY = 2.6 + WorldBrain.weather.visual.fog * 1.0;
+        let rangeTilt = .012 + wind * .008;
         if (mood === 'laugh' || mood === 'happy') rangeX += 1.3;
         if (mood === 'angry') rangeTilt *= .65;
         if (mood === 'shy') rangeX *= .65;
@@ -1899,7 +1911,7 @@
         const data = generateSpeechText(mood);
         speech.active = true;
         speech.start = now;
-        speech.duration = rnd(1900, 4200);
+        speech.duration = rnd(3000, 6000);
         speech.text = data.text;
         speech.mood = mood;
         speech.meaningful = data.meaningful;
@@ -2080,7 +2092,7 @@
 
       const sig = bgEvents.signal;
       if (!sig.active && now > sig.nextAt) {
-        sig.active = true; sig.start = now; sig.duration = rnd(900, 1800); sig.x = rnd(30,330); sig.y = rnd(26,132);
+        sig.active = true; sig.start = now; sig.duration = rnd(900, 1800); sig.x = rnd(30,330); sig.y = rnd(26, H - 60);
       }
       if (sig.active && now > sig.start + sig.duration) { sig.active=false; sig.nextAt = now + rnd(16000, 36000); }
     }
@@ -2146,6 +2158,7 @@
     }
 
     function drawMoodAura(now){
+      if (!RICH_PALETTE) return;   // strak: geen gekleurde gloed achter het hoofd
       const entityAlpha = WardrobeBrain.opacity == null ? 1 : WardrobeBrain.opacity;
       if (entityAlpha <= .02) return;
       const p = expr;
@@ -2166,10 +2179,12 @@
       const wv = WorldBrain.weather.visual;
 
       rect(0,0,W,H,C.bg);
-      const skyTint = phase === 'dawn' ? C.green0 : phase === 'dusk' ? C.magenta : phase.includes('night') ? C.cyan0 : C.cyan1;
-      ctx.globalAlpha = .08 + light * .06;
-      rect(0,0,W,H,skyTint);
-      ctx.globalAlpha = 1;
+      if (RICH_PALETTE){
+        const skyTint = phase === 'dawn' ? C.green0 : phase === 'dusk' ? C.magenta : phase.includes('night') ? C.cyan0 : C.cyan1;
+        ctx.globalAlpha = .08 + light * .06;
+        rect(0,0,W,H,skyTint);
+        ctx.globalAlpha = 1;
+      }
 
       const starAlpha = clamp((1-light) * .65 + wv.clarity * .20, .06, .72);
       for (const s of stars) {
@@ -2267,13 +2282,13 @@
         ev.blink = rnd(.006, .012);
       } else if (type === 'flash'){
         ev.dur = rnd(1400, 2300);
-        ev.x = rnd(30, W - 30); ev.y = rnd(14, 150); ev.color = Math.random()<.6 ? C.white : accent;
+        ev.x = rnd(30, W - 30); ev.y = rnd(14, H - 40); ev.color = Math.random()<.6 ? C.white : accent;
       } else if (type === 'debris'){
         ev.dur = rnd(5200, 9000);
         const n = REDUCED ? 3 : rndInt(4, 7);
         ev.bits = Array.from({length:n}, (_,i)=>({
           x: fromLeft ? rnd(-30,-4) : rnd(W+4, W+30),
-          y: rnd(20, 170),
+          y: rnd(20, H - 30),
           vx: (fromLeft ? 1 : -1) * rnd(6, 16),
           vy: rnd(-3, 3),
           s: rndInt(1, 3),
@@ -2282,10 +2297,10 @@
         ev.color = Math.random()<.5 ? C.cyan2 : C.green0;
       } else if (type === 'ripple'){
         ev.dur = rnd(2200, 3600);
-        ev.x = rnd(40, W - 40); ev.y = rnd(20, 150); ev.color = accent;
+        ev.x = rnd(40, W - 40); ev.y = rnd(20, H - 50); ev.color = accent;
       } else if (type === 'pulsar'){
         ev.dur = rnd(5000, 9000);
-        ev.x = rnd(36, W - 36); ev.y = rnd(16, 70); ev.period = rnd(620, 1100); ev.color = accent;
+        ev.x = rnd(36, W - 36); ev.y = rnd(16, H - 60); ev.period = rnd(620, 1100); ev.color = accent;
       } else if (type === 'aurora'){
         ev.dur = rnd(7000, 13000);
         ev.y = rnd(20, 64); ev.amp = rnd(6, 16); ev.color = pick([C.green2, C.cyan4, C.magentaSoft]);
@@ -2299,7 +2314,7 @@
         }));
       } else if (type === 'riftGlow'){
         ev.dur = rnd(5000, 9000);
-        ev.x = rnd(50, W - 50); ev.y = rnd(20, 150);
+        ev.x = rnd(50, W - 50); ev.y = rnd(20, H - 50);
         ev.w = rnd(20, 50); ev.h = rnd(2, 5); ev.color = pick([C.magenta, C.cyan4, C.green1]);
       } else if (type === 'driftMoon'){
         ev.dur = rnd(24000, 42000);
@@ -2951,25 +2966,28 @@
         ['C',286,82,295,166,276,223],['C',250,204,222,193,180,194],
         ['C',138,193,110,204,84,223]
       ];
-      paper(halo, mixHex(vellum,'#182638',.28), 501, {fibers:16, fiber:mixHex(stitch,gold,.30), fiberAlpha:.10, stitchAlpha:.16, hi:mixHex(pearl,C.cyan4,.08), hiAlpha:.18, lw:2});
+      if (RICH_PALETTE) paper(halo, mixHex(vellum,'#182638',.28), 501, {fibers:16, fiber:mixHex(stitch,gold,.30), fiberAlpha:.10, stitchAlpha:.16, hi:mixHex(pearl,C.cyan4,.08), hiAlpha:.18, lw:2});
 
       const innerHalo=[
         ['M',103,214],['C',91,165,100,94,132,56],['C',156,28,206,28,229,56],
         ['C',260,94,269,165,257,214],['C',237,199,214,189,180,190],
         ['C',146,189,123,199,103,214]
       ];
-      strokeCommands(innerHalo, gold, 1, .36, true);
+      if (RICH_PALETTE) strokeCommands(innerHalo, gold, 1, .36, true);
       strokeCommands([['M',92,222],['C',119,232,148,237,180,237],['C',212,237,241,232,268,222]], C.cyan4, 1, .16, true);
 
       // Soft side veils: verbinden hoofd-silhouet met mantel en halen de toy-look weg.
       const veilL=[['M',105,195],['C',82,259,91,355,118,452],['C',132,393,139,308,137,226],['C',126,211,116,201,105,195]];
       const veilR=[['M',255,195],['C',278,259,269,355,242,452],['C',228,393,221,308,223,226],['C',234,211,244,201,255,195]];
+      if (RICH_PALETTE) {
       paper(veilL, mixHex(vellumLite,teal,.32), 511, {alpha:.80, fibers:9, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.15), hiAlpha:.10, lw:1.5});
       paper(veilR, mixHex(vellumLite,nightViolet,.28), 512, {alpha:.80, fibers:9, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.magenta,C.white,.15), hiAlpha:.10, lw:1.5});
+      }
 
       // small celestial ornaments around the head frame
-      star(112,76,6,gold,.52); star(247,89,5,C.cyan4,.38); star(264,178,4,C.magenta,.40);
-      crescent(180,48,8,mixHex(vellum,'#182638',.28),.55);
+      if (RICH_PALETTE) star(112,76,6,gold,.52);
+      star(247,89,5,C.cyan4,.38); star(264,178,4,C.magenta,.40);
+      crescent(180,48,8,mixHex(C.white,C.cyan4,.45),.5);
       ctx.globalAlpha=.20;
       line(180,56,180,205,1,gold);
       ctx.globalAlpha=1;
@@ -3002,12 +3020,14 @@
       const elbowR={x:shoulderR.x + Math.cos(aR1)*ARM.Rupper, y:shoulderR.y + Math.sin(aR1)*ARM.Rupper};
       const wristL={x:clamp(elbowL.x + Math.cos(aL2)*ARM.Lfore, 40, 320), y:clamp(elbowL.y + Math.sin(aL2)*ARM.Lfore, 300, 470)};
       const wristR={x:clamp(elbowR.x + Math.cos(aR2)*ARM.Rfore, 40, 320), y:clamp(elbowR.y + Math.sin(aR2)*ARM.Rfore, 300, 470)};
-      const hipL={x:151,y:405};
-      const hipR={x:209,y:405};
-      const kneeL={x:143 + walk*8,y:492};
-      const kneeR={x:217 - walk*8,y:492};
-      const ankleL={x:135 + walk*7,y:566};
-      const ankleR={x:225 - walk*7,y:566};
+      // Trage gewichtsverplaatsing (contrapposto) — onafhankelijk van de gedeelde sway, geeft de benen leven.
+      const wshift = Math.sin(t * .42 + .6) * rm;
+      const hipL={x:151 + wshift*1.8, y:405};
+      const hipR={x:209 + wshift*1.8, y:405};
+      const kneeL={x:143 + walk*8 + wshift*3.2, y:492};
+      const kneeR={x:217 - walk*8 + wshift*3.2, y:492};
+      const ankleL={x:135 + walk*7 + wshift*3.8, y:566};
+      const ankleR={x:225 - walk*7 + wshift*3.8, y:566};
 
       // Back cape: a long, ethereal paper silhouette rather than a wooden puppet body.
       const cape=[
@@ -3015,53 +3035,69 @@
         ['C',274,315,263,471,236,589],['C',216,602,195,590,180,565],
         ['C',165,590,144,602,124,589],['C',97,471,86,315,111,238]
       ];
+      if (RICH_PALETTE) {
       paper(cape, mixHex(deepTeal,nightViolet,.16), 601, {alpha:.72, fibers:18, fiberAlpha:.075, stitchAlpha:.10, hi:mixHex(tealLit,C.white,.05), hiAlpha:.10, lw:2});
+      }
+
+      // Mysterieuze mantel: translucent diep-indigo, valt achter het lichaam maar vóór het ruimte-verkeer,
+      // zodat de schepen er spookachtig doorheen schemeren. Lichte deining in de zoom.
+      const mSway = Math.sin(t * .5) * 4 * rm;
+      const mantle=[
+        ['M',128,242],
+        ['C',92,300,80,452,94 + mSway,604],
+        ['C',132,612,160,610,180,604],
+        ['C',200,610,228,612,266 - mSway,604],
+        ['C',280,452,268,300,232,242],
+        ['C',210,234,150,234,128,242]
+      ];
+      paper(mantle, mixHex(nightViolet, voidBlue, .42), 590, {alpha:.30, fibers:16, fiberAlpha:.04, stitchAlpha:.03, hi:mixHex(C.cyan4,C.white,.12), hiAlpha:.10, lw:1.5});
 
       // Legs: long and elegant, visible through high split paper panels.
-      segment(hipL,kneeL,17,14,mixHex(skinPaper,vellumDark,.08),701,{fibers:6, stitchAlpha:.10, hi:mixHex(skinPaper,C.white,.10), lw:2});
-      segment(kneeL,ankleL,14,11,mixHex(skinPaper,teal,.07),702,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
-      segment(hipR,kneeR,17,14,mixHex(skinPaper,vellumDark,.08),703,{fibers:6, stitchAlpha:.10, hi:mixHex(skinPaper,C.white,.10), lw:2});
-      segment(kneeR,ankleR,14,11,mixHex(skinPaper,teal,.07),704,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
-      foot(ankleL.x-4,ankleL.y+18,-1,-.06 + walk*.08);
-      foot(ankleR.x+4,ankleR.y+18, 1, .06 - walk*.08);
+      segment(hipL,kneeL,21,16,mixHex(skinPaper,vellumDark,.08),701,{fibers:6, stitchAlpha:.10, hi:mixHex(skinPaper,C.white,.10), lw:2});
+      segment(kneeL,ankleL,16,11,mixHex(skinPaper,teal,.07),702,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
+      segment(hipR,kneeR,21,16,mixHex(skinPaper,vellumDark,.08),703,{fibers:6, stitchAlpha:.10, hi:mixHex(skinPaper,C.white,.10), lw:2});
+      segment(kneeR,ankleR,16,11,mixHex(skinPaper,teal,.07),704,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
+      foot(ankleL.x-4,ankleL.y+18,-1,-.06 + walk*.08 + wshift*.05);
+      foot(ankleR.x+4,ankleR.y+18, 1, .06 - walk*.08 + wshift*.05);
 
       // Arms: slimmer and more elegant; joints are ornaments, not toy screws.
       segment(shoulderL,elbowL,15,12,mixHex(skinPaper,vellum,.06),711,{fibers:5, stitchAlpha:.07, hi:skinGlow, hiAlpha:.13, lw:2});
       segment(elbowL,wristL,12,9,mixHex(skinPaper,skinShade,.06),712,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
       segment(shoulderR,elbowR,15,12,mixHex(skinPaper,vellum,.06),713,{fibers:5, stitchAlpha:.07, hi:skinGlow, hiAlpha:.13, lw:2});
       segment(elbowR,wristR,12,9,mixHex(skinPaper,skinShade,.06),714,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
-      hand(wristL.x-2,wristL.y+12,-1,-.10 + (aL2-ARM.L2) + P.lh);
-      hand(wristR.x+2,wristR.y+12, 1, .10 + (aR2-ARM.R2) + P.rh);
+      const handLife = Math.sin(t * .9 + .3) * .035 * rm;
+      hand(wristL.x-2,wristL.y+12,-1,-.10 + (aL2-ARM.L2) + P.lh + handLife);
+      hand(wristR.x+2,wristR.y+12, 1, .10 + (aR2-ARM.R2) + P.rh - handLife);
 
-      // Neck transition simplified so the neckline reads as one clear shape, not two stacked V-forms.
+      // Normale anatomie, schoon gescheiden: eerst de torso (schouders + borst) als basis,
+      // dan de hals-kolom daar overheen, dan het gezicht erover. Hoofd → hals → torso.
+      const torso=[
+        ['M',180,234],['C',163,236,148,242,126,253],
+        ['C',122,286,148,312,180,314],['C',212,312,238,286,234,253],
+        ['C',212,242,197,236,180,234]
+      ];
+      paper(torso, mixHex(skinPaper,vellumLite,.08), 801, {fibers:6, stitch:false, hi:skinGlow, hiAlpha:.12, lw:1.5, alpha:.97});
+
       const neck=[
-        ['M',166,198],['C',171,192,176,190,180,190],['C',184,190,189,192,194,198],
-        ['L',194,220],['C',190,224,170,224,166,220],['L',166,198]
+        ['M',163,204],['C',162,217,162,229,166,241],['C',172,247,188,247,194,241],
+        ['C',198,229,198,217,197,204]
       ];
-      paper(neck, skinPaper, 801, {fibers:4, stitch:false, hi:pearl, hiAlpha:.14, lw:1.5});
+      paper(neck, mixHex(skinPaper,vellumLite,.05), 805, {fibers:4, stitch:false, hi:skinGlow, hiAlpha:.14, lw:1.5, alpha:.98});
 
-      const choker=[
-        ['M',149,211],['C',160,204,171,205,180,214],['C',189,205,200,204,211,211],
-        ['C',205,226,194,236,180,238],['C',166,236,155,226,149,211]
-      ];
-      paper(choker, mixHex(vellumLite,roseGold,.24), 802, {fibers:6, stitchAlpha:.10, hi:mixHex(goldHi,C.magenta,.06), hiAlpha:.18, lw:2});
+      // zachte diepteschaduwen: onder de kin, aan de halsbasis, en de borstwelving
+      ctx.globalAlpha=.20; ellipse(180,212,28,8,skinShade); ctx.globalAlpha=1;
+      ctx.globalAlpha=.14; ellipse(180,250,30,9,skinShade); ctx.globalAlpha=1;
+      ctx.globalAlpha=.14; ellipse(158,268,17,11,skinShade); ellipse(202,268,17,11,skinShade); ctx.globalAlpha=1;
 
       const shoulderWrap=[
         ['M',104,236],['C',126,215,154,211,180,225],['C',206,211,234,215,256,236],
         ['C',250,254,234,264,213,264],['C',200,250,190,242,180,238],
         ['C',170,242,160,250,147,264],['C',126,264,110,254,104,236]
       ];
-      paper(shoulderWrap, mixHex(vellumLite,teal,.32), 803, {fibers:10, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.11), hiAlpha:.13, lw:2});
-      strokeCommands([['M',113,240],['C',143,243,166,250,180,266],['C',194,250,217,243,247,240]], gold, 1, .28, true);
+      // shoulderWrap verwijderd op verzoek: het rare stijve borst/schouderstuk. Bare shoulders.
 
-      // Shared skin chest/shoulder area: same color family as the face, but matte and paper-like.
-      const upperSkin=[
-        ['M',136,246],['C',150,236,168,235,180,243],['C',192,235,210,236,224,246],
-        ['C',218,274,203,294,184,298],['C',181,299,179,299,176,298],
-        ['C',157,294,142,274,136,246]
-      ];
-      paper(upperSkin, mixHex(skinPaper,vellumLite,.10), 804, {fibers:6, stitch:false, hi:skinGlow, hiAlpha:.14, lw:1.5, alpha:.96});
-      ctx.globalAlpha=.20; ellipse(160,269,19,14,skinShade); ellipse(200,269,19,14,skinShade); ctx.globalAlpha=1;
+      // (upperSkin + choker zijn samengevoegd in throatChest hierboven — één huidvorm, geen naden)
+
 
       // Hourglass bodice: more haute-couture/corset, less wooden puppet.
       const bodice=[
@@ -3069,13 +3105,10 @@
         ['C',216,306,205,335,195,354],['C',188,363,172,363,165,354],
         ['C',155,335,144,306,141,274]
       ];
-      paper(bodice, mixHex(teal,nightViolet,.16), 811, {fibers:12, fiberAlpha:.10, stitchAlpha:.09, hi:mixHex(tealLit,C.white,.08), hiAlpha:.16, lw:2});
+      const INK = mixHex(deepTeal, nightViolet, .5);   // strak: één samenhangende diepe kostuumtoon
+      paper(bodice, RICH_PALETTE ? mixHex(teal,nightViolet,.16) : INK, 811, {fibers:12, fiberAlpha:.10, stitchAlpha:.09, hi:mixHex(tealLit,C.white,.08), hiAlpha:.16, lw:2});
 
-      const centerSkin=[
-        ['M',172,259],['C',175,252,185,252,188,259],['C',187,287,185,319,183,346],
-        ['C',181,350,179,350,177,346],['C',175,319,173,287,172,259]
-      ];
-      paper(centerSkin, mixHex(skinPaper,vellumLite,.18), 812, {fibers:5, stitch:false, hi:skinGlow, hiAlpha:.12, lw:1.5, alpha:.92});
+      // centerSkin verwijderd: de verticale huidstrip las als doorlopende 'tweede hals'. Bodice sluit nu dicht.
 
       const corsetLeft=[
         ['M',147,282],['C',156,262,168,262,177,282],['C',173,306,170,334,167,352],['C',156,339,149,310,147,282]
@@ -3083,9 +3116,9 @@
       const corsetRight=[
         ['M',213,282],['C',204,262,192,262,183,282],['C',187,306,190,334,193,352],['C',204,339,211,310,213,282]
       ];
-      paper(corsetLeft, mixHex(nightViolet,teal,.18), 813, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
-      paper(corsetRight, mixHex(nightViolet,teal,.18), 814, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
-      strokeCommands([['M',180,258],['C',177,286,177,319,180,350]], gold, 1, .32, true);
+      paper(corsetLeft, RICH_PALETTE ? mixHex(nightViolet,teal,.18) : mixHex(INK,C.black,.18), 813, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
+      paper(corsetRight, RICH_PALETTE ? mixHex(nightViolet,teal,.18) : mixHex(INK,C.black,.18), 814, {fibers:5, stitchAlpha:.07, hi:mixHex(violetLit,C.white,.08), lw:1.5});
+      // gouden sternum-lijn verwijderd: borstitem dat de boel rommelig maakte.
 
       // Pelvis / hips: rounded and ornamental, mostly integrated under flowing panels.
       const pelvis=[
@@ -3093,7 +3126,7 @@
         ['C',226,400,209,421,185,426],['C',181,427,179,427,175,426],
         ['C',151,421,134,400,130,372]
       ];
-      paper(pelvis, mixHex(vellumDark,nightViolet,.18), 821, {fibers:7, stitchAlpha:.08, hi:mixHex(roseGold,C.cyan4,.06), hiAlpha:.10, lw:2});
+      paper(pelvis, RICH_PALETTE ? mixHex(vellumDark,nightViolet,.18) : mixHex(INK,C.black,.10), 821, {fibers:7, stitchAlpha:.08, hi:mixHex(roseGold,C.cyan4,.06), hiAlpha:.10, lw:2});
 
       // Flowing skirt strips with high side slits: sexy space-oracle instead of wooden puppet.
       const skirtCenter=[
@@ -3108,15 +3141,19 @@
         ['M',215,337],['C',228,373,239,462,247,571],['C',230,584,207,571,195,548],
         ['C',201,476,203,391,196,344]
       ];
+      if (RICH_PALETTE) {
       paper(skirtL, mixHex(vellumLite,teal,.33), 831, {alpha:.86, fibers:13, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.08), hiAlpha:.10, lw:2});
       paper(skirtR, mixHex(vellumLite,nightViolet,.26), 832, {alpha:.86, fibers:13, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.magenta,C.white,.06), hiAlpha:.10, lw:2});
-      paper(skirtCenter, mixHex(deepTeal,teal,.34), 833, {fibers:12, fiberAlpha:.08, stitchAlpha:.12, hi:mixHex(tealLit,C.white,.07), hiAlpha:.12, lw:2});
+      }
+      paper(skirtCenter, RICH_PALETTE ? mixHex(deepTeal,teal,.34) : INK, 833, {fibers:12, fiberAlpha:.08, stitchAlpha:.12, hi:mixHex(tealLit,C.white,.07), hiAlpha:.12, lw:2});
 
       // Extra floating ribbons / paper tails for ethereal motion.
+      if (RICH_PALETTE) {
       const ribbonL=[['M',126,319],['C',103,389,97,493,99,602],['C',112,592,124,552,130,491],['C',134,419,136,360,126,319]];
       const ribbonR=[['M',234,319],['C',257,389,263,493,261,602],['C',248,592,236,552,230,491],['C',226,419,224,360,234,319]];
       paper(ribbonL, mixHex(vellumLite,C.cyan4,.14), 841, {alpha:.44, fibers:8, fiberAlpha:.05, stitchAlpha:.06, hi:mixHex(C.cyan4,C.white,.16), hiAlpha:.06, lw:1.5});
       paper(ribbonR, mixHex(vellumLite,C.magenta,.10), 842, {alpha:.44, fibers:8, fiberAlpha:.05, stitchAlpha:.06, hi:mixHex(C.magenta,C.white,.16), hiAlpha:.06, lw:1.5});
+      }
 
       // Celestial markings and couture seams.
       crescent(180,272,7,mixHex(skinPaper,vellumLite,.24),.78);
@@ -3198,7 +3235,7 @@
 
       // small old digital accents remain, but warmer/subtler so the face no longer fights the body.
       rect(202,190,16,5,C.black);
-      ctx.globalAlpha=.42; rect(134,150,13,4,'#fff0b8'); ctx.globalAlpha=1;
+
     }
 
     function drawHairFront(){
@@ -3292,7 +3329,7 @@
 
     function drawEffects(p, now){
       if(p.blush>.05){ ctx.globalAlpha=p.blush*.18; rect(128,150,16,6,C.magenta); rect(214,148,16,6,C.magenta); ctx.globalAlpha=1; }
-      if(p.tear>.05){ const a=p.tear*(.65+.35*Math.sin(now*.009)); ctx.globalAlpha=a; rect(138,126,3,7,C.white); rect(139,133,4,8,C.cyan4); rect(140,142,3,5,C.green2); rect(142,149,2,2,C.white); ctx.globalAlpha=1; }
+      if(p.tear>.05){ const a=p.tear*(.65+.35*Math.sin(now*.009)); ctx.globalAlpha=a; rect(138,126,3,7,C.white); rect(139,133,4,8,C.cyan4); rect(140,142,3,5,C.cyan4); rect(142,149,2,2,C.white); ctx.globalAlpha=1; }
       if(p.accent>.12){ ctx.globalAlpha=p.accent*.22; line(247,88,259,153,2,C.cyan4); line(107,93,96,160,1,C.magenta); ctx.globalAlpha=1; }
     }
 
@@ -3309,10 +3346,10 @@
     function drawSpeechBubble(now){
       const a=speechAlpha(now); if(a<=.001) return;
       const lines=splitBubbleLines(speech.text, speech.meaningful?16:20);
-      const fontSize=speech.meaningful?10:9, padX=8, padY=7, lineH=12;
+      const fontSize=speech.meaningful?12:11, padX=11, padY=9, lineH=15;
       const maxLine=Math.max(...lines.map(s=>s.length),8);
-      const bubbleW=Math.min(150,16+maxLine*6.2), bubbleH=padY*2+lines.length*lineH;
-      const x=210+Math.sin(now*.0013+speech.phase)*1.2, y=24+Math.sin(now*.002+speech.phase)*1.5;
+      const bubbleW=Math.min(180,20+maxLine*7.2), bubbleH=padY*2+lines.length*lineH;
+      const x=Math.min(208, W-bubbleW-8)+Math.sin(now*.0013+speech.phase)*1.2, y=24+Math.sin(now*.002+speech.phase)*1.5;
       ctx.save(); ctx.globalAlpha=a*.94;
       roundedBubble(x,y,bubbleW,bubbleH,8,206,88);
       ctx.fillStyle=C.bubbleFill; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
@@ -3326,9 +3363,9 @@
       if (entityAlpha <= .01) return;
       const t=now*.001, p=expr;
       const breath=1+Math.sin(t*1.12)*.003;
-      const driftX=motion.x+Math.sin(t*.37)*.55+Math.sin(t*.19+1.2)*.35;
-      const driftY=motion.y+Math.sin(t*.43+.8)*.45 + (WardrobeBrain.offsetY || 0);
-      const tilt=motion.tilt+Math.sin(t*.31)*.004;
+      const driftX=motion.x+Math.sin(t*.37)*1.1+Math.sin(t*.19+1.2)*.7;
+      const driftY=motion.y+Math.sin(t*.43+.8)*.8 + (WardrobeBrain.offsetY || 0);
+      const tilt=motion.tilt+Math.sin(t*.31)*.009 + Math.sin(t*.12+.5)*.005;
       ctx.save();
       ctx.globalAlpha *= entityAlpha;
       ctx.translate(W/2+driftX,H/2+driftY);
@@ -3337,7 +3374,7 @@
       ctx.translate(-W/2,-H/2);
       drawHairBack(); drawShouldersAndNeck(now); drawFaceBase(); drawHairFront(); drawBrows(p);
       drawEye(146,107,-1,p); drawEye(207,107,1,p); drawNose(); drawMouth(p,now); drawEffects(p,now);
-      rect(242,118,3,17,C.black); rect(151,196,37,3,C.black);
+      rect(242,118,3,17,C.black);
       ctx.restore();
     }
 
@@ -3463,36 +3500,6 @@
       window.addEventListener('pointerdown', unlock, { once:true });
       window.addEventListener('keydown', unlock, { once:true });
       window.addEventListener('touchstart', unlock, { once:true });
-    })();
-
-    // Scharnier-stand: onthouden keuze herstellen (tenzij via URL gezet) + dubbel-tap om te wisselen.
-    (() => {
-      const order = ['full','min','off'];
-      if (!JOINTS_FROM_URL) {
-        const saved = safeStorage.get('wa_joints');
-        RIG_JOINTS = order.includes(saved) ? saved : 'off';
-      }
-      const toast = document.getElementById('mode');
-      let toastTimer = null;
-      function showMode(txt){
-        if (!toast) return;
-        toast.textContent = txt;
-        toast.classList.add('show');
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => toast.classList.remove('show'), 1100);
-      }
-      function cycleJoints(){
-        RIG_JOINTS = order[(order.indexOf(RIG_JOINTS) + 1) % order.length];
-        safeStorage.set('wa_joints', RIG_JOINTS);
-        showMode('scharnieren · ' + RIG_JOINTS);
-      }
-      // Dubbel-tap (twee taps binnen 320ms) cyclet de stand.
-      let lastTap = 0;
-      window.addEventListener('pointerup', () => {
-        const t = performance.now();
-        if (t - lastTap < 320) { cycleJoints(); lastTap = 0; }
-        else lastTap = t;
-      });
     })();
 
     if (STATIC_PREVIEW) render(performance.now() + 1600);
