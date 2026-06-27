@@ -130,6 +130,15 @@
     }
     #enter.show{ opacity:.16; }
     #enter.gone{ opacity:0; transition:opacity 1.4s ease; }
+    #mode{
+      position:fixed; left:0; right:0; bottom:12%; z-index:9;
+      text-align:center; pointer-events:none;
+      font:11px/1 monospace; letter-spacing:.28em; text-transform:lowercase;
+      color:#69fff3; opacity:0;
+      text-shadow:0 0 6px rgba(0,255,214,.4);
+      transition:opacity .5s ease;
+    }
+    #mode.show{ opacity:.55; }
     @media (prefers-reduced-motion: reduce){
       canvas{ filter:contrast(1.06) saturate(1.08) drop-shadow(0 0 18px rgba(0,255,214,.12)); }
     }
@@ -140,6 +149,7 @@
     <canvas id="entity" width="360" height="640"></canvas>
   </main>
   <div id="enter" aria-hidden="true">binnentreden</div>
+  <div id="mode" aria-hidden="true"></div>
   <pre id="dbg"></pre>
 
   <script>
@@ -150,6 +160,13 @@
     const STATIC_PREVIEW = PARAMS.has('static');
     const DEBUG = PARAMS.has('debug');
     const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Body-rig gebaren: standaard aan. ?rig=still zet ze uit (armen in rustpose) — directe A/B & rollback.
+    const RIG_MOTION = PARAMS.get('rig') !== 'still';
+    // Zichtbare scharnieren: 'full' = alles, 'min' = alleen kostuum-orbs (schouders/keel/borst),
+    // 'off' = geen joints (puur vloeiend papier). Beweging is in alle standen identiek.
+    // URL-param wint; anders wordt de onthouden keuze (of 'full') later hersteld. Dubbel-tap wisselt live.
+    let RIG_JOINTS = ((v) => (v === 'off' || v === 'min' || v === 'full') ? v : null)(PARAMS.get('joints'));
+    const JOINTS_FROM_URL = RIG_JOINTS != null;
     // Audio standaard aan (na de drempel-gesture). ?audio=off of ?mute = pure stille versie.
     // Bij reduced-motion standaard uit, tenzij ?audio=on.
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
@@ -306,6 +323,43 @@
     };
     const gaze = { x:0, y:0, tx:0, ty:0, nextAt:performance.now() + 1200 };
     const motion = { x:0, y:0, tilt:0, tx:0, ty:0, ttilt:0, nextAt:performance.now() + rnd(3500,7000) };
+
+    // ── BODY POSE RIG ────────────────────────────────────────────────────────
+    // Net als het gezicht (PROTO): een pool van benoemde gebaren waar de rig
+    // soepel naartoe damp't. De armen draaien als forward-kinematics vanuit de
+    // schouder-broches; botlengtes zijn vast, dus een lid kan nooit "breken".
+    // De rusthoeken reproduceren exact de bestaande arm-stand (101,336)/(100,425).
+    const ARM = {
+      Lupper:93.06, Lfore:89.01, Rupper:93.06, Rfore:89.01,
+      L1:Math.atan2(90,-24), L2:Math.atan2(89,-1),   // links: schouder- en elleboog-rusthoek
+      R1:Math.atan2(90, 24), R2:Math.atan2(89, 1)    // rechts (gespiegeld)
+    };
+    // Per arm: s = schouderzwaai, e = elleboogbuiging, h = extra hand-rotatie (radialen, delta t.o.v. rust).
+    // w = relatief gewicht in de keuze. Alle posen + transities zijn frame-veilig geverifieerd:
+    // handen blijven binnen [46..314]x / [250..452]y, over cape/achtergrond (nooit onder gezicht/bodice).
+    const LIMB_POSES = {
+      rest:        { l:{s:0,    e:0,    h:0   }, r:{s:0,    e:0,    h:0   }, mood:'neutral',    w:3 },
+      openVeil:    { l:{s:.14,  e:-.12, h:.12 }, r:{s:-.14, e:-.12, h:-.12}, mood:'interested', w:2 }, // armen openen zacht
+      gather:      { l:{s:-.16, e:-.14, h:.20 }, r:{s:.16,  e:-.14, h:-.20}, mood:'shy',        w:2 }, // handen naar het midden
+      blessing:    { l:{s:-.06, e:-.18, h:.16 }, r:{s:.06,  e:-.18, h:-.16}, mood:'neutral',    w:2 }, // rustig zegenend
+      driftL:      { l:{s:-.14, e:-.06, h:.10 }, r:{s:-.10, e:-.04, h:-.06}, mood:'happy',      w:2 }, // deining naar links
+      driftR:      { l:{s:.10,  e:-.04, h:.06 }, r:{s:.14,  e:-.06, h:-.10}, mood:'happy',      w:2 }, // deining naar rechts
+      offerUp:     { l:{s:-.10, e:-.34, h:.24 }, r:{s:.10,  e:-.34, h:-.24}, mood:'happy',      w:2 }, // onderarmen op, palmen voor
+      beckonL:     { l:{s:-.22, e:-.44, h:.30 }, r:{s:.05,  e:.04,  h:0   }, mood:'interested', w:2 }, // linkerhand wenkt
+      beckonR:     { l:{s:-.05, e:.04,  h:0   }, r:{s:.34,  e:.20,  h:-.30}, mood:'interested', w:2 }, // rechterhand wenkt
+      presentR:    { l:{s:-.06, e:-.10, h:.06 }, r:{s:-1.10,e:1.42, h:-.20}, mood:'surprised',  w:1 }, // rechterarm presenteert naar buiten
+      presentL:    { l:{s:1.10, e:-1.42,h:.20 }, r:{s:.06,  e:-.10, h:-.06}, mood:'surprised',  w:1 }, // linkerarm presenteert naar buiten
+      flourishR:   { l:{s:-.18, e:-.30, h:.22 }, r:{s:-.90, e:1.18, h:-.18}, mood:'happy',      w:1 }, // weidse rechter zwier
+      flourishL:   { l:{s:.90,  e:-1.18,h:.18 }, r:{s:.18,  e:-.30, h:-.22}, mood:'happy',      w:1 }  // weidse linker zwier
+    };
+    const POSE_KEYS = Object.keys(LIMB_POSES);
+    // cur/tar houden de live-geïnterpoleerde en doel-deltas vast (zoals expr ↔ PROTO).
+    const PoseBrain = {
+      cur:{ ls:0, le:0, lh:0, rs:0, re:0, rh:0 },
+      tar:{ ls:0, le:0, lh:0, rs:0, re:0, rh:0 },
+      name:'rest', nextAt:performance.now() + rnd(4000, 8000)
+    };
+
 
     const bgEvents = {
       star:{ active:false, start:0, duration:0, nextAt:performance.now() + rnd(2200, 6800), x0:0, y0:0, x1:0, y1:0 },
@@ -1799,6 +1853,41 @@
       motion.tilt = damp(motion.tilt, motion.ttilt, .45, dt);
     }
 
+    function pickPose(now){
+      const mood = dominantMood();
+      // Gewogen keuze: pose-gewicht × mood-boost; huidige pose uitgesloten.
+      const cand = []; let total = 0;
+      for (const k of POSE_KEYS){
+        if (k === PoseBrain.name) continue;
+        const p = LIMB_POSES[k];
+        const wgt = (p.w || 1) * (p.mood === mood ? 2.4 : 1);
+        cand.push({ k, wgt }); total += wgt;
+      }
+      let r = Math.random() * total, chosen = cand[0].k;
+      for (const c of cand){ r -= c.wgt; if (r <= 0){ chosen = c.k; break; } }
+      const p = LIMB_POSES[chosen];
+      // Intensiteit gekoppeld aan arousal (kalm = ingetogen, levendig = voller). Altijd ≤1:
+      // dat houdt de doel-pose op het geverifieerde rust→pose pad, dus gegarandeerd in-frame.
+      const scale = clamp((.66 + emotion.arousal * .5) * (.9 + Math.random() * .14), .5, 1);
+      PoseBrain.name = chosen;
+      PoseBrain.tar.ls = p.l.s * scale; PoseBrain.tar.le = p.l.e * scale; PoseBrain.tar.lh = p.l.h * scale;
+      PoseBrain.tar.rs = p.r.s * scale; PoseBrain.tar.re = p.r.e * scale; PoseBrain.tar.rh = p.r.h * scale;
+      // Grote 'moment'-gebaren iets langer vastgehouden; rust korter.
+      const big = (p.w || 1) <= 1 && chosen !== 'rest';
+      PoseBrain.nextAt = now + (chosen === 'rest' ? rnd(2400, 4800) : big ? rnd(5200, 9500) : rnd(3800, 7200));
+    }
+
+    function updatePose(now, dt){
+      if (!RIG_MOTION){
+        const z = PoseBrain.tar; z.ls=z.le=z.lh=z.rs=z.re=z.rh=0; PoseBrain.name='rest';
+      } else if (now > PoseBrain.nextAt){
+        pickPose(now);
+      }
+      const rate = .9, c = PoseBrain.cur, t = PoseBrain.tar;
+      c.ls = damp(c.ls, t.ls, rate, dt); c.le = damp(c.le, t.le, rate, dt); c.lh = damp(c.lh, t.lh, rate, dt);
+      c.rs = damp(c.rs, t.rs, rate, dt); c.re = damp(c.re, t.re, rate, dt); c.rh = damp(c.rh, t.rh, rate, dt);
+    }
+
     function updateSpeech(now){
       if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') {
         speech.active = false;
@@ -2730,18 +2819,42 @@
         ctx.restore();
       }
 
-      function joint(x,y,r=6,alpha=1){
+      // Couture-hardware: een rivet die twee papierlagen vastzet en oogt als sieraad.
+      // kind: 'orbital' (grote schouder-broches, armillairring + gem),
+      //       'rivet'  (ellebogen/knieën/keel/borst, fastener-slot),
+      //       'fine'   (polsen/enkels/heupen).
+      function joint(x,y,r=6,alpha=1,kind='rivet'){
         ctx.save();
-        ctx.globalAlpha = .20 * alpha;
-        ellipse(x,y,r+7,r+7,C.cyan4);
-        ctx.globalAlpha = .18 * alpha;
-        ellipse(x,y,r+4,r+4,C.magenta);
-        ctx.globalAlpha = alpha;
-        ellipse(x+2,y+3,r+3,r+3,edge);
-        ellipse(x,y,r+2,r+2,goldLo);
-        ellipse(x,y,r,r,gold);
-        ctx.globalAlpha = .75 * alpha;
-        ellipse(x-r*.35,y-r*.42,Math.max(1,r*.32),Math.max(1,r*.25),goldHi);
+        // celestiale halo, subtiel
+        ctx.globalAlpha = .15 * alpha; ellipse(x,y,r+8,r+8,C.cyan4);
+        ctx.globalAlpha = .13 * alpha; ellipse(x+1,y+1,r+5,r+5,C.magenta);
+
+        // washer / achterplaat: bewijst dat de rivet door twee papierlagen pint
+        ctx.globalAlpha = .50 * alpha; ellipse(x+2,y+3,r+5,r+4,edge);       // contactschaduw plaat
+        ctx.globalAlpha = alpha;       ellipse(x,y,r+4,r+3.4,goldLo);       // donkere gouden rand
+        ctx.globalAlpha = .9 * alpha;  ellipse(x,y,r+2.5,r+2.1,mixHex(gold,edge,.42)); // verzonken ring
+
+        // armillairring voor de grote orbitale pivots
+        if(kind === 'orbital'){
+          ctx.globalAlpha = .8 * alpha; ctx.strokeStyle = goldHi; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.ellipse(x,y,r+6,r*.5+2,-0.5,0,Math.PI*2); ctx.stroke();
+          ctx.beginPath(); ctx.ellipse(x,y,r*.5+2,r+6,-0.5,0,Math.PI*2); ctx.stroke();
+        }
+
+        // de pin-kop (gouden dome)
+        ctx.globalAlpha = alpha;       ellipse(x,y,r,r,gold);
+        ctx.globalAlpha = .5 * alpha;  ellipse(x,y,r*.6,r*.6,mixHex(gold,goldLo,.5)); // verzonken midden
+        // fastener-slot, zodat het hardware leest i.p.v. parel
+        ctx.globalAlpha = .55 * alpha; ctx.strokeStyle = goldLo; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x-r*.42,y); ctx.lineTo(x+r*.42,y); ctx.stroke();
+        // speculaire highlight
+        ctx.globalAlpha = .9 * alpha;  ellipse(x-r*.34,y-r*.42,Math.max(1,r*.3),Math.max(1,r*.22),goldHi);
+
+        // celestiale gem voor orbitale broches
+        if(kind === 'orbital'){
+          ctx.globalAlpha = .8 * alpha; ellipse(x,y,r*.3,r*.3,starBlue);
+          ctx.globalAlpha = .9 * alpha; ellipse(x-r*.1,y-r*.12,Math.max(1,r*.12),Math.max(1,r*.12),C.white);
+        }
         ctx.restore();
       }
 
@@ -2772,18 +2885,39 @@
         ctx.translate(x,y);
         ctx.scale(side,1);
         ctx.rotate(rot);
-        const palm=[
-          ['M',-8,-2],['C',-9,-14,1,-18,9,-10],['C',12,-1,9,11,1,15],['C',-6,13,-9,6,-8,-2]
+
+        // Eén gesculpteerde papier-cutout: palm + vingers als één elegante vorm.
+        const handShape=[
+          ['M',-7,-13],
+          ['C',-11,-4,-10,8,-6,18],     // buitenrand (pink) omlaag
+          ['C',-3,25,3,25,7,18],        // afgeronde vingertop-boog
+          ['C',10,12,11,4,11,-1],       // binnenrand omhoog
+          ['C',15,-2,15,-9,10,-11],     // duim-welving
+          ['C',4,-13,-1,-14,-7,-13]     // terug naar pols
         ];
-        paper(palm, skinPaper, 200+x+y, {fibers:4, stitch:false, lw:2, hi:pearl, strokeAlpha:.82});
-        for(let i=0;i<4;i++){
-          const fx=-6+i*4.2;
-          ctx.globalAlpha=.95;
-          line(fx,9,fx+1,22-i*.9,2,edge);
-          line(fx,9,fx+1,22-i*.9,1,skinPaper);
-        }
+        paper(handShape, skinPaper, 200+x+y, {fibers:5, stitch:false, lw:2, hi:pearl, hiAlpha:.18, strokeAlpha:.84});
+
+        // Ingesneden vingergroeven: donkere insnijdingen die binnen het papier blijven.
+        ctx.save();
+        drawCommands(handShape); ctx.clip();
+        ctx.lineCap='round';
+        ctx.strokeStyle=skinShade;
+        ctx.globalAlpha=.55; ctx.lineWidth=1.4;
+        const grooves=[[-3.5,3,-4.5,18],[-0.3,4,-0.3,20],[3,3,4,18]];
+        for(const g of grooves){ ctx.beginPath(); ctx.moveTo(g[0],g[1]); ctx.lineTo(g[2],g[3]); ctx.stroke(); }
+        // duim-vouw
+        ctx.globalAlpha=.5; ctx.beginPath(); ctx.moveTo(8,-6); ctx.lineTo(3,3); ctx.stroke();
+        // knokkel-schaduw
+        ctx.globalAlpha=.28; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(-6,2); ctx.quadraticCurveTo(2,5,10,1); ctx.stroke();
+        ctx.restore();
+
+        // Zachte highlights die op de toppen het licht vangen.
+        ctx.globalAlpha=.3; line(-5,-9,-2,-12,1,skinGlow);
+        ctx.globalAlpha=.22;
+        const tips=[[-4,16],[-0.3,18],[3.5,16]];
+        for(const t of tips) ellipse(t[0],t[1],1.2,2,skinGlow);
         ctx.globalAlpha=1;
-        line(8,2,16,11,2,edge); line(8,2,16,11,1,skinPaper);
         ctx.restore();
       }
 
@@ -2855,10 +2989,19 @@
 
       const shoulderL={x:125,y:246 + breath*.22};
       const shoulderR={x:235,y:246 + breath*.22};
-      const elbowL={x:101 + walk*8, y:336 + oracleDip*12};
-      const elbowR={x:259 - walk*8, y:336 - oracleDip*12};
-      const wristL={x:100 + walk*10, y:425};
-      const wristR={x:260 - walk*10, y:425};
+      // Armen via forward-kinematics vanuit de schouder-broches (de pivot-scharnieren).
+      // Rusthoeken reproduceren exact de oude stand; gebaren + idle zijn deltas erbovenop.
+      const P = PoseBrain.cur;
+      const idleS = Math.sin(t*.76)*.018*rm;        // vervangt 'walk'
+      const idleE = Math.sin(t*.31+1.1)*.026*rm;    // vervangt 'oracleDip'
+      const aL1 = ARM.L1 + P.ls + idleS;
+      const aL2 = ARM.L2 + P.ls + P.le + idleE;
+      const aR1 = ARM.R1 + P.rs - idleS;
+      const aR2 = ARM.R2 + P.rs + P.re - idleE;
+      const elbowL={x:shoulderL.x + Math.cos(aL1)*ARM.Lupper, y:shoulderL.y + Math.sin(aL1)*ARM.Lupper};
+      const elbowR={x:shoulderR.x + Math.cos(aR1)*ARM.Rupper, y:shoulderR.y + Math.sin(aR1)*ARM.Rupper};
+      const wristL={x:clamp(elbowL.x + Math.cos(aL2)*ARM.Lfore, 40, 320), y:clamp(elbowL.y + Math.sin(aL2)*ARM.Lfore, 300, 470)};
+      const wristR={x:clamp(elbowR.x + Math.cos(aR2)*ARM.Rfore, 40, 320), y:clamp(elbowR.y + Math.sin(aR2)*ARM.Rfore, 300, 470)};
       const hipL={x:151,y:405};
       const hipR={x:209,y:405};
       const kneeL={x:143 + walk*8,y:492};
@@ -2887,8 +3030,8 @@
       segment(elbowL,wristL,12,9,mixHex(skinPaper,skinShade,.06),712,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
       segment(shoulderR,elbowR,15,12,mixHex(skinPaper,vellum,.06),713,{fibers:5, stitchAlpha:.07, hi:skinGlow, hiAlpha:.13, lw:2});
       segment(elbowR,wristR,12,9,mixHex(skinPaper,skinShade,.06),714,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
-      hand(wristL.x-2,wristL.y+13,-1,-.10 + walk*.06);
-      hand(wristR.x+2,wristR.y+13, 1, .10 - walk*.06);
+      hand(wristL.x-2,wristL.y+12,-1,-.10 + (aL2-ARM.L2) + P.lh);
+      hand(wristR.x+2,wristR.y+12, 1, .10 + (aR2-ARM.R2) + P.rh);
 
       // Off-shoulder collar and bust line: adult, sensual, but abstract/paper-couture.
       const neck=[
@@ -2983,15 +3126,30 @@
       strokeCommands([['M',134,533],['C',159,548,201,548,226,533]], stitch, 1, .18, true);
       strokeCommands([['M',151,235],['C',158,249,168,257,180,258],['C',192,257,202,249,209,235]], roseGold, 1, .42, false);
 
-      // Jewelry-like hinges: fewer and more intentional, to avoid Pinocchio.
-      joint(shoulderL.x,shoulderL.y,6,.92); joint(shoulderR.x,shoulderR.y,6,.92);
-      joint(elbowL.x,elbowL.y,4,.56);       joint(elbowR.x,elbowR.y,4,.56);
-      joint(wristL.x,wristL.y,3,.46);       joint(wristR.x,wristR.y,3,.46);
-      joint(hipL.x,hipL.y,4,.58);           joint(hipR.x,hipR.y,4,.58);
-      joint(kneeL.x,kneeL.y,4,.44);         joint(kneeR.x,kneeR.y,4,.44);
-      joint(ankleL.x,ankleL.y,3,.38);       joint(ankleR.x,ankleR.y,3,.38);
-      joint(180,227,5,.96);
-      joint(180,346,4,.65);
+      // Papier-op-papier contactschaduw bij de ledemaat-pivots: alleen zinvol als de rivet er ook zit.
+      if (RIG_JOINTS === 'full'){
+        ctx.globalAlpha=.22;
+        ellipse(elbowL.x+1,elbowL.y+4,9,5,edge); ellipse(elbowR.x-1,elbowR.y+4,9,5,edge);
+        ellipse(wristL.x+1,wristL.y+4,7,4,edge); ellipse(wristR.x-1,wristR.y+4,7,4,edge);
+        ellipse(kneeL.x,kneeL.y+4,9,5,edge);     ellipse(kneeR.x,kneeR.y+4,9,5,edge);
+        ctx.globalAlpha=1;
+      }
+
+      // Jewelry-like hinges: hiërarchie van orbitale broches → rivets → fijne pinnen.
+      if (RIG_JOINTS !== 'off'){
+        // Kostuum-orbs (ook in 'min'): schouders, keel, borstbeen — lezen als sieraad, niet mechaniek.
+        joint(shoulderL.x,shoulderL.y,7,1,'orbital'); joint(shoulderR.x,shoulderR.y,7,1,'orbital');
+        joint(180,227,5.5,1,'rivet');   // keel — sleutel-accessoire onder de kin
+        joint(180,346,4,.7,'rivet');    // borstbeen
+        if (RIG_JOINTS === 'full'){
+          // Ledemaat-hardware: alleen in de volledige stand.
+          joint(elbowL.x,elbowL.y,4.5,.72,'rivet');     joint(elbowR.x,elbowR.y,4.5,.72,'rivet');
+          joint(wristL.x,wristL.y,3,.6,'fine');         joint(wristR.x,wristR.y,3,.6,'fine');
+          joint(hipL.x,hipL.y,4,.62,'fine');            joint(hipR.x,hipR.y,4,.62,'fine');
+          joint(kneeL.x,kneeL.y,4,.56,'rivet');         joint(kneeR.x,kneeR.y,4,.56,'rivet');
+          joint(ankleL.x,ankleL.y,3,.46,'fine');        joint(ankleR.x,ankleR.y,3,.46,'fine');
+        }
+      }
 
       // Contact shadow from head to collar + rimlight to unify material/light.
       ctx.globalAlpha=.30; ellipse(180,208,42,10,edge);
@@ -3229,6 +3387,7 @@
       updateVisitor(now, dt);
       updateGaze(now,dt);
       updateMotion(now,dt);
+      updatePose(now,dt);
       updateSpeech(now);
       updateShips(now,dt);
       updateDriftGlyphs(now,dt);
@@ -3304,6 +3463,36 @@
       window.addEventListener('pointerdown', unlock, { once:true });
       window.addEventListener('keydown', unlock, { once:true });
       window.addEventListener('touchstart', unlock, { once:true });
+    })();
+
+    // Scharnier-stand: onthouden keuze herstellen (tenzij via URL gezet) + dubbel-tap om te wisselen.
+    (() => {
+      const order = ['full','min','off'];
+      if (!JOINTS_FROM_URL) {
+        const saved = safeStorage.get('wa_joints');
+        RIG_JOINTS = order.includes(saved) ? saved : 'off';
+      }
+      const toast = document.getElementById('mode');
+      let toastTimer = null;
+      function showMode(txt){
+        if (!toast) return;
+        toast.textContent = txt;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 1100);
+      }
+      function cycleJoints(){
+        RIG_JOINTS = order[(order.indexOf(RIG_JOINTS) + 1) % order.length];
+        safeStorage.set('wa_joints', RIG_JOINTS);
+        showMode('scharnieren · ' + RIG_JOINTS);
+      }
+      // Dubbel-tap (twee taps binnen 320ms) cyclet de stand.
+      let lastTap = 0;
+      window.addEventListener('pointerup', () => {
+        const t = performance.now();
+        if (t - lastTap < 320) { cycleJoints(); lastTap = 0; }
+        else lastTap = t;
+      });
     })();
 
     if (STATIC_PREVIEW) render(performance.now() + 1600);
