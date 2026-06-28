@@ -52,7 +52,7 @@
     :root{ --bg:#020207; --wa-full-w:100vw; --wa-full-h:100vh; }
     *{ box-sizing:border-box; margin:0; padding:0; }
     html,body{
-      width:100%; height:100%; min-height:var(--wa-full-h); overflow:hidden; background:#07131d;
+      width:100%; height:100%; min-height:var(--wa-full-h); overflow:hidden; background:#061018;
       /* Mobiel: voorkom tekst-selectie en tap-highlight */
       -webkit-user-select:none; user-select:none;
       -webkit-tap-highlight-color:transparent;
@@ -82,9 +82,9 @@
       overflow:hidden;
       background:
         radial-gradient(circle at 50% 48%, rgba(11,255,212,.05), transparent 34%),
-        radial-gradient(circle at 50% 100%, rgba(10,40,60,.55), transparent 46%),
-        radial-gradient(circle at 48% 50%, rgba(4,12,18,.10), transparent 48%),
-        #07131d;
+        radial-gradient(ellipse at 50% 110%, rgba(30,90,60,.80) 0%, rgba(10,40,55,.60) 40%, transparent 70%),
+        radial-gradient(ellipse at 30% 105%, rgba(213,166,77,.18) 0%, transparent 50%),
+        #061018;
     }
     canvas{
       display:block;
@@ -3763,17 +3763,13 @@
       ctx.beginPath();
       ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
       if(side==='right'){
-        // staart wijst naar rechts vanuit de rechterzijde
-        const ty=clamp(tailY, y+r+6, y+h-r-6);
+        const ty=clamp(tailY,y+r+6,y+h-r-6);
         ctx.lineTo(x+w,ty-7); ctx.lineTo(tailX,tailY); ctx.lineTo(x+w,ty+7);
         ctx.lineTo(x+w,y+h-r);
-      } else {
-        ctx.lineTo(x+w,y+h-r);
-      }
+      } else { ctx.lineTo(x+w,y+h-r); }
       ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
       if(side==='bottom'){
-        // staart wijst omlaag vanuit de onderzijde
-        ctx.lineTo(x+18,y+h); ctx.lineTo(tailX,tailY); ctx.lineTo(x+32,y+h);
+        ctx.lineTo(tailX+8,y+h); ctx.lineTo(tailX,tailY); ctx.lineTo(tailX-8,y+h);
       }
       ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
       ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
@@ -3805,24 +3801,20 @@
     function drawSpeechBubble(now){
       const a=speechAlpha(now); if(a<=.001) return;
       const vis=visibleCanvasRect();
-      const lines=splitBubbleLines(speech.text, speech.meaningful?16:20);
       const fontSize=speech.meaningful?15:13, padX=13, padY=10, lineH=18;
-      const maxLine=Math.max(...lines.map(s=>s.length),8);
-      const visibleW=Math.max(120, vis.right-vis.left);
-      const bubbleW=Math.min(180, Math.max(118, visibleW-20), 20+maxLine*7.2);
+      const lines=splitBubbleLines(speech.text, speech.meaningful?16:20);
+      const bubbleW=Math.min(175, vis.right-vis.left-16);
       const bubbleH=padY*2+lines.length*lineH;
-      const wobX=Math.sin(now*.0013+speech.phase)*1.2;
-      const wobY=Math.sin(now*.002+speech.phase)*1.5;
-      // Ballon links, op schouder/borst-hoogte — daar is veel lege ruimte naast de figuur.
-      // Staart wijst naar rechts richting de figuur. Blijft onder het gezicht (y-midden ~250).
-      const cy = 250;
-      const x = clamp(vis.left + 12 + wobX, vis.left + 6, vis.right - bubbleW - 6);
-      const y = clamp(cy - bubbleH/2 + wobY, vis.top + 40, vis.bottom - bubbleH - 24);
-      const tailX = x + bubbleW + 16;
-      const tailY = y + bubbleH * .4;
+      const wobX=Math.sin(now*.0013+speech.phase)*.8;
+      const wobY=Math.sin(now*.002 +speech.phase)*.8;
+      const x=vis.left+10+wobX;
+      const y=vis.top +52+wobY;
+      const tailX=x+bubbleW*.65;
+      const tailY=y+bubbleH+14;
       ctx.save(); ctx.globalAlpha=a*.94;
-      roundedBubble(x,y,bubbleW,bubbleH,8,tailX,tailY,'right');
-      ctx.fillStyle=C.bubbleFill; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
+      roundedBubble(x,y,bubbleW,bubbleH,8,tailX,tailY,'bottom');
+      ctx.fillStyle=C.bubbleFill; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
       ctx.fillStyle=C.bubble; ctx.font=fontSize+'px monospace'; ctx.textBaseline='top';
       for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],x+padX,y+padY+i*lineH);
       ctx.restore();
