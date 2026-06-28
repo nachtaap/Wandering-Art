@@ -3775,10 +3775,19 @@
       ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
     }
 
-    function splitBubbleLines(text,maxLen=18){
-      const words=text.split(' '), lines=[]; let line='';
-      for(const w of words){ const test=line?line+' '+w:w; if(test.length>maxLen && line){ lines.push(line); line=w; } else line=test; }
-      if(line) lines.push(line); return lines.slice(0,3);
+    function splitBubbleLines(text, maxPx, font){
+      // Gebruik ctx.measureText voor exacte breedte — nooit meer overflow.
+      ctx.font = font;
+      const words = text.split(' ');
+      const lines = []; let line = '';
+      for(const w of words){
+        const test = line ? line+' '+w : w;
+        if(ctx.measureText(test).width > maxPx && line){
+          lines.push(line); line = w;
+        } else { line = test; }
+      }
+      if(line) lines.push(line);
+      return lines;
     }
 
     function visibleCanvasRect(){
@@ -3812,9 +3821,9 @@
       const bubbleW  = Math.max(60, tailX - 18 - vis.left - 8);
       const x        = vis.left + 8;
 
-      // Tekst-wrap op basis van werkelijke breedte.
-      const charsPerLine = Math.max(8, Math.floor((bubbleW - padX*2) / (fontSize * .62)));
-      const lines    = splitBubbleLines(speech.text, charsPerLine);
+      const font = fontSize+'px monospace';
+      const maxPx = bubbleW - padX*2;
+      const lines    = splitBubbleLines(speech.text, maxPx, font);
       const bubbleH  = padY*2 + lines.length*lineH;
 
       const wobX=Math.sin(now*.0013+speech.phase)*.7;
@@ -3827,7 +3836,7 @@
       roundedBubble(x+wobX, y, bubbleW, bubbleH, 8, tailX, tailY, 'right');
       ctx.fillStyle=C.bubbleFill; ctx.fill();
       ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
-      ctx.fillStyle=C.bubble; ctx.font=fontSize+'px monospace'; ctx.textBaseline='top';
+      ctx.fillStyle=C.bubble; ctx.font=font; ctx.textBaseline='top';
       for(let i=0;i<lines.length;i++) ctx.fillText(lines[i], x+wobX+padX, y+padY+i*lineH);
       ctx.restore();
     }
