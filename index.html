@@ -3801,22 +3801,34 @@
     function drawSpeechBubble(now){
       const a=speechAlpha(now); if(a<=.001) return;
       const vis=visibleCanvasRect();
-      const fontSize=speech.meaningful?15:13, padX=13, padY=10, lineH=18;
-      const lines=splitBubbleLines(speech.text, speech.meaningful?16:20);
-      const bubbleW=Math.min(175, vis.right-vis.left-16);
-      const bubbleH=padY*2+lines.length*lineH;
-      const wobX=Math.sin(now*.0013+speech.phase)*.8;
-      const wobY=Math.sin(now*.002 +speech.phase)*.8;
-      const x=vis.left+10+wobX;
-      const y=vis.top +52+wobY;
-      const tailX=x+bubbleW*.65;
-      const tailY=y+bubbleH+14;
+      const fontSize=speech.meaningful?15:13, padX=12, padY=10, lineH=18;
+
+      // Harde rechtergrens: links van haar gezicht (halo-rand ~W/2 - 72).
+      const faceLeft = W * .5 - 72;
+      const tailX    = faceLeft - 4;
+      const tailY    = H * .31;              // mondhoogte
+
+      // Bubble-breedte = ruimte tussen vis.left en staart-basis.
+      const bubbleW  = Math.max(60, tailX - 18 - vis.left - 8);
+      const x        = vis.left + 8;
+
+      // Tekst-wrap op basis van werkelijke breedte.
+      const charsPerLine = Math.max(8, Math.floor((bubbleW - padX*2) / (fontSize * .62)));
+      const lines    = splitBubbleLines(speech.text, charsPerLine);
+      const bubbleH  = padY*2 + lines.length*lineH;
+
+      const wobX=Math.sin(now*.0013+speech.phase)*.7;
+      const wobY=Math.sin(now*.002 +speech.phase)*.7;
+
+      // Verticaal: centreer op mondhoogte; mag omhoog groeien bij veel tekst.
+      const y = clamp(tailY - bubbleH*.5 + wobY, vis.top + 8, tailY - 8);
+
       ctx.save(); ctx.globalAlpha=a*.94;
-      roundedBubble(x,y,bubbleW,bubbleH,8,tailX,tailY,'bottom');
+      roundedBubble(x+wobX, y, bubbleW, bubbleH, 8, tailX, tailY, 'right');
       ctx.fillStyle=C.bubbleFill; ctx.fill();
       ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
       ctx.fillStyle=C.bubble; ctx.font=fontSize+'px monospace'; ctx.textBaseline='top';
-      for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],x+padX,y+padY+i*lineH);
+      for(let i=0;i<lines.length;i++) ctx.fillText(lines[i], x+wobX+padX, y+padY+i*lineH);
       ctx.restore();
     }
 
