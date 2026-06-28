@@ -431,7 +431,7 @@
       const fullW = Math.ceil(Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0, vv ? vv.width : 0, sw));
       const fullH = Math.ceil(Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0, vv ? vv.height : 0, sh));
       document.documentElement.style.setProperty('--wa-full-w', fullW + 'px');
-      document.documentElement.style.setProperty('--wa-full-h', (fullH + 8) + 'px');
+      document.documentElement.style.setProperty('--wa-full-h', (fullH + 80) + 'px');
     }
     updateFullBleedViewport();
     window.addEventListener('resize', updateFullBleedViewport, { passive:true });
@@ -3815,7 +3815,7 @@
       const wobY=Math.sin(now*.002+speech.phase)*1.5;
       // Ballon staat links — daar is ruimte naast de figuur die rechts staat.
       const x = clamp(vis.left + 14 + wobX, vis.left + 8, vis.right - bubbleW - 8);
-      const y = clamp(32 + wobY, vis.top + 14, vis.bottom - bubbleH - 24);
+      const y = clamp(vis.top + 88 + wobY, vis.top + 80, vis.bottom - bubbleH - 24);
       // Staart wijst naar rechts, richting de mond van de figuur (ca. W*0.55, y+bubbleH/2).
       const tailX = x + bubbleW + 18;
       const tailY = y + bubbleH * .45;
@@ -3908,11 +3908,11 @@
       // ── Grondvlak ──────────────────────────────────────────────────────────
       // Fullscreen-versie: geen harde zwarte onderbalk. De voorgrond blijft donker,
       // maar behoudt kleur tot aan de home-indicator/safe-area.
-      const gg=ctx.createLinearGradient(0,gnd,0,H);
+      const gg=ctx.createLinearGradient(0,gnd,0,H+80);
       gg.addColorStop(0,isDay?'#1c4a2b':'#08160e');
       gg.addColorStop(.58,isDay?'#0e3328':'#061019');
       gg.addColorStop(1,isDay?'#0a3c56':'#092238');
-      ctx.fillStyle=gg; ctx.fillRect(0,gnd,W,H-gnd);
+      ctx.fillStyle=gg; ctx.fillRect(0,gnd,W,H+80-gnd);
       ctx.globalAlpha = isDay ? .10 : .06;
       ellipse(W*.50, H+18, W*.62, 58, isDay ? '#57b6c8' : C.cyan4);
       ctx.globalAlpha = 1;
