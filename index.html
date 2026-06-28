@@ -3052,6 +3052,10 @@
       ];
       paper(mantle, mixHex(nightViolet, voidBlue, .42), 590, {alpha:.30, fibers:16, fiberAlpha:.04, stitchAlpha:.03, hi:mixHex(C.cyan4,C.white,.12), hiAlpha:.10, lw:1.5});
 
+      // Samenhangende couture-stofkleur (inkt) + een iets diepere tint, voor mouwen, rok en bodice.
+      const INK = mixHex(deepTeal, nightViolet, .5);
+      const INKdeep = mixHex(INK, C.black, .16);
+
       // Legs: long and elegant, visible through high split paper panels.
       segment(hipL,kneeL,21,16,mixHex(skinPaper,vellumDark,.08),701,{fibers:6, stitchAlpha:.10, hi:mixHex(skinPaper,C.white,.10), lw:2});
       segment(kneeL,ankleL,16,11,mixHex(skinPaper,teal,.07),702,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
@@ -3059,12 +3063,23 @@
       segment(kneeR,ankleR,16,11,mixHex(skinPaper,teal,.07),704,{fibers:5, stitchAlpha:.10, hi:mixHex(skinPaper,C.cyan4,.06), lw:2});
       foot(ankleL.x-4,ankleL.y+18,-1,-.06 + walk*.08 + wshift*.05);
       foot(ankleR.x+4,ankleR.y+18, 1, .06 - walk*.08 + wshift*.05);
+      // gouden enkelbanden
+      ctx.lineWidth=2; ctx.strokeStyle=gold; ctx.globalAlpha=.7;
+      ctx.beginPath(); ctx.ellipse(ankleL.x,ankleL.y+6,5,3,0,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(ankleR.x,ankleR.y+6,5,3,0,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha=1;
 
       // Arms: slimmer and more elegant; joints are ornaments, not toy screws.
-      segment(shoulderL,elbowL,15,12,mixHex(skinPaper,vellum,.06),711,{fibers:5, stitchAlpha:.07, hi:skinGlow, hiAlpha:.13, lw:2});
-      segment(elbowL,wristL,12,9,mixHex(skinPaper,skinShade,.06),712,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
-      segment(shoulderR,elbowR,15,12,mixHex(skinPaper,vellum,.06),713,{fibers:5, stitchAlpha:.07, hi:skinGlow, hiAlpha:.13, lw:2});
-      segment(elbowR,wristR,12,9,mixHex(skinPaper,skinShade,.06),714,{fibers:5, stitchAlpha:.06, hi:skinGlow, hiAlpha:.12, lw:2});
+      // Mouwen: de armsegmenten zijn nu inkt-stof (volgen automatisch de beweging), forearm iets dieper.
+      segment(shoulderL,elbowL,16,12,INK,711,{fibers:6, stitchAlpha:.06, hi:mixHex(violetLit,C.white,.10), hiAlpha:.14, lw:2});
+      segment(elbowL,wristL,12,9,INKdeep,712,{fibers:5, stitchAlpha:.05, hi:mixHex(violetLit,C.white,.08), hiAlpha:.10, lw:2});
+      segment(shoulderR,elbowR,16,12,INK,713,{fibers:6, stitchAlpha:.06, hi:mixHex(violetLit,C.white,.10), hiAlpha:.14, lw:2});
+      segment(elbowR,wristR,12,9,INKdeep,714,{fibers:5, stitchAlpha:.05, hi:mixHex(violetLit,C.white,.08), hiAlpha:.10, lw:2});
+      // gouden polsboorden / armbanden (bewegen mee met de polsen)
+      ctx.lineWidth=2; ctx.strokeStyle=gold; ctx.globalAlpha=.72;
+      ctx.beginPath(); ctx.ellipse(wristL.x,wristL.y,5,4,0,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(wristR.x,wristR.y,5,4,0,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha=1;
       const handLife = Math.sin(t * .9 + .3) * .035 * rm;
       hand(wristL.x-2,wristL.y+12,-1,-.10 + (aL2-ARM.L2) + P.lh + handLife);
       hand(wristR.x+2,wristR.y+12, 1, .10 + (aR2-ARM.R2) + P.rh - handLife);
@@ -3105,7 +3120,6 @@
         ['C',216,306,205,335,195,354],['C',188,363,172,363,165,354],
         ['C',155,335,144,306,141,274]
       ];
-      const INK = mixHex(deepTeal, nightViolet, .5);   // strak: één samenhangende diepe kostuumtoon
       paper(bodice, RICH_PALETTE ? mixHex(teal,nightViolet,.16) : INK, 811, {fibers:12, fiberAlpha:.10, stitchAlpha:.09, hi:mixHex(tealLit,C.white,.08), hiAlpha:.16, lw:2});
 
       // centerSkin verwijderd: de verticale huidstrip las als doorlopende 'tweede hals'. Bodice sluit nu dicht.
@@ -3144,8 +3158,32 @@
       if (RICH_PALETTE) {
       paper(skirtL, mixHex(vellumLite,teal,.33), 831, {alpha:.86, fibers:13, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.cyan4,C.white,.08), hiAlpha:.10, lw:2});
       paper(skirtR, mixHex(vellumLite,nightViolet,.26), 832, {alpha:.86, fibers:13, fiberAlpha:.08, stitchAlpha:.10, hi:mixHex(C.magenta,C.white,.06), hiAlpha:.10, lw:2});
+      } else {
+        // Vollere rok in inkt: zelfde slit-vorm, cohesief donker (geen modder).
+        paper(skirtL, INK, 831, {fibers:11, fiberAlpha:.07, stitchAlpha:.08, hi:mixHex(tealLit,C.white,.06), hiAlpha:.10, lw:2});
+        paper(skirtR, INKdeep, 832, {fibers:11, fiberAlpha:.07, stitchAlpha:.08, hi:mixHex(violetLit,C.white,.06), hiAlpha:.10, lw:2});
       }
       paper(skirtCenter, RICH_PALETTE ? mixHex(deepTeal,teal,.34) : INK, 833, {fibers:12, fiberAlpha:.08, stitchAlpha:.12, hi:mixHex(tealLit,C.white,.07), hiAlpha:.12, lw:2});
+
+      // ── Goud couture-detail (geen kleurvlakken, alleen lijnwerk + sterren + gems) ──
+      // Gouden ceintuur op de taille met centrale gem.
+      ctx.lineWidth=3; ctx.strokeStyle=gold; ctx.globalAlpha=.82;
+      ctx.beginPath(); ctx.moveTo(150,355); ctx.quadraticCurveTo(180,364,210,355); ctx.stroke();
+      ctx.lineWidth=1.4; ctx.strokeStyle=goldHi; ctx.globalAlpha=.5;
+      ctx.beginPath(); ctx.moveTo(151,355); ctx.quadraticCurveTo(180,362,209,355); ctx.stroke();
+      ctx.globalAlpha=.9; ellipse(180,359,4.6,4.6,goldLo); ellipse(180,359,3,3,gold); ellipse(179,358,1.3,1.3,starBlue);
+      // Hemelborduursel: constellatie + sterren op de bodice.
+      ctx.globalAlpha=.5; ctx.strokeStyle=gold; ctx.lineWidth=.8;
+      ctx.beginPath(); ctx.moveTo(168,300); ctx.lineTo(177,318); ctx.lineTo(189,309); ctx.stroke();
+      ctx.globalAlpha=1;
+      star(168,300,1.6,goldHi,.7); star(177,318,1.4,goldHi,.6); star(189,309,1.5,goldHi,.65); star(180,332,1.3,gold,.6);
+      // Sterren langs de rok.
+      star(178,402,1.6,goldHi,.55); star(176,452,1.4,gold,.5); star(184,498,1.5,goldHi,.45);
+      // Dunne gouden halsketting + hangende gem.
+      ctx.strokeStyle=gold; ctx.lineWidth=1.4; ctx.globalAlpha=.78;
+      ctx.beginPath(); ctx.moveTo(160,244); ctx.quadraticCurveTo(180,256,200,244); ctx.stroke();
+      ctx.globalAlpha=.92; ellipse(180,261,2.9,3.5,goldLo); ellipse(180,260,1.9,2.3,gold); ellipse(179.4,259,.9,.9,starBlue);
+      ctx.globalAlpha=1;
 
       // Extra floating ribbons / paper tails for ethereal motion.
       if (RICH_PALETTE) {
@@ -3375,6 +3413,16 @@
       drawHairBack(); drawShouldersAndNeck(now); drawFaceBase(); drawHairFront(); drawBrows(p);
       drawEye(146,107,-1,p); drawEye(207,107,1,p); drawNose(); drawMouth(p,now); drawEffects(p,now);
       rect(242,118,3,17,C.black);
+      // Gouden hangende oorbellen (ná gezicht/haar zodat ze vóór alles vallen).
+      (() => {
+        const gold='#d5a64d', goldLo='#57370a', gem=mixHex(C.cyan4,'#7b62ff',.30);
+        for (const ex of [122, 244]) {
+          ctx.strokeStyle=gold; ctx.lineWidth=1.2; ctx.globalAlpha=.8;
+          ctx.beginPath(); ctx.moveTo(ex,178); ctx.lineTo(ex,193); ctx.stroke();
+          ctx.globalAlpha=.92; ellipse(ex,198,2.7,3.3,goldLo); ellipse(ex,197,1.8,2.2,gold); ellipse(ex-0.5,196,.8,.8,gem);
+        }
+        ctx.globalAlpha=1;
+      })();
       ctx.restore();
     }
 
