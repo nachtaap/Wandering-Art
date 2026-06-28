@@ -133,19 +133,21 @@
     }
     #enter{
       position:fixed; inset:0; z-index:8;
-      display:flex; align-items:center; justify-content:center;
+      display:flex; align-items:flex-end; justify-content:center;
+      padding-bottom:max(12px, env(safe-area-inset-bottom));
       pointer-events:none; opacity:0;
       transition:opacity 1.2s ease;
     }
     #enter .ring{
       display:flex; align-items:center; justify-content:center;
-      width:136px; height:136px; border-radius:50%;
-      border:1.5px solid rgba(105,255,243,.6);
-      background:radial-gradient(circle at 50% 38%, rgba(105,255,243,.12), rgba(2,2,7,.32) 72%);
-      box-shadow:0 0 24px rgba(0,255,214,.22), inset 0 0 22px rgba(0,255,214,.10);
-      color:#9bfff5; font:17px/1.4 monospace; letter-spacing:.14em; text-transform:lowercase;
-      text-align:center; text-shadow:0 0 8px rgba(0,255,214,.45);
+      width:172px; height:52px; border-radius:26px;
+      border:none;
+      background:linear-gradient(135deg,#c8922a 0%,#f0c050 45%,#d4a030 100%);
+      box-shadow:0 4px 22px rgba(213,166,77,.55), 0 1px 0 rgba(255,240,160,.5) inset;
+      color:#1a0e00; font:17px/1.4 monospace; letter-spacing:.14em; text-transform:lowercase;
+      text-align:center; text-shadow:0 1px 0 rgba(255,240,160,.4);
       animation:enterPulse 2.6s ease-in-out infinite;
+      cursor:pointer; pointer-events:auto;
     }
     @keyframes enterPulse{
       0%,100%{ transform:scale(1); box-shadow:0 0 22px rgba(0,255,214,.18), inset 0 0 20px rgba(0,255,214,.09); }
@@ -355,7 +357,7 @@
   <main id="stage" aria-label="Wandering Art — autonomous pixel entity">
     <canvas id="entity" width="360" height="640"></canvas>
   </main>
-  <div id="enter" aria-hidden="true"><span class="ring">binnentreden</span></div>
+  <div id="enter" aria-hidden="true"><span class="ring">begroeten</span></div>
 
   <!-- Publiek: event-grimoire (enkele tap) -->
   <div id="wa-log" class="wa-overlay" role="dialog" aria-label="Grimoire">
@@ -2195,7 +2197,76 @@
       PoseBrain.nextAt = now + (chosen === 'rest' ? rnd(1800, 3400) : rnd(2600, 5200));
     }
 
+    const GreetBrain = { active:false, start:0 };
+
     function updatePose(now, dt){
+      // ── Begroet-zwaai (tijdgestuurde sequentie, heeft voorrang) ────────────
+      if (GreetBrain.active){
+        const e = (now - GreetBrain.start) / 1000;
+        const T_RAISE  = .70;   // onderarm omhoog
+        const T_HAND   = .42;   // pols/hand draait daarna apart mee
+        const T_WAVE   = 2.05;  // zwaai-fase
+        const T_LOWER  = .78;   // arm en pols rustig terug
+        const LS_UP    = -.12;  // schouder blijft subtiel; onderarm doet het werk
+        const LE_UP    = 2.0;   // onderarm: wijst links-omhoog
+        const HAND_REST_ABS = -.10;
+        // Linkerhand wordt gespiegeld getekend. Visueel "vingers omhoog / palm naar voren"
+        // is daarom een absolute rotatie rond PI, niet een grote negatieve delta.
+        const HAND_UP_ABS  = Math.PI + .06;
+        const WAVE_AMP = .34;   // natuurlijke polszwaai: ±19°, geen 45° klap
+        const ss = f => f*f*(3-2*f);
+        const c = PoseBrain.cur, t = PoseBrain.tar;
+        let le=0, lh=0, done=false;
+
+        const wristDeltaFor = (forearmDelta, handAbs) => {
+          // draw-hand gebruikt: -.10 + (aL2-ARM.L2) + P.lh.
+          // P.lh moet dus de polsrotatie zijn die de hand naar een absolute,
+          // leesbare palm-forward hoek brengt. Zo stapelt de hand niet onnatuurlijk
+          // bovenop de onderarmrotatie.
+          return handAbs - (HAND_REST_ABS + forearmDelta);
+        };
+
+        if (e < T_RAISE){
+          // Onderarm leidt. De hand blijft eerst losjes hangen en begint pas licht te volgen.
+          const f = ss(e / T_RAISE);
+          le = LE_UP * f;
+          const looseHand = HAND_REST_ABS + le * .24;
+          lh = wristDeltaFor(le, looseHand);
+        } else if (e < T_RAISE + T_HAND){
+          // Daarna draait alleen de pols door naar palm-forward.
+          const f = ss((e - T_RAISE) / T_HAND);
+          le = LE_UP;
+          const looseHand = HAND_REST_ABS + LE_UP * .24;
+          const handAbs = lerp(looseHand, HAND_UP_ABS, f);
+          lh = wristDeltaFor(le, handAbs);
+        } else if (e < T_RAISE + T_HAND + T_WAVE){
+          // Zwaai uit de pols, met een kleine forearm-bounce zodat het niet mechanisch wordt.
+          const w = e - T_RAISE - T_HAND;
+          const wavePhase = w * Math.PI * 3.6;
+          const envelope = Math.sin(clamp(w / T_WAVE, 0, 1) * Math.PI);
+          le = LE_UP + Math.sin(wavePhase + .8) * .045 * envelope;
+          const handAbs = HAND_UP_ABS + Math.sin(wavePhase) * WAVE_AMP * (.72 + .28 * envelope);
+          lh = wristDeltaFor(le, handAbs);
+        } else if (e < T_RAISE + T_HAND + T_WAVE + T_LOWER){
+          // Terug: eerst ontspant de pols, daarna zakt de onderarm mee.
+          const f = ss((e - T_RAISE - T_HAND - T_WAVE) / T_LOWER);
+          le = LE_UP * (1 - f);
+          const handAbs = lerp(HAND_UP_ABS, HAND_REST_ABS, f);
+          lh = wristDeltaFor(le, handAbs);
+        } else { done = true; }
+
+        if (!done){
+          c.ls=t.ls=LS_UP; c.le=t.le=le; c.lh=t.lh=lh;
+          c.rs=t.rs=0;     c.re=t.re=0;  c.rh=t.rh=0;
+          PoseBrain.name='greet';
+          return;
+        }
+        GreetBrain.active=false;
+        // Zeker weten dat de rig schoon terugvalt naar de normale autonome pose-pool.
+        const z = PoseBrain.tar; z.ls=z.le=z.lh=z.rs=z.re=z.rh=0;
+        PoseBrain.nextAt=now+500;
+      }
+
       if (!RIG_MOTION){
         const z = PoseBrain.tar; z.ls=z.le=z.lh=z.rs=z.re=z.rh=0; PoseBrain.name='rest';
       } else if (now > PoseBrain.nextAt){
@@ -3759,12 +3830,12 @@
       if(p.accent>.12){ ctx.globalAlpha=p.accent*.22; line(247,88,259,153,2,C.cyan4); line(107,93,96,160,1,C.magenta); ctx.globalAlpha=1; }
     }
 
-    function roundedBubble(x,y,w,h,r,tailX,tailY,side='bottom'){
+    function roundedBubble(x,y,w,h,r,tailX,tailY,side='bottom',tailBaseX){
       ctx.beginPath();
       ctx.moveTo(x+r,y);
       if(side==='top'){
-        const tx=clamp(tailX,x+r+8,x+w-r-8);
-        ctx.lineTo(tx-8,y); ctx.lineTo(tailX,tailY); ctx.lineTo(tx+8,y);
+        const bx=clamp(tailBaseX!==undefined?tailBaseX:tailX,x+r+8,x+w-r-8);
+        ctx.lineTo(bx-8,y); ctx.lineTo(tailX,tailY); ctx.lineTo(bx+8,y);
       }
       ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
       if(side==='right'){
@@ -3828,15 +3899,16 @@
       const bubbleH = padY*2 + lines.length*lineH;
       const y = chinY + 6;   // ballon begint direct onder het gezicht
 
-      // Staart: kort driehoekje bovenop, midden-rechts (richting haar nek).
-      const tailX = x + bubbleW * .62;
-      const tailY = y - 16;
+      // Staartbasis centraal op ballon; punt leunt naar links richting haar mond.
+      const tailBaseX = x + bubbleW * .50;
+      const tailX     = x + bubbleW * .50;
+      const tailY     = y - 16;
 
       const wobX=Math.sin(now*.0013+speech.phase)*.6;
       const wobY=Math.sin(now*.002 +speech.phase)*.6;
 
       ctx.save(); ctx.globalAlpha=a*.94;
-      roundedBubble(x+wobX,y+wobY,bubbleW,bubbleH,9,tailX,tailY,'top');
+      roundedBubble(x+wobX,y+wobY,bubbleW,bubbleH,9,tailX,tailY,'top',tailBaseX);
       ctx.fillStyle=C.bubbleFill; ctx.fill();
       ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
       ctx.fillStyle=C.bubble; ctx.font=font; ctx.textBaseline='top';
@@ -4076,6 +4148,21 @@
       lastNow=now;
       SceneBrain.tick();
       updateTimeBrain(now);
+
+      // Begroetings-hook: triggered door de "begroeten"-knop.
+      window._greet = () => {
+        const now = performance.now();
+        GreetBrain.active = true;
+        GreetBrain.start  = now;
+        // Begroeting via de echte speech API
+        speech.active   = true;
+        speech.start    = now + 300;
+        speech.duration = 5000;
+        speech.text     = 'hallo ... welkom';
+        speech.meaningful = true;
+        speech.phase    = Math.random() * 999;
+        speech.mood     = 'happy';
+      };
       updateWeatherBrain(now,dt);
       updateEmotion(now,dt);
       updateMemory(dt);
@@ -4157,13 +4244,15 @@
         if (unlocked) return; unlocked = true; clearTimeout(showAt);
         AudioBrain.start(); AudioBrain.resume();
         if (veil) { veil.classList.remove('show'); veil.classList.add('gone'); setTimeout(() => veil.remove(), 1600); }
+        // Zwaai en zeg hallo
+        if (window._greet) window._greet();
         window.removeEventListener('pointerdown', unlock);
         window.removeEventListener('keydown', unlock);
         window.removeEventListener('touchstart', unlock);
       }
-      window.addEventListener('pointerdown', unlock, { once:true });
+      // Alleen de knop zelf triggert unlock (niet heel scherm)
+      if (veil) veil.addEventListener('pointerdown', e => { e.stopPropagation(); unlock(); });
       window.addEventListener('keydown', unlock, { once:true });
-      window.addEventListener('touchstart', unlock, { once:true });
     })();
 
     if (STATIC_PREVIEW) render(performance.now() + 1600);
