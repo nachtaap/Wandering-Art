@@ -3761,15 +3761,20 @@
 
     function roundedBubble(x,y,w,h,r,tailX,tailY,side='bottom'){
       ctx.beginPath();
-      ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+      ctx.moveTo(x+r,y);
+      if(side==='top'){
+        const tx=clamp(tailX,x+r+8,x+w-r-8);
+        ctx.lineTo(tx-8,y); ctx.lineTo(tailX,tailY); ctx.lineTo(tx+8,y);
+      }
+      ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
       if(side==='right'){
         const ty=clamp(tailY,y+r+6,y+h-r-6);
         ctx.lineTo(x+w,ty-7); ctx.lineTo(tailX,tailY); ctx.lineTo(x+w,ty+7);
-        ctx.lineTo(x+w,y+h-r);
-      } else { ctx.lineTo(x+w,y+h-r); }
-      ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+      }
+      ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
       if(side==='bottom'){
-        ctx.lineTo(tailX+8,y+h); ctx.lineTo(tailX,tailY); ctx.lineTo(tailX-8,y+h);
+        const tx=clamp(tailX,x+r+8,x+w-r-8);
+        ctx.lineTo(tx+8,y+h); ctx.lineTo(tailX,tailY); ctx.lineTo(tx-8,y+h);
       }
       ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
       ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
@@ -3810,34 +3815,32 @@
     function drawSpeechBubble(now){
       const a=speechAlpha(now); if(a<=.001) return;
       const vis=visibleCanvasRect();
-      const fontSize=speech.meaningful?15:13, padX=12, padY=10, lineH=18;
+      const fontSize=15, padX=14, padY=11, lineH=19;
+      const font=fontSize+'px monospace';
 
-      // Harde rechtergrens: links van haar gezicht (halo-rand ~W/2 - 72).
-      const faceLeft = W * .5 - 72;
-      const tailX    = faceLeft - 4;
-      const tailY    = H * .31;              // mondhoogte
+      // Ballon breed onder het gezicht; mag het lichaam overlappen.
+      const x       = vis.left  + 8;
+      const bubbleW = vis.right - vis.left - 16;
+      const chinY   = H * .415;   // net onder de kin / halorand
 
-      // Bubble-breedte = ruimte tussen vis.left en staart-basis.
-      const bubbleW  = Math.max(60, tailX - 18 - vis.left - 8);
-      const x        = vis.left + 8;
+      // Tekst wrappen op werkelijke pixelbreedte.
+      const lines = splitBubbleLines(speech.text, bubbleW - padX*2, font);
+      const bubbleH = padY*2 + lines.length*lineH;
+      const y = chinY + 6;   // ballon begint direct onder het gezicht
 
-      const font = fontSize+'px monospace';
-      const maxPx = bubbleW - padX*2;
-      const lines    = splitBubbleLines(speech.text, maxPx, font);
-      const bubbleH  = padY*2 + lines.length*lineH;
+      // Staart: klein driehoekje bovenop de ballon, iets links van midden.
+      const tailX = x + bubbleW * .26;
+      const tailY = y - 16;
 
-      const wobX=Math.sin(now*.0013+speech.phase)*.7;
-      const wobY=Math.sin(now*.002 +speech.phase)*.7;
-
-      // Verticaal: centreer op mondhoogte; mag omhoog groeien bij veel tekst.
-      const y = clamp(tailY - bubbleH*.5 + wobY, vis.top + 8, tailY - 8);
+      const wobX=Math.sin(now*.0013+speech.phase)*.6;
+      const wobY=Math.sin(now*.002 +speech.phase)*.6;
 
       ctx.save(); ctx.globalAlpha=a*.94;
-      roundedBubble(x+wobX, y, bubbleW, bubbleH, 8, tailX, tailY, 'right');
+      roundedBubble(x+wobX,y+wobY,bubbleW,bubbleH,9,tailX,tailY,'top');
       ctx.fillStyle=C.bubbleFill; ctx.fill();
       ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
       ctx.fillStyle=C.bubble; ctx.font=font; ctx.textBaseline='top';
-      for(let i=0;i<lines.length;i++) ctx.fillText(lines[i], x+wobX+padX, y+padY+i*lineH);
+      for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],x+wobX+padX,y+wobY+padY+i*lineH);
       ctx.restore();
     }
 
