@@ -86,9 +86,12 @@
     }
     canvas{
       display:block;
-      /* Fullscreen portrait compositie: 9:16, met ruimte rondom het personage. */
-      width:min(100vw, calc(100vh * 0.5625));
-      height:min(100vh, calc(100vw / 0.5625));
+      /* Fullscreen cover: vul het scherm. Op smalle/tall phones croppen we liever links/rechts
+         dan dat er zwarte balken boven en onder ontstaan. */
+      width:max(100vw, calc(100vh * 0.5625));
+      height:max(100vh, calc(100vw / 0.5625));
+      min-width:100vw;
+      min-height:100vh;
       image-rendering:pixelated;
       image-rendering:crisp-edges;
       filter:
@@ -96,6 +99,13 @@
         saturate(1.12)
         drop-shadow(0 0 22px rgba(0,255,214,.16))
         drop-shadow(0 0 56px rgba(35,255,87,.08));
+    }
+    @supports (height: 100dvh){
+      canvas{
+        width:max(100vw, calc(100dvh * 0.5625));
+        height:max(100dvh, calc(100vw / 0.5625));
+        min-height:100dvh;
+      }
     }
     #stage::before{
       content:"";
