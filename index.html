@@ -225,6 +225,115 @@
     .seed-pill .sd{ font-size:11px; opacity:.55; }
 
 
+    /* ── Grimoire: leesbare perkament-sheet + notch-safe ruimte ───────────── */
+    #wa-log.wa-overlay{
+      /* De donkere overlay blijft full-screen, maar het paneel begint lager.
+         Zo blijft 'sluiten' vrij van Dynamic Island / notch / statusbar. */
+      padding:
+        calc(env(safe-area-inset-top, 0px) + 22px)
+        12px
+        calc(env(safe-area-inset-bottom, 0px) + 14px);
+      background:rgba(1,2,9,.68);
+      backdrop-filter:blur(9px);
+      color:#211b12;
+    }
+    #wa-log .wa-head,
+    #wa-log .wa-body{
+      width:min(100%, 680px);
+      margin-inline:auto;
+      border-left:1px solid rgba(98,74,42,.20);
+      border-right:1px solid rgba(98,74,42,.20);
+      box-shadow:0 14px 44px rgba(0,0,0,.34);
+    }
+    #wa-log .wa-head{
+      padding:14px 16px 10px;
+      border-radius:18px 18px 0 0;
+      border-top:1px solid rgba(255,255,255,.58);
+      border-bottom:1px solid rgba(98,74,42,.22);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(255,255,255,.72), transparent 40%),
+        linear-gradient(135deg, #fff8e8 0%, #efe2c3 100%);
+    }
+    #wa-log .wa-head h2{
+      color:#3e5d5a;
+      text-shadow:none;
+    }
+    #wa-log .wa-close{
+      min-height:34px;
+      background:#fffaf0;
+      border-color:rgba(82,60,31,.32);
+      color:#4a371a;
+      box-shadow:0 1px 0 rgba(255,255,255,.7) inset;
+    }
+    #wa-log .wa-close:active{ background:#eadfcb; }
+    #wa-log .wa-body{
+      min-height:0;
+      border-radius:0 0 18px 18px;
+      border-bottom:1px solid rgba(98,74,42,.24);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(255,255,255,.58), transparent 32%),
+        linear-gradient(180deg, #fbf2dc 0%, #ead9b7 100%);
+      color:#211b12;
+      -webkit-overflow-scrolling:touch;
+    }
+
+    /* Inline grimoire-kleuren worden hier op licht papier leesbaar gemaakt. */
+    #wa-log [style*="105,255,243"]{ color:rgba(54,72,69,.72) !important; }
+    #wa-log [style*="#d5a64d"]{ color:#8a5e12 !important; }
+
+    #wa-log .wa-sec{
+      color:rgba(85,60,28,.60);
+      text-shadow:0 1px 0 rgba(255,255,255,.45);
+    }
+    #wa-log .ev-card{
+      border-color:rgba(98,74,42,.18);
+      background:rgba(255,250,238,.76);
+      box-shadow:0 1px 0 rgba(255,255,255,.64) inset;
+    }
+    #wa-log .ev-card.seen{ border-color:rgba(166,116,24,.55); }
+    #wa-log .ev-card .ev-sym{ color:#5f543f; opacity:.82; }
+    #wa-log .ev-card .ev-name{ color:#211b12; }
+    #wa-log .ev-card .ev-stars{ color:#9a6b12; }
+    #wa-log .ev-card .ev-badge{ color:rgba(54,72,69,.62); }
+    #wa-log .ev-card.seen .ev-badge{ color:#176b65; }
+    #wa-log .wa-btn{
+      background:#fff7e7;
+      border-color:rgba(51,93,88,.34);
+      color:#275d58;
+      box-shadow:0 1px 0 rgba(255,255,255,.64) inset;
+    }
+    #wa-log .wa-btn:active{ background:#eadfcb; }
+    #wa-log .wa-btn.gold{
+      border-color:rgba(150,104,20,.42);
+      color:#8a5e12;
+    }
+    #wa-log .wa-btn.danger{
+      border-color:rgba(160,45,58,.34);
+      color:#9a2332;
+    }
+    #wa-log .seed-pill{
+      background:#fff7e7;
+      border-color:rgba(150,104,20,.34);
+      color:#8a5e12;
+    }
+    #wa-log .seed-pill.active{
+      background:rgba(213,166,77,.22);
+      border-color:rgba(150,104,20,.58);
+    }
+    #wa-log .seed-pill .sd{ color:rgba(74,55,26,.62); opacity:1; }
+
+    @media (max-width: 420px){
+      #wa-log.wa-overlay{
+        padding-top:calc(env(safe-area-inset-top, 0px) + 18px);
+        padding-inline:10px;
+      }
+      #wa-log .wa-head{ padding:12px 12px 9px; }
+      #wa-log .wa-body{ padding:12px 12px 24px; }
+      #wa-log .wa-head h2{ font-size:13px; letter-spacing:.20em; }
+      #wa-log .wa-close{ padding:6px 11px; }
+    }
+
+
     @media (prefers-reduced-motion: reduce){
       canvas{ filter:contrast(1.06) saturate(1.08) drop-shadow(0 0 18px rgba(0,255,214,.12)); }
     }
