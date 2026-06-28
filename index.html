@@ -2210,9 +2210,9 @@
         const LS_UP    = -.12;  // schouder blijft subtiel; onderarm doet het werk
         const LE_UP    = 2.0;   // onderarm: wijst links-omhoog
         const HAND_REST_ABS = -.10;
-        // Linkerhand wordt gespiegeld getekend. Visueel "vingers omhoog / palm naar voren"
-        // is daarom een absolute rotatie rond PI, niet een grote negatieve delta.
-        const HAND_UP_ABS  = Math.PI + .06;
+        // Linkerhand wordt gespiegeld getekend. Daardoor voelt +PI visueel als de
+        // verkeerde boog. Naar -PI draaien laat de vingers klokwijs omhoog komen.
+        const HAND_UP_ABS  = -Math.PI + .08;
         const WAVE_AMP = .34;   // natuurlijke polszwaai: ±19°, geen 45° klap
         const ss = f => f*f*(3-2*f);
         const c = PoseBrain.cur, t = PoseBrain.tar;
@@ -2230,13 +2230,13 @@
           // Onderarm leidt. De hand blijft eerst losjes hangen en begint pas licht te volgen.
           const f = ss(e / T_RAISE);
           le = LE_UP * f;
-          const looseHand = HAND_REST_ABS + le * .24;
+          const looseHand = HAND_REST_ABS - le * .08;
           lh = wristDeltaFor(le, looseHand);
         } else if (e < T_RAISE + T_HAND){
-          // Daarna draait alleen de pols door naar palm-forward.
+          // Daarna draait alleen de pols klokwijs door naar palm-forward.
           const f = ss((e - T_RAISE) / T_HAND);
           le = LE_UP;
-          const looseHand = HAND_REST_ABS + LE_UP * .24;
+          const looseHand = HAND_REST_ABS - LE_UP * .08;
           const handAbs = lerp(looseHand, HAND_UP_ABS, f);
           lh = wristDeltaFor(le, handAbs);
         } else if (e < T_RAISE + T_HAND + T_WAVE){
