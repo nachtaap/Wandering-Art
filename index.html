@@ -238,7 +238,7 @@
     .seed-pill .sd{ font-size:11px; opacity:.55; }
 
 
-    /* ── Grimoire: leesbare perkament-sheet + notch-safe ruimte ───────────── */
+    /* ── Logboek: leesbare perkament-sheet + notch-safe ruimte ───────────── */
     #wa-log.wa-overlay{
       /* De donkere overlay blijft full-screen, maar het paneel begint lager.
          Zo blijft 'sluiten' vrij van Dynamic Island / notch / statusbar. */
@@ -291,7 +291,7 @@
       -webkit-overflow-scrolling:touch;
     }
 
-    /* Inline grimoire-kleuren worden hier op licht papier leesbaar gemaakt. */
+    /* Inline logboek-kleuren worden hier op licht papier leesbaar gemaakt. */
     #wa-log [style*="105,255,243"]{ color:rgba(54,72,69,.72) !important; }
     #wa-log [style*="#d5a64d"]{ color:#8a5e12 !important; }
 
@@ -336,19 +336,104 @@
     }
     #wa-log .seed-pill .sd{ color:rgba(74,55,26,.62); opacity:1; }
 
-    /* Grimoire mini-illustraties */
-    .ev-card{ overflow:hidden; }
+    /* ── Logboek-vondsten: cutout-momentopnames ──────────────────────────── */
+    .ev-card{ overflow:hidden; position:relative; }
     .ev-card .ev-thumb{
-      height:72px; margin:-8px -10px 6px;
-      border-radius:6px 6px 4px 4px; overflow:hidden;
+      position:relative;
+      height:84px; margin:-8px -10px 7px;
+      border-radius:6px 6px 3px 3px; overflow:hidden;
       border-bottom:1px solid rgba(105,255,243,.12);
-      background:linear-gradient(180deg, rgba(7,23,29,.92), rgba(6,20,26,.65));
+      background:
+        radial-gradient(120% 80% at 30% 12%, rgba(20,44,54,.6), transparent 60%),
+        linear-gradient(180deg, rgba(7,23,29,.95), rgba(5,16,22,.9));
     }
-    .ev-card .ev-thumb img{ display:block; width:100%; height:100%; object-fit:cover; }
+    .ev-card .ev-thumb img{
+      display:block; width:100%; height:100%; object-fit:cover;
+      filter:saturate(1.08) contrast(1.04);
+    }
+    /* dun lichtrandje + filmische bovenrand op echte cutouts */
+    .ev-card .ev-thumb.has-shot::after{
+      content:''; position:absolute; inset:0; pointer-events:none;
+      border-radius:inherit;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 1px rgba(255,255,255,.05);
+    }
+    /* "moment"-tag op een echte momentopname */
+    .ev-card .ev-cap-tag{
+      position:absolute; left:6px; bottom:5px; z-index:2;
+      font-size:8.5px; letter-spacing:.22em; text-transform:uppercase;
+      color:rgba(255,255,255,.82);
+      padding:2px 6px; border-radius:9px;
+      background:rgba(4,10,14,.5); backdrop-filter:blur(2px);
+      border:1px solid rgba(255,255,255,.16);
+    }
+    /* placeholder — wel ontdekt, maar (nog) geen opname */
+    .ev-thumb--symbol{ display:grid; place-items:center; }
+    .ev-thumb--symbol .ph-sym{
+      font-size:30px; color:rgba(160,235,228,.82);
+      text-shadow:0 0 14px rgba(105,255,243,.45);
+    }
+    /* placeholder — verzegeld (nog niet ontdekt) */
+    .ev-thumb--locked{ display:grid; place-items:center;
+      background:
+        radial-gradient(90% 70% at 50% 42%, rgba(40,30,60,.5), transparent 65%),
+        linear-gradient(180deg, rgba(9,9,17,.96), rgba(5,6,12,.94)); }
+    .ev-thumb--locked .ph-sym{
+      font-size:28px; color:rgba(150,150,180,.22);
+      filter:blur(.4px);
+    }
+    .ev-thumb--locked .ph-q{
+      position:absolute; font-size:19px; font-weight:700;
+      color:rgba(190,200,230,.5); text-shadow:0 0 12px rgba(120,140,220,.5);
+    }
+    .ev-thumb--locked::after{
+      content:''; position:absolute; inset:0; pointer-events:none;
+      background:repeating-linear-gradient(45deg, transparent 0 9px, rgba(255,255,255,.012) 9px 10px);
+    }
+
+    /* rarity-rand-gloed op ontdekte vondsten */
+    .ev-card.seen[data-r="1"]{ box-shadow:0 0 0 1px rgba(150,170,180,.10); }
+    .ev-card.seen[data-r="2"]{ box-shadow:0 0 0 1px rgba(105,255,243,.16); }
+    .ev-card.seen[data-r="3"]{ box-shadow:0 0 14px -4px rgba(105,255,243,.45), inset 0 0 0 1px rgba(105,255,243,.14); border-color:rgba(105,255,243,.34); }
+    .ev-card.seen[data-r="4"]{ box-shadow:0 0 16px -4px rgba(213,166,77,.55), inset 0 0 0 1px rgba(213,166,77,.20); border-color:rgba(213,166,77,.42); }
+    .ev-card.seen[data-r="5"]{ box-shadow:0 0 20px -3px rgba(187,120,255,.62), inset 0 0 0 1px rgba(187,120,255,.24); border-color:rgba(187,120,255,.5); }
+    .ev-card.seen[data-r="4"] .ev-stars,
+    .ev-card.seen[data-r="5"] .ev-stars{ text-shadow:0 0 8px currentColor; }
+
+    /* lichte (perkament) variant: cutouts blijven donker-filmisch, placeholders aangepast */
     #wa-log .ev-card .ev-thumb{
       border-bottom-color:rgba(98,74,42,.16);
-      background:linear-gradient(180deg, rgba(255,252,246,.9), rgba(240,228,198,.82));
     }
+    #wa-log .ev-thumb--symbol{
+      background:linear-gradient(180deg, rgba(255,252,246,.92), rgba(238,224,194,.85)); }
+    #wa-log .ev-thumb--symbol .ph-sym{ color:rgba(120,86,30,.7); text-shadow:none; }
+    #wa-log .ev-thumb--locked{
+      background:linear-gradient(180deg, rgba(232,222,200,.95), rgba(214,200,168,.9)); }
+    #wa-log .ev-thumb--locked .ph-sym{ color:rgba(90,70,40,.2); }
+    #wa-log .ev-thumb--locked .ph-q{ color:rgba(110,86,46,.55); text-shadow:none; }
+
+    /* nieuw-ontdekt: korte oplichting */
+    @keyframes evReveal{
+      0%{ transform:scale(.97); opacity:.4; }
+      55%{ transform:scale(1.015); }
+      100%{ transform:scale(1); opacity:1; }
+    }
+    .ev-card.fresh{ animation:evReveal .5s ease-out; }
+
+    /* logboek-voortgang */
+    .lg-progress{ margin-bottom:18px; }
+    .lg-count{ font-size:13px; letter-spacing:.10em; color:rgba(105,255,243,.85); margin-bottom:7px; }
+    .lg-count b{ color:#d5a64d; font-size:16px; }
+    .lg-count span{ color:rgba(105,255,243,.45); letter-spacing:.14em; font-size:11px; }
+    .lg-bar{ height:4px; border-radius:3px; overflow:hidden;
+      background:rgba(105,255,243,.10); }
+    .lg-bar-fill{ height:100%; border-radius:3px;
+      background:linear-gradient(90deg, #69fff3, #d5a64d);
+      box-shadow:0 0 10px rgba(105,255,243,.5);
+      transition:width .6s cubic-bezier(.2,.8,.2,1); }
+    #wa-log .lg-count{ color:rgba(64,92,88,.85); }
+    #wa-log .lg-count b{ color:#8a5e12; }
+    #wa-log .lg-count span{ color:rgba(85,60,28,.5); }
+    #wa-log .lg-bar{ background:rgba(120,90,40,.16); }
 
     @media (max-width: 420px){
       #wa-log.wa-overlay{
@@ -373,10 +458,10 @@
   </main>
   <div id="enter" aria-hidden="true"><span class="ring">begroeten</span></div>
 
-  <!-- Publiek: event-grimoire (enkele tap) -->
-  <div id="wa-log" class="wa-overlay" role="dialog" aria-label="Grimoire">
+  <!-- Publiek: event-logboek (enkele tap) -->
+  <div id="wa-log" class="wa-overlay" role="dialog" aria-label="Logboek">
     <div class="wa-head">
-      <h2>· grimoire ·</h2>
+      <h2>· logboek ·</h2>
     </div>
     <div class="wa-body" id="wa-log-body"></div>
   </div>
@@ -4257,6 +4342,7 @@
       }
       drawSpeechBubble(now);
       drawDebug(now);
+      if (window._flushCaptures) window._flushCaptures();
     }
 
     let rafId = null;
@@ -4306,7 +4392,7 @@
     if (STATIC_PREVIEW) render(performance.now() + 1600);
     else startLoop();
 
-    // ── UIBrain: grimoire (enkele tap) ──────────────────────────────────────
+    // ── UIBrain: logboek (enkele tap) ──────────────────────────────────────
     (() => {
       const CATALOG = [
         {id:'flash',      l:'Kosmische flits',     c:'kosmisch',  r:1, s:'✦'},
@@ -4346,36 +4432,77 @@
         try{ seeds=JSON.parse(safeStorage.get(SEEDS_KEY)||'[]'); }catch(e){ seeds=[]; }
       };
       load();
-      window.UIBrain={ mark(id){ if(seen[id])return; seen[id]=Date.now(); safeStorage.set(SEEN_KEY,JSON.stringify(seen)); } };
+      window.UIBrain={ mark(id){ if(seen[id])return; seen[id]=Date.now(); safeStorage.set(SEEN_KEY,JSON.stringify(seen)); try{ enqueueCapture(id); }catch(e){} } };
 
-      const THUMB_COLORS = {
-        kosmisch:['#061018','#234d77','#c8fff9'],
-        vloot:['#08131b','#36573e','#f2d59c'],
-        bezoekers:['#0d0a18','#4d3367','#b8f7ff'],
-        orakel:['#130a1a','#5a3a74','#f3dba8']
+      // ── Cutout-momentopnames ─────────────────────────────────────────────
+      // Bij de eerste ontdekking van een item knippen we een uitsnede uit het
+      // canvas precies zoals het op dat moment is — een echte 'foto' van de
+      // scène. Per categorie kiezen we een passend kader: lucht-events tonen de
+      // hemel, orakel-events het gezicht.
+      const THUMBS_KEY = 'wa_thumbs_v2';
+      let thumbs = {};
+      try { thumbs = JSON.parse(safeStorage.get(THUMBS_KEY) || '{}') || {}; } catch(e){ thumbs = {}; }
+      const byId = {}; CATALOG.forEach(e => byId[e.id] = e);
+
+      // Uitsnede-kaders (in canvas-coördinaten, 360×640). Aspect ≈ 1.74.
+      const REGIONS = {
+        sky:  { x:8,  y:24,  w:344, h:198 },   // brede hemel — kosmisch & vloot
+        mid:  { x:6,  y:118, w:348, h:200 },   // middenveld — bezoekers
+        face: { x:62, y:92,  w:236, h:138 },   // gezicht & sieraden — orakel
       };
-      const svgUrl = s => 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(s);
-      function itemThumb(e){
-        const [bg1,bg2,fg] = THUMB_COLORS[e.c] || ['#081018','#254458','#d5f8ff'];
-        let motif='';
-        if(e.c==='kosmisch'){
-          motif = `<circle cx="34" cy="28" r="10" fill="${fg}" fill-opacity=".12"/><circle cx="34" cy="28" r="4" fill="${fg}"/><path d="M66 25c11-8 27-8 38 0" stroke="${fg}" stroke-opacity=".7" stroke-width="2" fill="none"/><path d="M61 48c18-12 37-12 53 0" stroke="${fg}" stroke-opacity=".35" stroke-width="2" fill="none"/>`;
-          if(e.id==='ripple') motif += `<circle cx="92" cy="28" r="10" stroke="${fg}" stroke-opacity=".6" stroke-width="2" fill="none"/><circle cx="92" cy="28" r="18" stroke="${fg}" stroke-opacity=".3" stroke-width="2" fill="none"/>`;
-          if(e.id==='pulsar') motif += `<circle cx="92" cy="28" r="8" fill="${fg}"/><path d="M92 10v36M74 28h36" stroke="${bg2}" stroke-width="3"/>`;
-          if(e.id==='riftGlow') motif += `<path d="M92 10l9 15-9 17-9-17z" fill="${fg}" fill-opacity=".85"/>`;
-        } else if(e.c==='vloot'){
-          const ship = e.id.includes('carrier') ? 'M40 38h58l12 8H28z' : e.id.includes('freighter') ? 'M34 39h64l12 7H24z' : e.id.includes('saucer') ? 'M28 40c10-8 62-8 72 0-10 8-62 8-72 0z' : e.id.includes('needle') ? 'M28 42l56-9 28 9-28 9z' : e.id.includes('organic') ? 'M35 44c8-18 32-26 53-13 10 6 14 18 2 24-17 10-47 4-55-11z' : e.id.includes('probe') ? 'M42 26l16 16-16 16-16-16z' : e.id.includes('broken') ? 'M30 43l26-7 8 7 24-6 19 12-26 4-11-5-18 6z' : 'M30 42l34-13 36 13-36 13z';
-          motif = `<path d="${ship}" fill="${fg}" fill-opacity=".92"/><circle cx="108" cy="28" r="2" fill="${fg}"/><circle cx="116" cy="22" r="1.5" fill="${fg}" fill-opacity=".8"/>`;
-        } else if(e.c==='bezoekers'){
-          motif = `<path d="M62 18c-10 0-18 7-19 16-1 10 5 16 10 19 5 4 7 10 8 17h20c1-7 3-13 8-17 5-3 11-9 10-19-1-9-9-16-19-16z" fill="${fg}" fill-opacity=".22" stroke="${fg}" stroke-opacity=".75"/><circle cx="72" cy="35" r="2.4" fill="${fg}"/><circle cx="90" cy="35" r="2.4" fill="${fg}"/><path d="M73 47c5 3 11 3 16 0" stroke="${fg}" stroke-width="2" fill="none"/>`;
-          if(e.id==='vis_astronaut') motif += `<circle cx="81" cy="39" r="26" stroke="${fg}" stroke-opacity=".65" stroke-width="2" fill="none"/>`;
-        } else {
-          motif = `<path d="M28 54c18-20 37-28 57-30 17-2 31 2 47 15-10-3-17-2-23 2 8 6 12 15 10 23-3 12-18 18-33 18-21 0-42-13-58-28z" fill="${fg}" fill-opacity=".18"/><path d="M55 30c9-5 23-5 33 0" stroke="${fg}" stroke-width="2.3" fill="none"/><ellipse cx="72" cy="44" rx="12" ry="6" fill="none" stroke="${fg}" stroke-width="2"/><ellipse cx="100" cy="44" rx="12" ry="6" fill="none" stroke="${fg}" stroke-width="2"/><path d="M86 42l4 3-4 3" stroke="${fg}" stroke-width="2" fill="none"/>`;
-        }
-        return svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 92"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/></linearGradient><radialGradient id="r" cx=".2" cy=".1" r=".9"><stop stop-color="#ffffff" stop-opacity=".28"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs><rect width="160" height="92" rx="10" fill="url(#g)"/><rect width="160" height="92" rx="10" fill="url(#r)"/>${motif}<text x="132" y="26" text-anchor="middle" font-family="monospace" font-size="24" fill="${fg}" fill-opacity=".82">${e.s}</text><text x="12" y="80" font-family="monospace" font-size="12" fill="#ffffff" fill-opacity=".78">${e.l}</text></svg>`);
+      function regionFor(id){
+        const e = byId[id]; const c = e ? e.c : '';
+        if (c === 'bezoekers') return REGIONS.mid;
+        if (c === 'orakel')    return REGIONS.face;
+        return REGIONS.sky;                    // kosmisch, vloot, en fallback
       }
 
-      // ── Grimoire renderen ────────────────────────────────────────────────
+      // Maak een gecomprimeerde uitsnede van het hoofdcanvas met vignet.
+      function grabCutout(region){
+        try{
+          if (!canvas || !canvas.width) return null;
+          const OW = 240, OH = 138;
+          const oc = document.createElement('canvas'); oc.width = OW; oc.height = OH;
+          const o = oc.getContext('2d');
+          let { x, y, w, h } = region;
+          x = Math.max(0, Math.min(x, W - 8)); y = Math.max(0, Math.min(y, H - 8));
+          w = Math.min(w, W - x);             h = Math.min(h, H - y);
+          o.drawImage(canvas, x, y, w, h, 0, 0, OW, OH);
+          // filmische vignet aan de randen
+          const vg = o.createRadialGradient(OW/2, OH*0.46, OH*0.22, OW/2, OH/2, OH*0.82);
+          vg.addColorStop(0, 'rgba(0,0,0,0)');
+          vg.addColorStop(1, 'rgba(0,0,0,.46)');
+          o.fillStyle = vg; o.fillRect(0, 0, OW, OH);
+          o.fillStyle = 'rgba(255,255,255,.05)'; o.fillRect(0, 0, OW, 1);
+          return oc.toDataURL('image/jpeg', 0.62);
+        } catch(e){ return null; }
+      }
+
+      function persistThumbs(){ safeStorage.set(THUMBS_KEY, JSON.stringify(thumbs)); }
+
+      // Captures verlopen via een wachtrij die in de render-loop wordt geleegd,
+      // zodat elke uitsnede gegarandeerd een vers, zichtbaar frame vastlegt.
+      const _capQueue = [];
+      function enqueueCapture(id){
+        if (thumbs[id]) return;
+        _capQueue.push(id);
+      }
+      window._flushCaptures = function(){
+        if (!_capQueue.length) return;
+        let changed = false, guard = 0;
+        while (_capQueue.length && guard++ < 4){
+          const id = _capQueue.shift();
+          if (thumbs[id]) continue;
+          const shot = grabCutout(regionFor(id));
+          if (shot){ thumbs[id] = shot; changed = true; window._lastCapId = id; }
+        }
+        if (changed){
+          persistThumbs();
+          if (logEl && logEl.classList.contains('open')) renderLog();
+        }
+      };
+
+      // ── Logboek renderen ────────────────────────────────────────────────
       const renderLog=()=>{
         const body=document.getElementById('wa-log-body');
         const found=CATALOG.filter(e=>seen[e.id]).length;
@@ -4388,8 +4515,10 @@
           : `<div style="font-size:12px;color:rgba(105,255,243,.35);margin-top:6px;letter-spacing:.10em;">geen opgeslagen seeds</div>`;
 
         body.innerHTML=`
-          <div style="font-size:13px;letter-spacing:.14em;color:rgba(105,255,243,.5);margin-bottom:16px;">
-            ${found} / ${CATALOG.length} ontdekt</div>
+          <div class="lg-progress">
+            <div class="lg-count"><b>${found}</b> / ${CATALOG.length} <span>vondsten vastgelegd</span></div>
+            <div class="lg-bar"><div class="lg-bar-fill" style="width:${Math.round(found/CATALOG.length*100)}%"></div></div>
+          </div>
 
           <div class="wa-sec">· dagelijkse scène ·</div>
           <div style="font-size:13px;color:rgba(105,255,243,.5);margin-bottom:10px;">
@@ -4404,16 +4533,29 @@
             return `<div class="wa-sec">· ${cat} ·</div>
             <div class="ev-grid">${items.map(e=>{
               const sv=seen[e.id];
+              const shot=thumbs[e.id];
               const d=sv?new Date(sv).toLocaleDateString('nl',{day:'numeric',month:'short'}):'';
-              return `<div class="ev-card${sv?' seen':''}">
-                <div class="ev-thumb"><img src="${itemThumb(e)}" alt="${e.l} illustratie" /></div>
+              const fresh=(window._lastCapId===e.id)?' fresh':'';
+              let thumbHTML;
+              if(shot){
+                thumbHTML=`<div class="ev-thumb has-shot"><img src="${shot}" alt="momentopname van ${e.l}" /><span class="ev-cap-tag">moment</span></div>`;
+              } else if(sv){
+                thumbHTML=`<div class="ev-thumb ev-thumb--symbol"><span class="ph-sym">${e.s}</span></div>`;
+              } else {
+                thumbHTML=`<div class="ev-thumb ev-thumb--locked"><span class="ph-sym">${e.s}</span><span class="ph-q">?</span></div>`;
+              }
+              const name=sv?e.l:'· verzegeld ·';
+              return `<div class="ev-card${sv?' seen':''}${fresh}" data-r="${e.r}">
+                ${thumbHTML}
                 <div class="ev-sym">${e.s}</div>
-                <div class="ev-name">${e.l}</div>
+                <div class="ev-name">${name}</div>
                 <div class="ev-stars">${STARS[e.r]}</div>
                 <div class="ev-badge">${sv?'gezien · '+d:'nog niet gezien'}</div>
               </div>`;
             }).join('')}</div>`;
-          }).join('')}`;
+          }).join('')}
+          <button class="wa-btn danger" id="lg-reset" style="margin-top:18px;">opnieuw beginnen</button>`;
+        window._lastCapId=null;
 
         // Seed-handlers
         document.getElementById('lg-save-seed').addEventListener('click',()=>{
@@ -4431,6 +4573,25 @@
             renderLog();
           });
         });
+
+        // Reset — twee tikken ter bevestiging (mobielvriendelijk, geen confirm-popup)
+        const rb=document.getElementById('lg-reset');
+        if(rb){
+          let armed=false, armTimer=null;
+          rb.addEventListener('click',()=>{
+            if(!armed){
+              armed=true; rb.textContent='tik nogmaals om te wissen';
+              clearTimeout(armTimer);
+              armTimer=setTimeout(()=>{ armed=false; rb.textContent='opnieuw beginnen'; },3000);
+              return;
+            }
+            clearTimeout(armTimer);
+            seen={}; thumbs={};
+            safeStorage.set(SEEN_KEY,'{}');
+            persistThumbs();
+            renderLog();
+          });
+        }
       };
 
       // ── Open/sluit ──────────────────────────────────────────────────────
@@ -4440,7 +4601,7 @@
       const toggleLog=()=>logEl.classList.contains('open') ? closeLog() : openLog();
 
       // ── Enkele tap als toggle ────────────────────────────────────────────
-      // Eerste tap opent het grimoire, de volgende tap sluit het weer. Geen aparte sluitknop.
+      // Eerste tap opent het logboek, de volgende tap sluit het weer. Geen aparte sluitknop.
       let tapTimer=null, uiActive=false;
       const waitU=setInterval(()=>{ if(!document.getElementById('enter')){ uiActive=true; clearInterval(waitU); }},300);
       window.addEventListener('pointerup',(ev)=>{
