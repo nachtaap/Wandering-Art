@@ -2198,12 +2198,18 @@
     }
 
     const GreetBrain = { active:false, start:0, showTextAfter:false };
+    const GREETING_LINES = [
+      '⟁ ... welkom ... reiziger ... ⟡',
+      ':: welkom :: reiziger ::',
+      '☾ ... signaal ontvangen ... welkom reiziger ...',
+      '∴ ... poort open ... welkom ... reiziger ...'
+    ];
 
     function startGreetingSpeech(now){
       speech.active   = true;
       speech.start    = now + 140;
-      speech.duration = 5000;
-      speech.text     = 'hallo ... welkom';
+      speech.duration = 5200;
+      speech.text     = pick(GREETING_LINES);
       speech.meaningful = true;
       speech.phase    = Math.random() * 999;
       speech.mood     = 'happy';
