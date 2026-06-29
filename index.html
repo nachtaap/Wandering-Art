@@ -2209,50 +2209,40 @@
         const T_LOWER  = .78;   // arm en pols rustig terug
         const LS_UP    = -.12;  // schouder blijft subtiel; onderarm doet het werk
         const LE_UP    = 2.0;   // onderarm: wijst links-omhoog
-        const HAND_REST_ABS = -.10;
-        // Linkerhand wordt gespiegeld getekend. Daardoor voelt +PI visueel als de
-        // verkeerde boog. Naar -PI draaien laat de vingers klokwijs omhoog komen.
-        const HAND_UP_ABS  = -Math.PI + .08;
-        const WAVE_AMP = .34;   // natuurlijke polszwaai: ±19°, geen 45° klap
+        // Nieuwe basis: de hand staat standaard in het verlengde van de onderarm.
+        // P.lh is dus puur een extra polsbuiging bovenop die lijn, niet langer de hele handhoek.
+        const WRIST_REST  = .02;
+        const WRIST_LOOSE = -.16;
+        // Voor de kijker moet de linkerhand tijdens de begroeting klokwijs openrollen.
+        // Dat betekent hier een negatieve polsbuiging t.o.v. de onderarm-lijn.
+        const WRIST_UP    = -1.04;
+        const WAVE_AMP = .26;   // subtiele polszwaai, geen losse slap hand
         const ss = f => f*f*(3-2*f);
         const c = PoseBrain.cur, t = PoseBrain.tar;
         let le=0, lh=0, done=false;
 
-        const wristDeltaFor = (forearmDelta, handAbs) => {
-          // draw-hand gebruikt: -.10 + (aL2-ARM.L2) + P.lh.
-          // P.lh moet dus de polsrotatie zijn die de hand naar een absolute,
-          // leesbare palm-forward hoek brengt. Zo stapelt de hand niet onnatuurlijk
-          // bovenop de onderarmrotatie.
-          return handAbs - (HAND_REST_ABS + forearmDelta);
-        };
-
         if (e < T_RAISE){
-          // Onderarm leidt. De hand blijft eerst losjes hangen en begint pas licht te volgen.
+          // Onderarm leidt; hand blijft netjes op de lijn van de onderarm, met slechts een minieme ontspanning.
           const f = ss(e / T_RAISE);
           le = LE_UP * f;
-          const looseHand = HAND_REST_ABS - le * .08;
-          lh = wristDeltaFor(le, looseHand);
+          lh = lerp(WRIST_REST, WRIST_LOOSE, f);
         } else if (e < T_RAISE + T_HAND){
-          // Daarna draait alleen de pols klokwijs door naar palm-forward.
+          // Daarna draait vooral de pols klokwijs door naar de zwaaipose.
           const f = ss((e - T_RAISE) / T_HAND);
           le = LE_UP;
-          const looseHand = HAND_REST_ABS - LE_UP * .08;
-          const handAbs = lerp(looseHand, HAND_UP_ABS, f);
-          lh = wristDeltaFor(le, handAbs);
+          lh = lerp(WRIST_LOOSE, WRIST_UP, f);
         } else if (e < T_RAISE + T_HAND + T_WAVE){
           // Zwaai uit de pols, met een kleine forearm-bounce zodat het niet mechanisch wordt.
           const w = e - T_RAISE - T_HAND;
           const wavePhase = w * Math.PI * 3.6;
           const envelope = Math.sin(clamp(w / T_WAVE, 0, 1) * Math.PI);
           le = LE_UP + Math.sin(wavePhase + .8) * .045 * envelope;
-          const handAbs = HAND_UP_ABS + Math.sin(wavePhase) * WAVE_AMP * (.72 + .28 * envelope);
-          lh = wristDeltaFor(le, handAbs);
+          lh = WRIST_UP + Math.sin(wavePhase) * WAVE_AMP * (.72 + .28 * envelope);
         } else if (e < T_RAISE + T_HAND + T_WAVE + T_LOWER){
           // Terug: eerst ontspant de pols, daarna zakt de onderarm mee.
           const f = ss((e - T_RAISE - T_HAND - T_WAVE) / T_LOWER);
           le = LE_UP * (1 - f);
-          const handAbs = lerp(HAND_UP_ABS, HAND_REST_ABS, f);
-          lh = wristDeltaFor(le, handAbs);
+          lh = lerp(WRIST_UP, WRIST_REST, f);
         } else { done = true; }
 
         if (!done){
@@ -3382,16 +3372,22 @@
       // valt exact op het einde van de onderarm. Dit voorkomt dat de hand visueel
       // onder de mouw "afzakt" wanneer de pols 180° draait tijdens de begroeting.
       function handAtWrist(wx, wy, side=1, rot=0){
-        // In hand() zit de pols-aanhechting bovenaan de palm, rond y=-12.
-        // Door die lokale anchor terug te rekenen naar canvas-ruimte blijft de
-        // hand vastgeprikt aan de onderarm, onafhankelijk van rotatie of spiegeling.
-        const ax = 0;
+        // Het echte polscentrum zit nét rechts van het geometrische midden van de handvorm.
+        // Door die lokale anchor te gebruiken staat de palm optisch op de mouw, niet eronder.
+        const ax = 1.2;
         const ay = -12;
         const cr = Math.cos(rot);
         const sr = Math.sin(rot);
         const tx = wx - side * (cr * ax - sr * ay);
         const ty = wy -        (sr * ax + cr * ay);
         hand(tx, ty, side, rot);
+      }
+
+      function handRotFromForearm(forearmAngle, side=1, wristDelta=0){
+        // De lokale handvorm wijst van pols -> vingers langs +Y (omlaag in lokale ruimte).
+        // Deze helper draait die as eerst exact in de richting van de onderarm,
+        // waarna alleen nog een kleine polsbuiging (wristDelta) wordt toegevoegd.
+        return side * (forearmAngle - Math.PI * 0.5) + wristDelta;
       }
 
       function foot(x,y,side=1,rot=0){
@@ -3556,13 +3552,13 @@
       ctx.beginPath(); ctx.ellipse(wristL.x,wristL.y,5,4,0,0,Math.PI*2); ctx.stroke();
       ctx.beginPath(); ctx.ellipse(wristR.x,wristR.y,5,4,0,0,Math.PI*2); ctx.stroke();
       ctx.globalAlpha=1;
-      const handLife = Math.sin(t * .9 + .3) * .035 * rm;
-      const handRotL = -.10 + (aL2-ARM.L2) + P.lh + handLife;
-      const handRotR =  .10 + (aR2-ARM.R2) + P.rh - handLife;
-      // De hand staat nu echt op de pols/onderarm. Een kleine projectie langs de
-      // onderarmrichting legt de palm nét óp de mouwrand, zoals anatomisch verwacht.
-      handAtWrist(wristL.x + Math.cos(aL2)*1.5, wristL.y + Math.sin(aL2)*1.5, -1, handRotL);
-      handAtWrist(wristR.x + Math.cos(aR2)*1.5, wristR.y + Math.sin(aR2)*1.5,  1, handRotR);
+      const handLife = Math.sin(t * .9 + .3) * .02 * rm;
+      const handRotL = handRotFromForearm(aL2, -1, P.lh + handLife);
+      const handRotR = handRotFromForearm(aR2,  1, P.rh - handLife);
+      // De hand staat in het verlengde van de onderarm en schuift een paar pixels de mouw in,
+      // zodat de aansluiting anatomisch leest als één doorlopende pols/hand-lijn.
+      handAtWrist(wristL.x + Math.cos(aL2)*4.5, wristL.y + Math.sin(aL2)*4.5, -1, handRotL);
+      handAtWrist(wristR.x + Math.cos(aR2)*4.5, wristR.y + Math.sin(aR2)*4.5,  1, handRotR);
 
       // Normale anatomie, schoon gescheiden: eerst de torso (schouders + borst) als basis,
       // dan de hals-kolom daar overheen, dan het gezicht erover. Hoofd → hals → torso.
