@@ -2197,7 +2197,17 @@
       PoseBrain.nextAt = now + (chosen === 'rest' ? rnd(1800, 3400) : rnd(2600, 5200));
     }
 
-    const GreetBrain = { active:false, start:0 };
+    const GreetBrain = { active:false, start:0, showTextAfter:false };
+
+    function startGreetingSpeech(now){
+      speech.active   = true;
+      speech.start    = now + 140;
+      speech.duration = 5000;
+      speech.text     = 'hallo ... welkom';
+      speech.meaningful = true;
+      speech.phase    = Math.random() * 999;
+      speech.mood     = 'happy';
+    }
 
     function updatePose(now, dt){
       // ── Begroet-zwaai (tijdgestuurde sequentie, heeft voorrang) ────────────
@@ -2252,6 +2262,10 @@
           return;
         }
         GreetBrain.active=false;
+        if (GreetBrain.showTextAfter){
+          GreetBrain.showTextAfter=false;
+          startGreetingSpeech(now);
+        }
         // Zeker weten dat de rig schoon terugvalt naar de normale autonome pose-pool.
         const z = PoseBrain.tar; z.ls=z.le=z.lh=z.rs=z.re=z.rh=0;
         PoseBrain.nextAt=now+500;
@@ -4170,14 +4184,11 @@
         const now = performance.now();
         GreetBrain.active = true;
         GreetBrain.start  = now;
-        // Begroeting via de echte speech API
-        speech.active   = true;
-        speech.start    = now + 300;
-        speech.duration = 5000;
-        speech.text     = 'hallo ... welkom';
-        speech.meaningful = true;
-        speech.phase    = Math.random() * 999;
-        speech.mood     = 'happy';
+        GreetBrain.showTextAfter = true;
+        // Geen tekstballon tijdens het zwaaien: eerst de volledige handbeweging,
+        // daarna pas de begroetingstekst laten infaden.
+        speech.active = false;
+        speech.nextAt = now + 12000;
       };
       updateWeatherBrain(now,dt);
       updateEmotion(now,dt);
