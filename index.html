@@ -3378,6 +3378,22 @@
         ctx.restore();
       }
 
+      // Plaats de hand via een echte pols-anchor: het lokale polspunt van de hand
+      // valt exact op het einde van de onderarm. Dit voorkomt dat de hand visueel
+      // onder de mouw "afzakt" wanneer de pols 180° draait tijdens de begroeting.
+      function handAtWrist(wx, wy, side=1, rot=0){
+        // In hand() zit de pols-aanhechting bovenaan de palm, rond y=-12.
+        // Door die lokale anchor terug te rekenen naar canvas-ruimte blijft de
+        // hand vastgeprikt aan de onderarm, onafhankelijk van rotatie of spiegeling.
+        const ax = 0;
+        const ay = -12;
+        const cr = Math.cos(rot);
+        const sr = Math.sin(rot);
+        const tx = wx - side * (cr * ax - sr * ay);
+        const ty = wy -        (sr * ax + cr * ay);
+        hand(tx, ty, side, rot);
+      }
+
       function foot(x,y,side=1,rot=0){
         ctx.save();
         ctx.translate(x,y);
@@ -3541,8 +3557,12 @@
       ctx.beginPath(); ctx.ellipse(wristR.x,wristR.y,5,4,0,0,Math.PI*2); ctx.stroke();
       ctx.globalAlpha=1;
       const handLife = Math.sin(t * .9 + .3) * .035 * rm;
-      hand(wristL.x-2,wristL.y+12,-1,-.10 + (aL2-ARM.L2) + P.lh + handLife);
-      hand(wristR.x+2,wristR.y+12, 1, .10 + (aR2-ARM.R2) + P.rh - handLife);
+      const handRotL = -.10 + (aL2-ARM.L2) + P.lh + handLife;
+      const handRotR =  .10 + (aR2-ARM.R2) + P.rh - handLife;
+      // De hand staat nu echt op de pols/onderarm. Een kleine projectie langs de
+      // onderarmrichting legt de palm nét óp de mouwrand, zoals anatomisch verwacht.
+      handAtWrist(wristL.x + Math.cos(aL2)*1.5, wristL.y + Math.sin(aL2)*1.5, -1, handRotL);
+      handAtWrist(wristR.x + Math.cos(aR2)*1.5, wristR.y + Math.sin(aR2)*1.5,  1, handRotR);
 
       // Normale anatomie, schoon gescheiden: eerst de torso (schouders + borst) als basis,
       // dan de hals-kolom daar overheen, dan het gezicht erover. Hoofd → hals → torso.
