@@ -336,6 +336,97 @@
     }
     #wa-log .seed-pill .sd{ color:rgba(74,55,26,.62); opacity:1; }
 
+    /* Grimoire mini-illustraties */
+    .ev-card{ overflow:hidden; }
+    .ev-card .ev-thumb{
+      height:72px; margin:-8px -10px 6px;
+      border-radius:6px 6px 4px 4px; overflow:hidden;
+      border-bottom:1px solid rgba(105,255,243,.12);
+      background:linear-gradient(180deg, rgba(7,23,29,.92), rgba(6,20,26,.65));
+    }
+    .ev-card .ev-thumb img{ display:block; width:100%; height:100%; object-fit:cover; }
+    #wa-log .ev-card .ev-thumb{
+      border-bottom-color:rgba(98,74,42,.16);
+      background:linear-gradient(180deg, rgba(255,252,246,.9), rgba(240,228,198,.82));
+    }
+
+    /* Ether-radio in de onderste zwarte balk */
+    #wa-radio{
+      position:fixed; left:0; right:0; bottom:0; z-index:18;
+      padding:10px 14px calc(env(safe-area-inset-bottom, 0px) + 10px);
+      background:
+        linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.2) 14%, rgba(1,4,10,.94) 15%, rgba(0,0,0,.98) 100%);
+      border-top:1px solid rgba(105,255,243,.14);
+      box-shadow:0 -14px 26px rgba(0,0,0,.26);
+      pointer-events:auto;
+      font-family:monospace;
+    }
+    #wa-radio .radio-panel{
+      width:min(100%, 680px); margin:0 auto;
+      display:grid; grid-template-columns:1fr auto; gap:6px 12px; align-items:center;
+    }
+    #wa-radio .radio-label{
+      font-size:11px; letter-spacing:.24em; text-transform:lowercase;
+      color:rgba(105,255,243,.68);
+    }
+    #wa-radio .radio-freq{
+      font-size:12px; letter-spacing:.14em; color:#d5a64d;
+      text-shadow:0 0 8px rgba(213,166,77,.16);
+    }
+    #wa-radio .radio-sub{
+      grid-column:1 / -1; min-height:16px;
+      font-size:12px; letter-spacing:.10em;
+      color:rgba(200,255,249,.72);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.92;
+    }
+    #wa-radio .radio-trackwrap{ grid-column:1 / -1; position:relative; padding-top:9px; }
+    #wa-radio .radio-scale{
+      position:absolute; left:0; right:0; top:0; height:8px; pointer-events:none;
+      background:repeating-linear-gradient(90deg,
+        rgba(213,166,77,.0) 0 8px,
+        rgba(213,166,77,.36) 8px 9px,
+        rgba(213,166,77,.0) 9px 18px,
+        rgba(105,255,243,.26) 18px 19px,
+        rgba(105,255,243,0) 19px 34px);
+      opacity:.5;
+    }
+    #wa-radio input[type=range]{
+      -webkit-appearance:none; appearance:none;
+      width:100%; height:24px; background:transparent; outline:none;
+      touch-action:pan-x; cursor:pointer;
+    }
+    #wa-radio input[type=range]::-webkit-slider-runnable-track{
+      height:4px; border-radius:999px;
+      background:linear-gradient(90deg, rgba(105,255,243,.2), rgba(213,166,77,.4), rgba(105,255,243,.2));
+      box-shadow:0 0 0 1px rgba(105,255,243,.12);
+    }
+    #wa-radio input[type=range]::-moz-range-track{
+      height:4px; border:none; border-radius:999px;
+      background:linear-gradient(90deg, rgba(105,255,243,.2), rgba(213,166,77,.4), rgba(105,255,243,.2));
+      box-shadow:0 0 0 1px rgba(105,255,243,.12);
+    }
+    #wa-radio input[type=range]::-webkit-slider-thumb{
+      -webkit-appearance:none; appearance:none;
+      width:18px; height:26px; margin-top:-11px; border-radius:4px;
+      border:1px solid rgba(255,248,221,.8);
+      background:linear-gradient(180deg, #fff4ca, #d5a64d 70%, #8a5e12);
+      box-shadow:0 0 0 1px rgba(0,0,0,.34), 0 0 12px rgba(213,166,77,.24);
+    }
+    #wa-radio input[type=range]::-moz-range-thumb{
+      width:18px; height:26px; border-radius:4px;
+      border:1px solid rgba(255,248,221,.8);
+      background:linear-gradient(180deg, #fff4ca, #d5a64d 70%, #8a5e12);
+      box-shadow:0 0 0 1px rgba(0,0,0,.34), 0 0 12px rgba(213,166,77,.24);
+    }
+    #wa-radio.tuned .radio-sub{ color:#69fff3; text-shadow:0 0 8px rgba(105,255,243,.18); }
+    #wa-radio.tuned .radio-freq{ color:#fff0c2; }
+
+    @media (max-width: 420px){
+      #wa-radio{ padding-inline:10px; }
+      #wa-radio .radio-label{ font-size:10px; }
+      #wa-radio .radio-sub{ font-size:11px; }
+    }
+
     @media (max-width: 420px){
       #wa-log.wa-overlay{
         padding-top:calc(env(safe-area-inset-top, 0px) + 18px);
@@ -365,6 +456,18 @@
       <h2>· grimoire ·</h2>
     </div>
     <div class="wa-body" id="wa-log-body"></div>
+  </div>
+
+  <div id="wa-radio" aria-label="Ether radio">
+    <div class="radio-panel">
+      <div class="radio-label">✶ etherband</div>
+      <div class="radio-freq" id="radio-freq">88.8 ΞHz</div>
+      <div class="radio-sub" id="radio-sub">ruis ... zoek een zender</div>
+      <div class="radio-trackwrap">
+        <div class="radio-scale" aria-hidden="true"></div>
+        <input id="radio-tuner" type="range" min="0" max="1000" step="1" value="80" aria-label="Zoek een zender" />
+      </div>
+    </div>
   </div>
 
   <pre id="dbg"></pre>
@@ -872,6 +975,89 @@
 
       suspend(){ if(this.ctx && this.ctx.state==='running') this.ctx.suspend(); },
       resume(){ if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); }
+    };
+
+    const RadioBrain = {
+      el:null, slider:null, freqEl:null, subEl:null,
+      stations:[
+        { pos:.17, msg:'⟡ zhaa ... velorum ... reiziger ... ⟡' },
+        { pos:.48, msg:':: klik ... orakel-band ... ontvangst ::' },
+        { pos:.79, msg:'☾ khhrr ... poort open ... kom dichterbij ...' }
+      ],
+      value:.08, strength:0, locked:-1, nextNoiseAt:0, nextTalkAt:0,
+      init(){
+        this.el=document.getElementById('wa-radio');
+        this.slider=document.getElementById('radio-tuner');
+        this.freqEl=document.getElementById('radio-freq');
+        this.subEl=document.getElementById('radio-sub');
+        if(!this.el || !this.slider || !this.freqEl || !this.subEl) return;
+        const onInput=(user=false)=>{
+          this.value=Number(this.slider.value||0)/1000;
+          this.refresh(user);
+          if(user){ AudioBrain.start(); AudioBrain.resume(); }
+        };
+        ['pointerdown','pointerup','click'].forEach(type=> this.el.addEventListener(type, ev => ev.stopPropagation()));
+        this.slider.addEventListener('input', ()=>onInput(true));
+        this.slider.addEventListener('change', ()=>onInput(true));
+        onInput(false);
+        setInterval(()=>this.tick(performance.now()), 140);
+      },
+      nearest(){
+        let best={ i:-1, d:999, st:null };
+        this.stations.forEach((st,i)=>{ const d=Math.abs(this.value-st.pos); if(d<best.d) best={i,d,st}; });
+        return best;
+      },
+      refresh(user=false){
+        const n=this.nearest();
+        const strength=clamp(1 - n.d / .09, 0, 1);
+        const prev=this.locked;
+        this.strength=strength;
+        this.locked = strength > .82 ? n.i : -1;
+        this.freqEl.textContent = (88 + this.value * 20).toFixed(1) + ' ΞHz';
+        if(this.locked >= 0){
+          this.subEl.textContent = n.st.msg;
+          this.el.classList.add('tuned');
+          if(user && prev !== this.locked){ this.nextTalkAt = 0; this.burst(true); }
+        } else if (strength > .34){
+          this.subEl.textContent = '... fragment ... bijna ... blijf zoeken ...';
+          this.el.classList.remove('tuned');
+        } else {
+          this.subEl.textContent = 'ruis ... zoek een zender';
+          this.el.classList.remove('tuned');
+        }
+      },
+      burst(full=false){
+        if(!AudioBrain.started) return;
+        const root = AudioBrain.root || 55;
+        if(this.locked >= 0){
+          const mul = [5.2, 6.1, 7.4][this.locked] || 6;
+          const seq = full ? [0,110,240,390] : [0,120,260];
+          seq.forEach((ms, idx)=>setTimeout(()=>{
+            const f = root * (mul + (idx % 2) * .35 + Math.random() * .22);
+            AudioBrain.voice(f, .12 + Math.random() * .08, idx % 2 ? 'square' : 'triangle', {
+              gain:.025 + this.strength * .03,
+              send:.24 + this.strength * .22,
+              filter:'bandpass', q:6,
+              slideTo:f * (.94 + Math.random() * .12),
+              attack:.004
+            });
+          }, ms));
+          setTimeout(()=>AudioBrain.noiseBurst(.09, {gain:.018 + this.strength * .016, type:'bandpass', freq: root * 28, q:8, send:.12}), full ? 500 : 340);
+        } else if (this.strength > .14){
+          AudioBrain.noiseBurst(.08, {gain:.018 + this.strength * .024, type:'bandpass', freq: 700 + this.value * 2400, q:2.8, send:.05});
+        }
+      },
+      tick(now){
+        if(!this.slider) return;
+        if(this.strength > .08 && now > this.nextNoiseAt){
+          this.nextNoiseAt = now + (this.locked >= 0 ? 620 : 150);
+          this.burst(false);
+        }
+        if(this.locked >= 0 && now > this.nextTalkAt){
+          this.nextTalkAt = now + rnd(900, 1800);
+          this.burst(false);
+        }
+      }
     };
 
     // ────────────────────────────────────────────────────
@@ -4267,6 +4453,8 @@
     fetchNewsKeywords(true);
     setInterval(() => fetchNewsKeywords(false), 1000 * 60 * 5);
 
+    RadioBrain.init();
+
     // Eenmalige drempel: één gesture ontgrendelt audio, daarna nooit meer UI.
     (() => {
       const veil = document.getElementById('enter');
@@ -4333,6 +4521,33 @@
       load();
       window.UIBrain={ mark(id){ if(seen[id])return; seen[id]=Date.now(); safeStorage.set(SEEN_KEY,JSON.stringify(seen)); } };
 
+      const THUMB_COLORS = {
+        kosmisch:['#061018','#234d77','#c8fff9'],
+        vloot:['#08131b','#36573e','#f2d59c'],
+        bezoekers:['#0d0a18','#4d3367','#b8f7ff'],
+        orakel:['#130a1a','#5a3a74','#f3dba8']
+      };
+      const svgUrl = s => 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(s);
+      function itemThumb(e){
+        const [bg1,bg2,fg] = THUMB_COLORS[e.c] || ['#081018','#254458','#d5f8ff'];
+        let motif='';
+        if(e.c==='kosmisch'){
+          motif = `<circle cx="34" cy="28" r="10" fill="${fg}" fill-opacity=".12"/><circle cx="34" cy="28" r="4" fill="${fg}"/><path d="M66 25c11-8 27-8 38 0" stroke="${fg}" stroke-opacity=".7" stroke-width="2" fill="none"/><path d="M61 48c18-12 37-12 53 0" stroke="${fg}" stroke-opacity=".35" stroke-width="2" fill="none"/>`;
+          if(e.id==='ripple') motif += `<circle cx="92" cy="28" r="10" stroke="${fg}" stroke-opacity=".6" stroke-width="2" fill="none"/><circle cx="92" cy="28" r="18" stroke="${fg}" stroke-opacity=".3" stroke-width="2" fill="none"/>`;
+          if(e.id==='pulsar') motif += `<circle cx="92" cy="28" r="8" fill="${fg}"/><path d="M92 10v36M74 28h36" stroke="${bg2}" stroke-width="3"/>`;
+          if(e.id==='riftGlow') motif += `<path d="M92 10l9 15-9 17-9-17z" fill="${fg}" fill-opacity=".85"/>`;
+        } else if(e.c==='vloot'){
+          const ship = e.id.includes('carrier') ? 'M40 38h58l12 8H28z' : e.id.includes('freighter') ? 'M34 39h64l12 7H24z' : e.id.includes('saucer') ? 'M28 40c10-8 62-8 72 0-10 8-62 8-72 0z' : e.id.includes('needle') ? 'M28 42l56-9 28 9-28 9z' : e.id.includes('organic') ? 'M35 44c8-18 32-26 53-13 10 6 14 18 2 24-17 10-47 4-55-11z' : e.id.includes('probe') ? 'M42 26l16 16-16 16-16-16z' : e.id.includes('broken') ? 'M30 43l26-7 8 7 24-6 19 12-26 4-11-5-18 6z' : 'M30 42l34-13 36 13-36 13z';
+          motif = `<path d="${ship}" fill="${fg}" fill-opacity=".92"/><circle cx="108" cy="28" r="2" fill="${fg}"/><circle cx="116" cy="22" r="1.5" fill="${fg}" fill-opacity=".8"/>`;
+        } else if(e.c==='bezoekers'){
+          motif = `<path d="M62 18c-10 0-18 7-19 16-1 10 5 16 10 19 5 4 7 10 8 17h20c1-7 3-13 8-17 5-3 11-9 10-19-1-9-9-16-19-16z" fill="${fg}" fill-opacity=".22" stroke="${fg}" stroke-opacity=".75"/><circle cx="72" cy="35" r="2.4" fill="${fg}"/><circle cx="90" cy="35" r="2.4" fill="${fg}"/><path d="M73 47c5 3 11 3 16 0" stroke="${fg}" stroke-width="2" fill="none"/>`;
+          if(e.id==='vis_astronaut') motif += `<circle cx="81" cy="39" r="26" stroke="${fg}" stroke-opacity=".65" stroke-width="2" fill="none"/>`;
+        } else {
+          motif = `<path d="M28 54c18-20 37-28 57-30 17-2 31 2 47 15-10-3-17-2-23 2 8 6 12 15 10 23-3 12-18 18-33 18-21 0-42-13-58-28z" fill="${fg}" fill-opacity=".18"/><path d="M55 30c9-5 23-5 33 0" stroke="${fg}" stroke-width="2.3" fill="none"/><ellipse cx="72" cy="44" rx="12" ry="6" fill="none" stroke="${fg}" stroke-width="2"/><ellipse cx="100" cy="44" rx="12" ry="6" fill="none" stroke="${fg}" stroke-width="2"/><path d="M86 42l4 3-4 3" stroke="${fg}" stroke-width="2" fill="none"/>`;
+        }
+        return svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 92"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/></linearGradient><radialGradient id="r" cx=".2" cy=".1" r=".9"><stop stop-color="#ffffff" stop-opacity=".28"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs><rect width="160" height="92" rx="10" fill="url(#g)"/><rect width="160" height="92" rx="10" fill="url(#r)"/>${motif}<text x="132" y="26" text-anchor="middle" font-family="monospace" font-size="24" fill="${fg}" fill-opacity=".82">${e.s}</text><text x="12" y="80" font-family="monospace" font-size="12" fill="#ffffff" fill-opacity=".78">${e.l}</text></svg>`);
+      }
+
       // ── Grimoire renderen ────────────────────────────────────────────────
       const renderLog=()=>{
         const body=document.getElementById('wa-log-body');
@@ -4364,6 +4579,7 @@
               const sv=seen[e.id];
               const d=sv?new Date(sv).toLocaleDateString('nl',{day:'numeric',month:'short'}):'';
               return `<div class="ev-card${sv?' seen':''}">
+                <div class="ev-thumb"><img src="${itemThumb(e)}" alt="${e.l} illustratie" /></div>
                 <div class="ev-sym">${e.s}</div>
                 <div class="ev-name">${e.l}</div>
                 <div class="ev-stars">${STARS[e.r]}</div>
@@ -4400,8 +4616,10 @@
       // Eerste tap opent het grimoire, de volgende tap sluit het weer. Geen aparte sluitknop.
       let tapTimer=null, uiActive=false;
       const waitU=setInterval(()=>{ if(!document.getElementById('enter')){ uiActive=true; clearInterval(waitU); }},300);
-      window.addEventListener('pointerup',()=>{
+      window.addEventListener('pointerup',(ev)=>{
         if(!uiActive)return;
+        const trg = ev.target;
+        if (trg && (trg.closest('#wa-log') || trg.closest('#wa-radio') || trg.closest('#enter'))) return;
         clearTimeout(tapTimer);
         tapTimer=setTimeout(toggleLog,120);
       });
