@@ -5357,7 +5357,9 @@
       }
 
       // ── Persistente staat ───────────────────────────────────────────────
-      const CH_KEY='wa_chronicle_v1', META_KEY='wa_chmeta_v1', SEEDS_KEY='wa_seeds_v1';
+      // Stabiele startversie: nieuw leeg logboek.
+      // Oude testdata uit v1 blijft in localStorage staan, maar wordt niet meer gelezen.
+      const CH_KEY='wa_chronicle_v2', META_KEY='wa_chmeta_v2', SEEDS_KEY='wa_seeds_v2';
       const CH_MAX=140;                 // tijdlijn-lengte
       let chronicle=[], seeds=[];
       let meta={ total:0, best:0, species:{}, opens:0, days:{}, stories:{} };
@@ -5365,6 +5367,10 @@
       try{ seeds=JSON.parse(safeStorage.get(SEEDS_KEY)||'[]')||[]; }catch(e){ seeds=[]; }
       try{ Object.assign(meta, JSON.parse(safeStorage.get(META_KEY)||'{}')||{}); }catch(e){}
       meta.species=meta.species||{}; meta.days=meta.days||{}; meta.stories=meta.stories||{}; meta.biomes=meta.biomes||{}; meta.opensByDay=meta.opensByDay||{};
+      // Anti-jackpot: zeldzame unlocks mogen niet als confetti achter elkaar vallen.
+      // lastLegendaryAt bewaakt alle 5-sterren-waarnemingen, lastStoryAt bewaakt verhaalmomenten.
+      meta.lastLegendaryAt=meta.lastLegendaryAt||0;
+      meta.lastStoryAt=meta.lastStoryAt||0;
 
       function persist(){
         safeStorage.set(META_KEY, JSON.stringify(meta));
@@ -5377,14 +5383,22 @@
 
       // ── Het journaal ────────────────────────────────────────────────────
       const THROTTLE={ kosmisch:12000, vloot:9000, bezoekers:4000, orakel:1500, verhaal:0 };
+      const LEGENDARY_COOLDOWN=12*60*1000; // 5-sterren: maximaal één echte unlock per 12 minuten
+      const STORY_COOLDOWN=3*60*1000;      // verhaalmomenten: ruimte tussen narratieve beats
       const _last={};
       const Chronicle={
         observe(cat, key, ev){
           const now=Date.now();
           if (THROTTLE[cat] && _last[key] && now-_last[key]<THROTTLE[cat]) return null;
-          _last[key]=now;
           const isStory = cat==='verhaal';
           const rar = (ev && ev.stars!=null) ? Rarity.fromStars(ev.stars) : Rarity.fromProb(probFor(cat,key));
+
+          // Globale zeldzaamheids-poort. Zonder deze poort kan één legendarische
+          // gebeurtenis meteen meerdere 5-sterren-verhalen losmaken.
+          if (rar.stars>=5 && meta.lastLegendaryAt && now-meta.lastLegendaryAt<LEGENDARY_COOLDOWN) return null;
+          if (isStory && meta.lastStoryAt && now-meta.lastStoryAt<STORY_COOLDOWN) return null;
+
+          _last[key]=now;
           const lore = (ev && ev.title) ? { title:ev.title, line:ev.line||'' } : Lore.name(cat,key,ev||{});
           const id='e'+now.toString(36)+Math.floor(Math.random()*46656).toString(36);
           // vloot & kosmisch: meteen een los vector-portret uit de live parameters
@@ -5398,6 +5412,8 @@
           if (chronicle.length>CH_MAX) chronicle.length=CH_MAX;
           meta.total++; meta.best=Math.max(meta.best, rar.stars);
           meta.species[key]=(meta.species[key]||0)+1;
+          if (rar.stars>=5) meta.lastLegendaryAt=now;
+          if (isStory) meta.lastStoryAt=now;
           persist();
           // bezoekers/orakel/verhaal: cutout van de scène (of fallback als portret faalde)
           if (!thumb && (rar.stars>=2 || meta.species[key]===1 || isStory)) enqueueCapture(id, cat);
@@ -5644,13 +5660,20 @@
       function checkStories(){
         if (!meta.biomes) meta.biomes={};
         if (!meta.biomes[SceneBrain.biome]){ meta.biomes[SceneBrain.biome]=Date.now(); persist(); }
+        // Verhalen zijn narratieve beloningen, geen checklist. Ook bij meerdere
+        // voldane voorwaarden ontgrendelt er maar af en toe één.
+        if (meta.lastStoryAt && Date.now()-meta.lastStoryAt<STORY_COOLDOWN) return;
         const ctx=storyContext();
         for(const st of STORIES){
           if (meta.stories[st.id]) continue;
           let ok=false; try{ ok=st.cond(ctx); }catch(e){ ok=false; }
           if(ok){
+            const entry=Chronicle.observe('verhaal', st.id, { stars:st.stars, title:st.title, line:st.line, sym:st.sym });
+            // Als een 5-sterren- of verhaal-cooldown actief is: niet als gezien markeren.
+            // Dan kan het moment later alsnog echt vallen, in plaats van verloren te gaan.
+            if(!entry) break;
             meta.stories[st.id]=Date.now();
-            Chronicle.observe('verhaal', st.id, { stars:st.stars, title:st.title, line:st.line, sym:st.sym });
+            persist();
             // het personage spreekt het verhaalmoment ook uit, maar via een wachtrij.
             // Zo overschrijft een nieuw verhaal nooit de huidige tekstballon.
             if (st.say && !(WardrobeBrain.phase && WardrobeBrain.phase!=='present')){
