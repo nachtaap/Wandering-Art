@@ -4479,101 +4479,70 @@
       const x       = vis.left  + 8;
       const bubbleW = vis.right - vis.left - 16;
       const chinY   = H * .415;
-      // Alle ballonvarianten delen dezelfde vaste ankerplek onder het gezicht.
-      // Zo verschijnen story/caption-teksten nooit meer als los rechthoekig vak bovenin.
+      // Eén vaste, oorspronkelijke tekstballonvorm. Alleen kleur verandert per toestand.
       const baseY   = chinY + 6;
 
       const wobX=Math.sin(now*.0013+speech.phase)*.6;
       const wobY=Math.sin(now*.002 +speech.phase)*.6;
 
-      ctx.save(); ctx.globalAlpha=a*.94;
-
-      if(type==='speech'){
-        // ── Gewone tekstballon — rechte rand, staart omhoog naar haar mond ──
-        const lines=splitBubbleLines(speech.text,bubbleW-padX*2,font);
-        const bubbleH=padY*2+lines.length*lineH;
-        const y=baseY;
-        const tailX=x+bubbleW*.50, tailY=y-16;
-        roundedBubble(x+wobX,y+wobY,bubbleW,bubbleH,9,tailX,tailY,'top',tailX);
-        ctx.fillStyle=C.bubbleFill; ctx.fill();
-        ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
-        ctx.fillStyle=C.bubble; ctx.font=font; ctx.textBaseline='top';
-        for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],x+wobX+padX,chinY+6+wobY+padY+i*lineH);
-
-      } else if(type==='thought'){
-        // ── Gedachteballon — wolkvorm: kleine bellen leiden omhoog naar haar hoofd ──
-        const lines=splitBubbleLines(speech.text,bubbleW-padX*2-8,font);
-        const bubbleH=padY*2+8+lines.length*lineH;
-        const bx=x+wobX, by=baseY+wobY;
-        const cx2=bx+bubbleW/2, cy2=by+bubbleH/2;
-        const rx=bubbleW/2+4, ry=bubbleH/2+4;
-        // Wolk: ellips met inkepingen (sinusoïde radiale variatie langs de rand)
-        ctx.beginPath();
-        const steps=64;
-        for(let i=0;i<=steps;i++){
-          const ang=(-Math.PI/2)+(i/steps)*2*Math.PI;
-          const bump=1+.13*Math.sin(ang*7+.4)+.06*Math.sin(ang*13+1.2);
-          ctx.lineTo(cx2+Math.cos(ang)*rx*bump, cy2+Math.sin(ang)*ry*bump);
+      const palette = (() => {
+        if (type === 'caption') {
+          return {
+            fill:'rgba(54,36,8,.94)',
+            stroke:'rgba(255,211,93,.86)',
+            text:'#ffe6a8',
+            glow:'rgba(255,211,93,.18)'
+          };
         }
-        ctx.closePath();
-        ctx.fillStyle=C.bubbleFill; ctx.fill();
-        ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
-        // Kleine bolletjes als staart (van groot naar klein richting haar hoofd)
-        const dotX=cx2+bubbleW*.1, dotBaseY=by-8;
-        [[10,6],[6,4],[3.5,3]].forEach(([r2,step],i)=>{
-          ctx.beginPath(); ctx.arc(dotX,dotBaseY-i*step*3.5,r2,0,Math.PI*2);
-          ctx.fillStyle=C.bubbleFill; ctx.fill();
-          ctx.lineWidth=1.5; ctx.strokeStyle=C.bubble; ctx.stroke();
-        });
-        ctx.fillStyle=C.bubble; ctx.font=font; ctx.textBaseline='top';
-        for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],bx+padX+2,by+padY+i*lineH);
-
-      } else if(type==='spiky'){
-        // ── Uitroepballon — getande rand: boosheid, schrik, intensiteit ──
-        const lines=splitBubbleLines(speech.text,bubbleW-padX*2-12,font);
-        const bubbleH=padY*2+8+lines.length*lineH;
-        const bx=x+wobX, by=baseY+wobY;
-        const cx2=bx+bubbleW/2, cy2=by+bubbleH/2;
-        const rx=bubbleW/2+8, ry=bubbleH/2+8;
-        // Starburst: wissel grote/kleine stralen af
-        const spikes=18;
-        ctx.beginPath();
-        for(let i=0;i<spikes*2;i++){
-          const ang=-Math.PI/2+(i/(spikes*2))*Math.PI*2;
-          const r2=(i%2===0) ? 1 : (0.74+Math.sin(ang*3)*.06); // punten vs. dalen
-          ctx.lineTo(cx2+Math.cos(ang)*rx*r2, cy2+Math.sin(ang)*ry*r2);
+        if (type === 'spiky') {
+          return {
+            fill:'rgba(58,27,4,.94)',
+            stroke:'rgba(255,176,54,.88)',
+            text:'#ffd27a',
+            glow:'rgba(255,176,54,.16)'
+          };
         }
-        ctx.closePath();
-        // Staart: driehoekje omhoog
-        ctx.moveTo(cx2-8, by-2);
-        ctx.lineTo(cx2+bubbleW*.05, by-20);
-        ctx.lineTo(cx2+8, by-2);
-        ctx.closePath();
-        ctx.fillStyle='rgba(255,49,89,.10)'; ctx.fill();
-        ctx.lineWidth=2.2;
-        ctx.strokeStyle=speech.mood==='angry'?'#ff3159':C.bubble; ctx.stroke();
-        ctx.fillStyle=speech.mood==='angry'?'#ff3159':C.bubble;
-        ctx.font=font; ctx.textBaseline='top';
-        for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],bx+padX+4,by+padY+i*lineH);
+        if (type === 'thought') {
+          return {
+            fill:'rgba(24,12,42,.94)',
+            stroke:'rgba(201,140,255,.82)',
+            text:'#ead8ff',
+            glow:'rgba(201,140,255,.15)'
+          };
+        }
+        return {
+          fill:'rgba(3,9,12,.94)',
+          stroke:C.bubble,
+          text:C.bubble,
+          glow:'rgba(105,255,243,.12)'
+        };
+      })();
 
-      } else if(type==='caption'){
-        // ── Verhaalballon — zelfde vaste plek als de gewone tekstballon ──
-        const lines=splitBubbleLines(speech.text,bubbleW-padX*2-10,font);
-        const capH=padY*2+lines.length*lineH;
-        const capY=baseY+wobY;
-        const cx=x+wobX;
-        const tailX=cx+bubbleW*.50, tailY=capY-16;
-        roundedBubble(cx,capY,bubbleW,capH,8,tailX,tailY,'top',tailX);
-        ctx.fillStyle='rgba(5,12,16,.90)'; ctx.fill();
-        ctx.lineWidth=2; ctx.strokeStyle='rgba(213,166,77,.72)'; ctx.stroke();
-        // Gouden markering blijft, maar nu geïntegreerd in de ballon i.p.v. als schermtitel.
-        ctx.fillStyle='rgba(213,166,77,.82)';
-        ctx.fillRect(cx+9,capY+8,3,Math.max(6,capH-16));
-        ctx.fillStyle='#ffd35d'; ctx.font=font; ctx.textBaseline='top';
-        for(let i=0;i<lines.length;i++)
-          ctx.fillText(lines[i],cx+padX+8,capY+padY+i*lineH);
+      const lines=splitBubbleLines(speech.text,bubbleW-padX*2,font);
+      const bubbleH=padY*2+lines.length*lineH;
+      const y=baseY;
+      const tailX=x+bubbleW*.50, tailY=y-16;
+
+      ctx.save();
+      ctx.globalAlpha=a*.94;
+      roundedBubble(x+wobX,y+wobY,bubbleW,bubbleH,9,tailX,tailY,'top',tailX);
+
+      // Zachte kleuridentiteit zonder andere vormtaal.
+      ctx.shadowColor=palette.glow;
+      ctx.shadowBlur=12;
+      ctx.fillStyle=palette.fill;
+      ctx.fill();
+      ctx.shadowBlur=0;
+      ctx.lineWidth=2;
+      ctx.strokeStyle=palette.stroke;
+      ctx.stroke();
+
+      ctx.fillStyle=palette.text;
+      ctx.font=font;
+      ctx.textBaseline='top';
+      for(let i=0;i<lines.length;i++){
+        ctx.fillText(lines[i],x+wobX+padX,y+wobY+padY+i*lineH);
       }
-
       ctx.restore();
     }
 
@@ -5357,20 +5326,45 @@
       }
 
       // ── Persistente staat ───────────────────────────────────────────────
-      // Stabiele startversie: nieuw leeg logboek.
-      // Oude testdata uit v1 blijft in localStorage staan, maar wordt niet meer gelezen.
-      const CH_KEY='wa_chronicle_v2', META_KEY='wa_chmeta_v2', SEEDS_KEY='wa_seeds_v2';
+      // Stabiele startversie: echt leeg logboek + opwarmfase.
+      // Oude testdata uit v1/v2 blijft lokaal staan, maar deze build leest v3.
+      const CH_KEY='wa_chronicle_v3', META_KEY='wa_chmeta_v3', SEEDS_KEY='wa_seeds_v3', RESET_KEY='wa_clean_start_v3';
+      const nowBoot=Date.now();
       const CH_MAX=140;                 // tijdlijn-lengte
       let chronicle=[], seeds=[];
       let meta={ total:0, best:0, species:{}, opens:0, days:{}, stories:{} };
-      try{ chronicle=JSON.parse(safeStorage.get(CH_KEY)||'[]')||[]; }catch(e){ chronicle=[]; }
-      try{ seeds=JSON.parse(safeStorage.get(SEEDS_KEY)||'[]')||[]; }catch(e){ seeds=[]; }
-      try{ Object.assign(meta, JSON.parse(safeStorage.get(META_KEY)||'{}')||{}); }catch(e){}
+
+      // Eénmalige schone start voor deze build. Belangrijk: niet alleen andere keys,
+      // maar ook een korte suppressie zodat reeds actieve condities niet als 80+ nieuwe
+      // ontdekkingen binnenstromen zodra de pagina opstart.
+      const needsCleanStart = safeStorage.get(RESET_KEY) !== 'done';
+      if (needsCleanStart){
+        chronicle=[];
+        seeds=[];
+        meta={
+          total:0, best:0, species:{}, opens:0, days:{}, stories:{},
+          biomes:{}, opensByDay:{},
+          lastLegendaryAt:nowBoot,
+          lastStoryAt:nowBoot,
+          suppressUntil:nowBoot + 120000,   // 2 minuten: warm starten, niets registreren
+          createdAt:nowBoot
+        };
+        safeStorage.set(CH_KEY, JSON.stringify(chronicle));
+        safeStorage.set(SEEDS_KEY, JSON.stringify(seeds));
+        safeStorage.set(META_KEY, JSON.stringify(meta));
+        safeStorage.set(RESET_KEY, 'done');
+      } else {
+        try{ chronicle=JSON.parse(safeStorage.get(CH_KEY)||'[]')||[]; }catch(e){ chronicle=[]; }
+        try{ seeds=JSON.parse(safeStorage.get(SEEDS_KEY)||'[]')||[]; }catch(e){ seeds=[]; }
+        try{ Object.assign(meta, JSON.parse(safeStorage.get(META_KEY)||'{}')||{}); }catch(e){}
+      }
+
       meta.species=meta.species||{}; meta.days=meta.days||{}; meta.stories=meta.stories||{}; meta.biomes=meta.biomes||{}; meta.opensByDay=meta.opensByDay||{};
       // Anti-jackpot: zeldzame unlocks mogen niet als confetti achter elkaar vallen.
       // lastLegendaryAt bewaakt alle 5-sterren-waarnemingen, lastStoryAt bewaakt verhaalmomenten.
       meta.lastLegendaryAt=meta.lastLegendaryAt||0;
       meta.lastStoryAt=meta.lastStoryAt||0;
+      meta.suppressUntil=meta.suppressUntil||0;
 
       function persist(){
         safeStorage.set(META_KEY, JSON.stringify(meta));
@@ -5389,6 +5383,8 @@
       const Chronicle={
         observe(cat, key, ev){
           const now=Date.now();
+          // Warm-start: bestaande toestand niet als ontdekking registreren.
+          if (meta.suppressUntil && now < meta.suppressUntil) return null;
           if (THROTTLE[cat] && _last[key] && now-_last[key]<THROTTLE[cat]) return null;
           const isStory = cat==='verhaal';
           const rar = (ev && ev.stars!=null) ? Rarity.fromStars(ev.stars) : Rarity.fromProb(probFor(cat,key));
@@ -5660,6 +5656,8 @@
       function checkStories(){
         if (!meta.biomes) meta.biomes={};
         if (!meta.biomes[SceneBrain.biome]){ meta.biomes[SceneBrain.biome]=Date.now(); persist(); }
+        // Tijdens de warm-start bouwen we wel stille context op, maar geen unlocks.
+        if (meta.suppressUntil && Date.now() < meta.suppressUntil) return;
         // Verhalen zijn narratieve beloningen, geen checklist. Ook bij meerdere
         // voldane voorwaarden ontgrendelt er maar af en toe één.
         if (meta.lastStoryAt && Date.now()-meta.lastStoryAt<STORY_COOLDOWN) return;
@@ -5843,7 +5841,10 @@
       // ── Waarnemings-hooks: lees de bestaande brains, noteer in het journaal ─
       let _ks=new Set(), _kc=new Set();
       setInterval(()=>{
-        (ShipBrain.ships||[]).forEach(s=>{ if(!_ks.has(s.id)){ _ks.add(s.id); Chronicle.observe('vloot', s.archetype||'drone', s); }});
+        (ShipBrain.ships||[]).forEach(s=>{
+          const sk=s._journalId || (s._journalId='ship_'+(s.seed||Math.random()).toString(36)+'_'+Math.floor(s.phase||0));
+          if(!_ks.has(sk)){ _ks.add(sk); Chronicle.observe('vloot', s.archetype||'drone', s); }
+        });
         (CosmicBrain.events||[]).forEach(e=>{ const k=e.id||(e.type+'_'+e.start); if(!_kc.has(k)){ _kc.add(k); Chronicle.observe('kosmisch', e.type, e); }});
         if(VisitorBrain.phase==='visible'&&VisitorBrain.alpha>.5){ const vk='vis_'+(VisitorBrain.archetype||'cloaked')+'_'+Math.floor(VisitorBrain.phaseStart||0); if(!_kc.has(vk)){ _kc.add(vk); Chronicle.observe('bezoekers', VisitorBrain.archetype||'cloaked', VisitorBrain); }}
         checkStories();
