@@ -788,7 +788,14 @@
       outfitLeaveMs: 2400,
       outfitAwayMs: 3600,
       outfitReturnMs: 3000,
-      speechFrequency: 0.82,
+      // Tekst moet schaars en leesbaar blijven. Hoge arousal maakt haar levendiger,
+      // maar mag niet leiden tot snel opeenvolgende, onleesbare ballonnen.
+      speechFrequency: 0.76,
+      speechMinCooldownMs: 26000,
+      speechMaxCooldownMs: 46000,
+      speechArousalCooldownExtraMs: 12000,
+      speechStoryCooldownExtraMs: 16000,
+      speechQueueMax: 5,
       newsMoodInfluence: 0.28,
       weatherIntensity: 0.86,
       speechAboveGlitch: true,
@@ -935,8 +942,12 @@
 
     const speech = {
       active:false, start:0, duration:0, nextAt:performance.now() + rnd(4500, 9000),
-      text:'', mood:'neutral', meaningful:false, phase:rnd(0,999)
+      text:'', mood:'neutral', meaningful:false, bubbleType:'speech', phase:rnd(0,999)
     };
+
+    // Verhaalmomenten kunnen tegelijk vrijkomen. Ze worden daarom in een
+    // kleine wachtrij gezet, zodat ze de huidige ballon niet overschrijven.
+    const StorySpeechQueue = [];
 
     const blink = { nextAt:performance.now() + rnd(1800, 5200), until:performance.now() + 120, strength:0 };
 
@@ -2639,16 +2650,44 @@
       '∴ ... poort open ... welkom ... reiziger ...'
     ];
 
+    function readableSpeechDuration(text, type='speech'){
+      // Mobiel lezen op een bewegend beeld kost meer tijd dan normale schermtekst.
+      // Daarom schaalt de zichtbaarheid mee met de tekstlengte en krijgt verhaaltekst extra rust.
+      const len = String(text || '').replace(/\s+/g, ' ').trim().length;
+      const isStory = type === 'caption';
+      const base = isStory ? 5600 : 5000;
+      const perChar = isStory ? 78 : 68;
+      const minDur = isStory ? 9000 : 7600;
+      const maxDur = isStory ? 17500 : 15500;
+      return clamp(base + len * perChar, minDur, maxDur);
+    }
+
+    function beginSpeech(now, text, mood='neutral', bubbleType='speech', meaningful=false){
+      const minDur = readableSpeechDuration(text, bubbleType);
+      speech.active = true;
+      speech.start = now;
+      speech.duration = rnd(minDur, minDur + 2200);
+      speech.text = text;
+      speech.mood = mood;
+      speech.meaningful = meaningful;
+      speech.bubbleType = bubbleType;
+      speech.phase = rnd(0,999);
+      MemoryBrain.lastSpeechAt = now;
+      AudioBrain.speak(text, mood);
+    }
+
+    function queueStorySpeech(st){
+      if (!st || !st.say) return;
+      if (StorySpeechQueue.some(q => q.id === st.id)) return;
+      if (StorySpeechQueue.length >= CONFIG.speechQueueMax) StorySpeechQueue.shift();
+      StorySpeechQueue.push({
+        id: st.id, text: st.say, mood: 'curious', bubbleType: 'caption', meaningful: true
+      });
+    }
+
     function startGreetingSpeech(now){
-      speech.active     = true;
-      speech.start      = now + 140;
-      speech.duration   = 7000;
-      speech.text       = pick(GREETING_LINES);
-      speech.meaningful = true;
-      speech.bubbleType = 'speech';
-      speech.phase      = Math.random() * 999;
-      speech.mood       = 'happy';
-      speech.nextAt     = now + 7000 + 20000; // na de begroeting 20s rust
+      beginSpeech(now + 140, pick(GREETING_LINES), 'happy', 'speech', true);
+      speech.nextAt = now + speech.duration + 22000; // na de begroeting rust
     }
 
     function updatePose(now, dt){
@@ -2726,33 +2765,67 @@
     function updateSpeech(now){
       if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') {
         speech.active = false;
-        speech.nextAt = Math.max(speech.nextAt, now + 18000);
+        speech.nextAt = Math.max(speech.nextAt, now + 22000);
         return;
       }
+
       const mood = dominantMood();
+
       if (!speech.active && now > speech.nextAt) {
+        // Verhaalmomenten eerst, maar nooit bovenop een bestaande ballon.
+        if (StorySpeechQueue.length) {
+          const queued = StorySpeechQueue.shift();
+          beginSpeech(now, queued.text, queued.mood, queued.bubbleType, queued.meaningful);
+          return;
+        }
+
         const data = generateSpeechText(mood);
-        // Ballon-type uit stemming kiezen — zoals in strips.
-        // Caption is gereserveerd voor story events (zie checkStories).
-        let bubbleType;
-        if (mood==='angry' || mood==='surprised') bubbleType='spiky';
-        else if (mood==='shy' || mood==='neutral') bubbleType = Math.random()<.42 ? 'thought' : 'speech';
-        else bubbleType='speech';
-        speech.active = true;
-        speech.start = now;
-        speech.duration = rnd(6500, 11000);
-        speech.text = data.text;
-        speech.mood = mood;
-        speech.meaningful = data.meaningful;
-        speech.bubbleType = bubbleType;
-        speech.phase = rnd(0,999);
-        MemoryBrain.lastSpeechAt = now;
-        AudioBrain.speak(data.text, mood);
+        // Ballon-type uit emotionele toestand kiezen — rustig afgesteld.
+        // Caption blijft gereserveerd voor story events (zie checkStories).
+        // Speech is de standaard; spiky en thought zijn speciale accenten.
+        let bubbleType = 'speech';
+
+        const highArousal = emotion.arousal > .82;
+        const veryHighArousal = emotion.arousal > .90;
+        const lowArousal = emotion.arousal < .46;
+        const quietMind = lowArousal && (emotion.curiosity > .52 || MemoryBrain.silence > .60 || mood === 'shy' || mood === 'neutral');
+
+        // Alleen echte intensiteit krijgt een gekartelde ballon.
+        if (
+          mood === 'angry'
+          || mood === 'surprised'
+          || (veryHighArousal && Math.random() < .62)
+          || (highArousal && (mood === 'laugh' || mood === 'happy') && Math.random() < .36)
+        ) {
+          bubbleType = 'spiky';
+
+        // Gedachtewolk alleen bij lage energie / mijmeren / introverte states.
+        } else if (
+          quietMind
+          || (mood === 'cry' && emotion.arousal < .58)
+        ) {
+          bubbleType = Math.random() < .82 ? 'thought' : 'speech';
+
+        // In alle andere gevallen blijft gewone spraak dominant.
+        } else {
+          bubbleType = Math.random() < .80 ? 'speech' : 'thought';
+        }
+
+        beginSpeech(now, data.text, mood, bubbleType, data.meaningful);
       }
+
       if (speech.active && now > speech.start + speech.duration) {
+        const justShownType = speech.bubbleType || 'speech';
+        const justShownLen = String(speech.text || '').length;
         speech.active = false;
-        const cooldown = Math.max(15000, rnd(18000, 38000) - emotion.arousal * 2000);
-        speech.nextAt = now + cooldown / CONFIG.speechFrequency;
+
+        // Hoge arousal mag expressiever ogen, maar tekst krijgt juist méér ademruimte.
+        const baseCooldown = rnd(CONFIG.speechMinCooldownMs, CONFIG.speechMaxCooldownMs);
+        const arousalExtra = emotion.arousal * CONFIG.speechArousalCooldownExtraMs;
+        const lengthExtra = clamp(justShownLen * 70, 0, 8000);
+        const storyExtra = justShownType === 'caption' ? CONFIG.speechStoryCooldownExtraMs : 0;
+        const cooldown = baseCooldown + arousalExtra + lengthExtra + storyExtra;
+        speech.nextAt = now + cooldown / Math.max(.25, CONFIG.speechFrequency);
       }
     }
 
@@ -4406,6 +4479,9 @@
       const x       = vis.left  + 8;
       const bubbleW = vis.right - vis.left - 16;
       const chinY   = H * .415;
+      // Alle ballonvarianten delen dezelfde vaste ankerplek onder het gezicht.
+      // Zo verschijnen story/caption-teksten nooit meer als los rechthoekig vak bovenin.
+      const baseY   = chinY + 6;
 
       const wobX=Math.sin(now*.0013+speech.phase)*.6;
       const wobY=Math.sin(now*.002 +speech.phase)*.6;
@@ -4416,7 +4492,7 @@
         // ── Gewone tekstballon — rechte rand, staart omhoog naar haar mond ──
         const lines=splitBubbleLines(speech.text,bubbleW-padX*2,font);
         const bubbleH=padY*2+lines.length*lineH;
-        const y=chinY+6;
+        const y=baseY;
         const tailX=x+bubbleW*.50, tailY=y-16;
         roundedBubble(x+wobX,y+wobY,bubbleW,bubbleH,9,tailX,tailY,'top',tailX);
         ctx.fillStyle=C.bubbleFill; ctx.fill();
@@ -4428,7 +4504,7 @@
         // ── Gedachteballon — wolkvorm: kleine bellen leiden omhoog naar haar hoofd ──
         const lines=splitBubbleLines(speech.text,bubbleW-padX*2-8,font);
         const bubbleH=padY*2+8+lines.length*lineH;
-        const bx=x+wobX, by=chinY+10+wobY;
+        const bx=x+wobX, by=baseY+wobY;
         const cx2=bx+bubbleW/2, cy2=by+bubbleH/2;
         const rx=bubbleW/2+4, ry=bubbleH/2+4;
         // Wolk: ellips met inkepingen (sinusoïde radiale variatie langs de rand)
@@ -4456,7 +4532,7 @@
         // ── Uitroepballon — getande rand: boosheid, schrik, intensiteit ──
         const lines=splitBubbleLines(speech.text,bubbleW-padX*2-12,font);
         const bubbleH=padY*2+8+lines.length*lineH;
-        const bx=x+wobX, by=chinY+8+wobY;
+        const bx=x+wobX, by=baseY+wobY;
         const cx2=bx+bubbleW/2, cy2=by+bubbleH/2;
         const rx=bubbleW/2+8, ry=bubbleH/2+8;
         // Starburst: wissel grote/kleine stralen af
@@ -4481,22 +4557,21 @@
         for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],bx+padX+4,by+padY+i*lineH);
 
       } else if(type==='caption'){
-        // ── Verhaalkapje — smal kader bovenin het scherm (alleen story events) ──
+        // ── Verhaalballon — zelfde vaste plek als de gewone tekstballon ──
         const lines=splitBubbleLines(speech.text,bubbleW-padX*2-10,font);
-        const capH=padY*1.6+lines.length*lineH;
-        const capY=vis.top+8+wobY*.3;
+        const capH=padY*2+lines.length*lineH;
+        const capY=baseY+wobY;
         const cx=x+wobX;
-        ctx.fillStyle='rgba(5,12,16,.88)';
-        ctx.fillRect(cx,capY,bubbleW,capH);
-        // Dunne cyaan buitenrand
-        ctx.lineWidth=1.5; ctx.strokeStyle='rgba(213,166,77,.55)';
-        ctx.strokeRect(cx+0.75,capY+0.75,bubbleW-1.5,capH-1.5);
-        // Gouden balk links — BUITEN de strokeRect getekend zodat er geen overlap is
+        const tailX=cx+bubbleW*.50, tailY=capY-16;
+        roundedBubble(cx,capY,bubbleW,capH,8,tailX,tailY,'top',tailX);
+        ctx.fillStyle='rgba(5,12,16,.90)'; ctx.fill();
+        ctx.lineWidth=2; ctx.strokeStyle='rgba(213,166,77,.72)'; ctx.stroke();
+        // Gouden markering blijft, maar nu geïntegreerd in de ballon i.p.v. als schermtitel.
         ctx.fillStyle='rgba(213,166,77,.82)';
-        ctx.fillRect(cx,capY,3,capH);
+        ctx.fillRect(cx+9,capY+8,3,Math.max(6,capH-16));
         ctx.fillStyle='#ffd35d'; ctx.font=font; ctx.textBaseline='top';
         for(let i=0;i<lines.length;i++)
-          ctx.fillText(lines[i],cx+padX+4,capY+padY*.8+i*lineH);
+          ctx.fillText(lines[i],cx+padX+8,capY+padY+i*lineH);
       }
 
       ctx.restore();
@@ -5576,15 +5651,10 @@
           if(ok){
             meta.stories[st.id]=Date.now();
             Chronicle.observe('verhaal', st.id, { stars:st.stars, title:st.title, line:st.line, sym:st.sym });
-            // het personage spreekt het verhaalmoment ook uit, met stem
+            // het personage spreekt het verhaalmoment ook uit, maar via een wachtrij.
+            // Zo overschrijft een nieuw verhaal nooit de huidige tekstballon.
             if (st.say && !(WardrobeBrain.phase && WardrobeBrain.phase!=='present')){
-              const t=performance.now();
-              speech.active=true; speech.start=t; speech.duration=rnd(4200,6200);
-              speech.text=st.say; speech.mood='curious'; speech.meaningful=true;
-              speech.bubbleType='caption';
-              speech.phase=rnd(0,999);
-              MemoryBrain.lastSpeechAt=t;
-              AudioBrain.speak(st.say,'curious');
+              queueStorySpeech(st);
             }
             break; // hooguit één verhaal per tik
           }
