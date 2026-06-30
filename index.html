@@ -260,40 +260,41 @@
     }
     #wa-log .wa-head{
       justify-content:center;
-      padding:14px 16px 10px;
+      position:relative;
+      padding:16px 16px 12px;
       border-radius:18px 18px 0 0;
-      border-top:1px solid rgba(255,255,255,.58);
-      border-bottom:1px solid rgba(98,74,42,.22);
+      border-top:1px solid rgba(255,255,255,.14);
+      border-bottom:1px solid rgba(255,255,255,.06);
       background:
-        radial-gradient(circle at 20% 0%, rgba(255,255,255,.72), transparent 40%),
-        linear-gradient(135deg, #fff8e8 0%, #efe2c3 100%);
+        radial-gradient(circle at 50% 0%, rgba(120,150,200,.22), transparent 60%),
+        linear-gradient(135deg, #0e1626 0%, #0a1019 100%);
     }
     #wa-log .wa-head h2{
-      color:#3e5d5a;
-      text-shadow:none;
+      color:#ffffff;
+      font-size:16px;
+      letter-spacing:.26em;
+      text-shadow:0 0 14px rgba(120,160,255,.4);
     }
     #wa-log .wa-close{
-      min-height:34px;
-      background:#fffaf0;
-      border-color:rgba(82,60,31,.32);
-      color:#4a371a;
-      box-shadow:0 1px 0 rgba(255,255,255,.7) inset;
+      position:absolute; right:14px; top:50%; transform:translateY(-50%);
+      width:38px; height:38px; padding:0; border-radius:50%;
+      display:grid; place-items:center; font-size:16px;
+      background:rgba(255,255,255,.08);
+      border:1.5px solid rgba(255,255,255,.22);
+      color:#fff;
     }
-    #wa-log .wa-close:active{ background:#eadfcb; }
+    #wa-log .wa-close:active{ background:rgba(255,255,255,.16); }
     #wa-log .wa-body{
       min-height:0;
       border-radius:0 0 18px 18px;
-      border-bottom:1px solid rgba(98,74,42,.24);
+      border-bottom:1px solid rgba(255,255,255,.06);
       background:
-        radial-gradient(circle at 8% 0%, rgba(255,255,255,.58), transparent 32%),
-        linear-gradient(180deg, #fbf2dc 0%, #ead9b7 100%);
-      color:#211b12;
+        radial-gradient(120% 60% at 50% 0%, rgba(40,56,86,.5), transparent 55%),
+        linear-gradient(180deg, #0c121e 0%, #070b13 100%);
+      color:#ffffff;
+      overflow-x:hidden;
       -webkit-overflow-scrolling:touch;
     }
-
-    /* Inline logboek-kleuren worden hier op licht papier leesbaar gemaakt. */
-    #wa-log [style*="105,255,243"]{ color:rgba(54,72,69,.72) !important; }
-    #wa-log [style*="#d5a64d"]{ color:#8a5e12 !important; }
 
     #wa-log .wa-sec{
       color:rgba(85,60,28,.60);
@@ -435,6 +436,129 @@
     #wa-log .lg-count span{ color:rgba(85,60,28,.5); }
     #wa-log .lg-bar{ background:rgba(120,90,40,.16); }
 
+    /* ── Journaal — hoog contrast, volgekleurde rariteit-kaarten ──────────── */
+    /* rariteit-paletten: --rc accent (rand/sterren/gloed), --b1/--b2 kaartvlak */
+    .jr-row[data-r="1"], .jr-summary[data-best="1"], .jr-chip[data-f="1"]{ --rc:#eef2f7; --b1:#414c5b; --b2:#2b323d; }
+    .jr-row[data-r="2"], .jr-summary[data-best="2"], .jr-chip[data-f="2"]{ --rc:#6ff081; --b1:#1c7a31; --b2:#114f20; }
+    .jr-row[data-r="3"], .jr-summary[data-best="3"], .jr-chip[data-f="3"]{ --rc:#67b6ff; --b1:#1a5cab; --b2:#103e76; }
+    .jr-row[data-r="4"], .jr-summary[data-best="4"], .jr-chip[data-f="4"]{ --rc:#c98cff; --b1:#5d2b97; --b2:#3c1c66; }
+    .jr-row[data-r="5"], .jr-summary[data-best="5"], .jr-chip[data-f="5"]{ --rc:#ffb24d; --b1:#b35912; --b2:#7c3c0c; }
+
+    /* samenvatting */
+    .jr-summary{ margin-bottom:16px; }
+    .jr-sum-main{ font-size:17px; letter-spacing:.02em; color:#fff; }
+    .jr-sum-main b{ color:#fff; font-size:30px; font-weight:800; }
+    .jr-sum-sub{ font-size:14px; letter-spacing:.04em; color:rgba(255,255,255,.7); margin-top:4px; }
+    .jr-summary .jr-stars{ color:var(--rc,#fff); text-shadow:0 0 10px currentColor; font-weight:700; }
+
+    /* filterchips */
+    .jr-filters{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+    .jr-chip{
+      font-size:14px; font-weight:600; letter-spacing:.04em; padding:8px 15px; border-radius:22px; cursor:pointer;
+      border:1.5px solid rgba(255,255,255,.25); color:#fff; background:rgba(255,255,255,.06);
+    }
+    .jr-chip[data-f="2"], .jr-chip[data-f="3"], .jr-chip[data-f="4"], .jr-chip[data-f="5"]{
+      color:var(--rc); border-color:color-mix(in srgb, var(--rc) 55%, transparent);
+    }
+    .jr-chip.on{ color:#0a0e15; background:var(--rc,#fff); border-color:var(--rc,#fff);
+      box-shadow:0 0 16px -3px var(--rc,#fff); }
+
+    /* waarnemingen-lijst */
+    .jr-list{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
+    .jr-row{
+      display:flex; gap:12px; align-items:stretch; height:108px;
+      border-radius:12px; padding:10px; position:relative; overflow:hidden;
+      border:1.5px solid var(--rc, rgba(255,255,255,.2));
+      background:linear-gradient(135deg, var(--b1,#27303d) 0%, var(--b2,#161c27) 100%);
+      box-shadow:0 4px 16px -6px rgba(0,0,0,.6), 0 0 16px -8px var(--rc, transparent);
+    }
+    .jr-thumb{
+      flex:0 0 108px; width:108px; align-self:stretch;
+      margin:-10px 0 -10px -10px;            /* tegen de rand: links/boven/onder vlak */
+      border-radius:11px 0 0 11px;           /* rondt mee met de kaart, net als rechts */
+      border-right:3px solid var(--rc, rgba(255,255,255,.3)); /* rariteit-accent op de naad */
+      overflow:hidden; position:relative;
+      background:linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.45));
+      display:grid; place-items:center;
+    }
+    .jr-thumb img{ width:100%; height:100%; object-fit:cover; }
+    .jr-thumb--sym span{ font-size:30px; color:var(--rc, #fff); text-shadow:0 0 14px currentColor; }
+
+    .jr-txt{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:4px; }
+    .jr-title{ font-size:18px; font-weight:700; letter-spacing:.01em; color:#fff; line-height:1.18;
+      text-shadow:0 1px 3px rgba(0,0,0,.5);
+      display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .jr-line{ font-size:14px; color:rgba(255,255,255,.82); font-style:italic; line-height:1.3;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .jr-meta{ font-size:13px; letter-spacing:.03em; color:rgba(255,255,255,.78); margin-top:1px; display:flex; align-items:center; gap:7px; }
+    .jr-stars{ color:var(--rc, #fff); font-size:15px; letter-spacing:.06em; text-shadow:0 0 8px currentColor; }
+
+    /* verhaal: zelfde rariteit-kleur, maar met gouden zegel */
+    .jr-row.story{ overflow:visible; box-shadow:0 4px 16px -6px rgba(0,0,0,.6), 0 0 22px -6px rgba(255,200,90,.6); }
+    .jr-row.story::after{
+      content:'VERHAAL'; position:absolute; right:-8px; top:6px; z-index:5;
+      font-size:11px; font-weight:800; letter-spacing:.16em;
+      color:rgba(255,226,150,.55);
+      border:2px solid rgba(255,226,150,.4); border-radius:5px;
+      padding:4px 8px 3px;
+      transform:rotate(24deg); transform-origin:center;
+      text-shadow:0 1px 3px rgba(0,0,0,.8); box-shadow:0 0 0 1px rgba(0,0,0,.2);
+      pointer-events:none;
+    }
+    .jr-row.story .jr-title{ color:#fff; }
+
+    .jr-row.fresh{ animation:evReveal .5s ease-out; }
+    .jr-empty{ font-size:15px; line-height:1.6; color:rgba(255,255,255,.7); text-align:center; padding:30px 14px; letter-spacing:.02em; }
+
+    /* secties & seed/knoppen op donker paneel */
+    #wa-log .wa-sec{ color:rgba(255,255,255,.55); font-size:12px; text-shadow:none; margin:20px 0 10px; }
+    #wa-log .wa-btn{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.28); color:#fff; font-size:14px; padding:13px; }
+    #wa-log .wa-btn.gold{ border-color:rgba(255,200,90,.6); color:#ffd87a; }
+    #wa-log .wa-btn.danger{ border-color:rgba(255,90,110,.5); color:#ff8a98; }
+    #wa-log .seed-pill{ background:rgba(255,255,255,.07); border-color:rgba(255,200,90,.4); color:#ffd87a; font-size:13px; }
+    #wa-log .seed-pill.active{ background:rgba(255,200,90,.18); }
+    #wa-log .seed-pill .sd{ color:rgba(255,255,255,.55); }
+
+    /* hele kaart is aantikbaar voor detailweergave */
+    .jr-row{ cursor:pointer; }
+    .jr-row:active{ filter:brightness(1.08); }
+
+    /* ── Detailweergave: item in het groot ───────────────────────────────── */
+    #jr-lightbox{ position:fixed; inset:0; z-index:120; display:none; place-items:center;
+      background:rgba(2,4,10,.94); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); padding:20px; cursor:pointer; }
+    #jr-lightbox.open{ display:grid; }
+    #jr-lightbox .lb-inner{
+      position:relative; width:340px; max-width:94vw; max-height:88vh; overflow-y:auto;
+      text-align:center; cursor:default;
+      border:2px solid var(--rc,#fff); border-radius:18px;
+      background:linear-gradient(180deg, #111a28 0%, #0a0f18 100%);
+      box-shadow:0 0 54px -8px var(--rc,#000), 0 22px 60px rgba(0,0,0,.7);
+      padding-bottom:24px;
+    }
+    #jr-lightbox .lb-x{
+      position:absolute; top:10px; right:10px; z-index:3;
+      width:38px; height:38px; border-radius:50%;
+      border:1.5px solid rgba(255,255,255,.3); background:rgba(0,0,0,.55); color:#fff;
+      font-size:16px; cursor:pointer; display:grid; place-items:center;
+    }
+    #jr-lightbox .lb-media{ width:100%; border-radius:16px 16px 0 0; overflow:hidden;
+      background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.35)); }
+    #jr-lightbox .lb-media img{ display:block; width:100%; height:auto; max-height:52vh; object-fit:cover; }
+    #jr-lightbox .lb-media.sym{ height:170px; display:grid; place-items:center; }
+    #jr-lightbox .lb-media.sym span{ font-size:82px; color:var(--rc,#fff); text-shadow:0 0 30px currentColor; }
+    #jr-lightbox .lb-tag{ display:none; margin-top:14px; font-size:12px; font-weight:800; letter-spacing:.22em;
+      color:#ffe6a8; text-shadow:0 0 12px rgba(255,200,90,.7); }
+    #jr-lightbox .lb-stars{ margin-top:14px; font-size:24px; letter-spacing:.12em;
+      color:var(--rc,#fff); text-shadow:0 0 14px currentColor; }
+    #jr-lightbox .lb-title{ color:#fff; font-size:25px; font-weight:800; line-height:1.18;
+      margin-top:8px; padding:0 22px; text-shadow:0 1px 4px rgba(0,0,0,.6); }
+    #jr-lightbox .lb-line{ color:rgba(255,255,255,.82); font-style:italic; font-size:16px;
+      margin-top:9px; padding:0 26px; line-height:1.4; }
+    #jr-lightbox .lb-meta{ margin-top:14px; font-size:14px; letter-spacing:.06em;
+      color:rgba(255,255,255,.6); text-transform:capitalize; }
+    #jr-lightbox[data-r="1"]{ --rc:#eef2f7 } #jr-lightbox[data-r="2"]{ --rc:#6ff081 }
+    #jr-lightbox[data-r="3"]{ --rc:#67b6ff } #jr-lightbox[data-r="4"]{ --rc:#c98cff }
+    #jr-lightbox[data-r="5"]{ --rc:#ffb24d }
     @media (max-width: 420px){
       #wa-log.wa-overlay{
         padding-top:calc(env(safe-area-inset-top, 0px) + 18px);
@@ -462,6 +586,7 @@
   <div id="wa-log" class="wa-overlay" role="dialog" aria-label="Logboek">
     <div class="wa-head">
       <h2>· logboek ·</h2>
+      <button class="wa-close" id="lg-head-close" aria-label="Sluiten">✕</button>
     </div>
     <div class="wa-body" id="wa-log-body"></div>
   </div>
@@ -2427,12 +2552,33 @@
       return a * rhythm * .72;
     }
 
+    // Fase 2 — kleuridentiteit per schip. Allemaal uit de wereld-kleurfamilie,
+    // zodat de vloot gevarieerd is maar cohesief blijft. Index 0 = de
+    // oorspronkelijke look (romp cyaan, motor amber).
+    const SHIP_TINTS = [
+      { edge:C.cyan1,  mid:C.cyan3,  hi:C.white,   eng:C.amber   }, // klassiek cyaan
+      { edge:'#1f4e7a', mid:'#3f8fd6', hi:'#cfe9ff', eng:'#ffce5e' }, // staalblauw
+      { edge:'#4a2b78', mid:'#9166d6', hi:'#e6d6ff', eng:C.cyan4   }, // violet
+      { edge:'#0a5f44', mid:'#22c98f', hi:'#caffe8', eng:C.amber   }, // teal
+      { edge:C.green0,  mid:C.green1,  hi:'#d6ffcf', eng:'#ff8ad0' }, // smaragd
+      { edge:'#7a4a1f', mid:'#d69140', hi:'#ffe6c8', eng:C.cyan4   }, // koper
+      { edge:'#7a1f63', mid:'#d640b0', hi:'#ffd6f2', eng:C.green2  }, // magenta
+      { edge:'#3a424e', mid:'#8893a4', hi:'#ffffff', eng:C.cyan4   }, // staalgrijs
+    ];
+
     function createShip(seed, archetype, depth, route=null){
       const rng = mulberry32(seed);
       const specs = {
         needle:[13,5], freighter:[19,7], drone:[9,7], saucer:[15,5], organic:[15,9], broken:[17,7], carrier:[42,11]
       };
-      const [gw, gh] = specs[archetype] || specs.freighter;
+      const [baseGw, gh] = specs[archetype] || specs.freighter;
+      // Fase 2 — proportie per schip: de romp mag langer worden (nooit korter,
+      // zodat de archetype-bouwloops nooit een lege/ongeldige reeks krijgen).
+      const GROW = { needle:6, freighter:8, drone:4, saucer:5, organic:6, broken:6, carrier:10 };
+      const gMax = GROW[archetype]!=null ? GROW[archetype] : 5;
+      let grow = Math.floor(hash(seed*2.3+7) * (gMax+1));
+      if (archetype==='drone') grow -= (grow & 1);        // even houden → symmetrisch kruis
+      const gw = baseGw + grow;
       const grid = Array.from({length:gh},()=>Array(gw).fill(0));
       const midY = Math.floor(gh/2), midX = Math.floor(gw/2);
       const cell = (x,y,v) => { if (x>=0 && x<gw && y>=0 && y<gh) grid[y][x] = Math.max(grid[y][x], v); };
@@ -2507,6 +2653,7 @@
         speed:speedBase * (route ? route.speedMul : 1) * lerp(.55, 1.05, routeDepth),
         alpha:lerp(.46, .92, routeDepth) * (route ? route.alphaMul : 1),
         phase:rng()*999,
+        tint: SHIP_TINTS[Math.floor(hash(seed*1.7+11) * SHIP_TINTS.length) % SHIP_TINTS.length],
         behavior: route ? 'route' : archetype === 'saucer' ? 'hover' : archetype === 'broken' ? 'glitch' : pick(['straight','hover','arc'])
       };
     }
@@ -2784,7 +2931,8 @@
         const cellSize = 2;
         const offX = -s.gw * cellSize / 2, offY = -s.gh * cellSize / 2;
         const wp = WardrobeBrain.current || { accent:C.green1, line:C.cyan4 };
-        const pal = [C.black, C.cyan1, C.cyan3, C.white, wp.accent, C.amber, C.magenta];
+        const t = s.tint || SHIP_TINTS[0];
+        const pal = [C.black, t.edge, t.mid, t.hi, wp.accent, t.eng, C.magenta];
 
         if (s.archetype === 'carrier') {
           ctx.globalAlpha *= .48;
@@ -4318,9 +4466,70 @@
       saveMemory(now);
     }
 
+    // ── Sky-wide poollicht: een groot, traag, lichtgevend gordijn ──────────
+    // Volledig additieve achtergrondlaag (raakt figuur/objecten niet). Verschijnt
+    // zelden en traag; kleur en vorm variëren per keer. Makkelijk uit te zetten
+    // door de AuroraBrain.step(now)-aanroep in render() te verwijderen.
+    const AuroraBrain = {
+      active:false, t0:0, dur:0, nextAt:0, pal:null, seed:0,
+      PALS:[
+        { bright:[150,255,170], mid:[34,230,90]  }, // groen
+        { bright:[150,255,170], mid:[34,230,90]  }, // groen (vaker)
+        { bright:[122,255,240], mid:[19,225,223] }, // cyaan
+        { bright:[200,156,255], mid:[145,102,214]}, // violet
+        { bright:[255,156,240], mid:[255,80,200] }, // magenta (zeldzaam)
+      ],
+      spawn(now){
+        this.active=true; this.t0=now; this.dur=rnd(48000,82000); this.seed=rnd(1,9999);
+        this.pal=this.PALS[Math.floor(hash(this.seed*1.3)*this.PALS.length) % this.PALS.length];
+      },
+      step(now){
+        if(!this.nextAt) this.nextAt = now + 15000;            // eerste keer snel (voor testen)
+        if(this.active){
+          if(now - this.t0 > this.dur){ this.active=false; this.nextAt = now + rnd(160000,360000); }
+        } else if(now >= this.nextAt){ this.spawn(now); }
+        this.draw(now);
+      },
+      draw(now){
+        if(!this.active) return;
+        const t=(now-this.t0)/1000;
+        let env=1;
+        const inT=(now-this.t0)/6000;            if(inT<1) env=inT*inT*(3-2*inT);
+        const outT=(this.dur-(now-this.t0))/9000; if(outT<1) env=Math.min(env, Math.max(0,outT));
+        if(env<=0) return;
+        const pal=this.pal;
+        const rb=a=>`rgba(${pal.bright[0]},${pal.bright[1]},${pal.bright[2]},${a})`;
+        const rm=a=>`rgba(${pal.mid[0]},${pal.mid[1]},${pal.mid[2]},${a})`;
+        const night = !(WorldBrain.time && WorldBrain.time.isNight===false);
+        const top=16, bandH=156, dim = night?1:0.55;
+        ctx.save();
+        ctx.globalCompositeOperation='lighter';
+        // brede sluier (body)
+        const broad=ctx.createLinearGradient(0,top,0,top+bandH);
+        broad.addColorStop(0, rm(0)); broad.addColorStop(.4, rm(.10*env*dim)); broad.addColorStop(1, rm(0));
+        ctx.fillStyle=broad; ctx.fillRect(0,top-6,W,bandH+12);
+        // shimmerende verticale stralen (één gradient, per strip verschoven)
+        const grad=ctx.createLinearGradient(0,0,0,bandH);
+        grad.addColorStop(0, rb(0)); grad.addColorStop(.16, rb(.9));
+        grad.addColorStop(.45, rm(.6)); grad.addColorStop(1, rm(0));
+        ctx.fillStyle=grad;
+        const stripW=(typeof REDUCED!=='undefined' && REDUCED)?7:4;
+        const base=.26*env*dim;
+        for(let x=0;x<W;x+=stripW){
+          const yo=Math.sin(x*.018 + t*.5)*16 + Math.sin(x*.045 - t*.3)*6;
+          const sh=.35 + .65*(.5+.5*Math.sin(x*.06 + t*1.1))*(.55+.45*(.5+.5*Math.sin(x*.15 - t*.7)));
+          ctx.globalAlpha=base*sh;
+          ctx.save(); ctx.translate(x, top+yo); ctx.fillRect(0,0,stripW+0.7,bandH); ctx.restore();
+        }
+        ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+        ctx.restore();
+      }
+    };
+
     function render(now){
       update(now);
       drawBackground(now);
+      AuroraBrain.step(now);
       drawNature(now);
       drawCosmic(now);
       drawMoodAura(now);
@@ -4392,120 +4601,363 @@
     if (STATIC_PREVIEW) render(performance.now() + 1600);
     else startLoop();
 
-    // ── UIBrain: logboek (enkele tap) ──────────────────────────────────────
+    // ── ChronicleBrain: oneindig journaal van waarnemingen ─────────────────
+    // Geen vaste catalogus meer. Elke waarneming wordt genoteerd met een
+    // procedurele naam en een rariteit die volgt uit hoe onwaarschijnlijk ze
+    // was — niet uit een vaste tier-tabel. Bijzondere momenten krijgen een
+    // cutout-foto. Daarnaast leeft er een register van 50 handgemaakte
+    // verhaalmomenten die tussen de procedurele stroom door opduiken.
     (() => {
-      const CATALOG = [
-        {id:'flash',      l:'Kosmische flits',     c:'kosmisch',  r:1, s:'✦'},
-        {id:'debris',     l:'Ruimtepuin',           c:'kosmisch',  r:1, s:'⋯'},
-        {id:'ripple',     l:'Ruimterimpling',       c:'kosmisch',  r:2, s:'◎'},
-        {id:'pulsar',     l:'Pulsar',               c:'kosmisch',  r:2, s:'◉'},
-        {id:'riftGlow',   l:'Scheurgloed',          c:'kosmisch',  r:3, s:'⟁'},
-        {id:'ship_drone',     l:'Verkenner',        c:'vloot', r:1, s:'▷'},
-        {id:'ship_freighter', l:'Vrachtschip',      c:'vloot', r:1, s:'▬'},
-        {id:'ship_saucer',    l:'Schotel',          c:'vloot', r:2, s:'◯'},
-        {id:'ship_needle',    l:'Naaldschip',       c:'vloot', r:2, s:'↑'},
-        {id:'ship_organic',   l:'Organisch wezen',  c:'vloot', r:3, s:'❧'},
-        {id:'ship_probe',     l:'Ruimtesonde',      c:'vloot', r:3, s:'◆'},
-        {id:'ship_broken',    l:'Wrak',             c:'vloot', r:4, s:'✕'},
-        {id:'ship_carrier',   l:'Ruimtecarrier',    c:'vloot', r:4, s:'▰'},
-        {id:'vis_cloaked',    l:'Gemaskerde',       c:'bezoekers', r:2, s:'◧'},
-        {id:'vis_traveler',   l:'Reiziger',         c:'bezoekers', r:2, s:'◫'},
-        {id:'vis_scholar',    l:'Geleerde',         c:'bezoekers', r:3, s:'◨'},
-        {id:'vis_ghost',      l:'Geest',            c:'bezoekers', r:3, s:'◭'},
-        {id:'vis_astronaut',  l:'Ruimtereiziger',   c:'bezoekers', r:4, s:'◮'},
-        {id:'r_slowClose',    l:'Trage sluiting',   c:'orakel', r:2, s:'◔'},
-        {id:'r_wink',         l:'Knipoog',          c:'orakel', r:2, s:'◕'},
-        {id:'r_fourthWall',   l:'Vierde wand',      c:'orakel', r:3, s:'◈'},
-        {id:'r_cascade',      l:'Cascade',          c:'orakel', r:3, s:'⟳'},
-        {id:'r_rareTear',     l:'Zeldzame traan',   c:'orakel', r:4, s:'◬'},
-        {id:'r_paletteFlash', l:'Paletflits',       c:'orakel', r:4, s:'◍'},
-        {id:'r_notices',      l:'Zij ziet je',      c:'orakel', r:5, s:'◉'},
-        {id:'r_worldShift',   l:'Wereldverschuiving',c:'orakel',r:5, s:'⟡'},
-        {id:'r_visitor',      l:'Bezoeker verschijnt',c:'orakel',r:5,s:'⟢'},
-      ];
       const STARS = ['','★','★★','★★★','★★★★','★★★★★'];
-      const SEEN_KEY  = 'wa_seen_v1';
-      const SEEDS_KEY = 'wa_seeds_v1';
-      let seen={}, seeds=[];
-      const load=()=>{
-        try{ seen =JSON.parse(safeStorage.get(SEEN_KEY) ||'{}'); }catch(e){ seen={}; }
-        try{ seeds=JSON.parse(safeStorage.get(SEEDS_KEY)||'[]'); }catch(e){ seeds=[]; }
-      };
-      load();
-      window.UIBrain={ mark(id){ if(seen[id])return; seen[id]=Date.now(); safeStorage.set(SEEN_KEY,JSON.stringify(seen)); try{ enqueueCapture(id); }catch(e){} } };
 
-      // ── Cutout-momentopnames ─────────────────────────────────────────────
-      // Bij de eerste ontdekking van een item knippen we een uitsnede uit het
-      // canvas precies zoals het op dat moment is — een echte 'foto' van de
-      // scène. Per categorie kiezen we een passend kader: lucht-events tonen de
-      // hemel, orakel-events het gezicht.
-      const THUMBS_KEY = 'wa_thumbs_v2';
-      let thumbs = {};
-      try { thumbs = JSON.parse(safeStorage.get(THUMBS_KEY) || '{}') || {}; } catch(e){ thumbs = {}; }
-      const byId = {}; CATALOG.forEach(e => byId[e.id] = e);
-
-      // Uitsnede-kaders (in canvas-coördinaten, 360×640). Aspect ≈ 1.74.
-      const REGIONS = {
-        sky:  { x:8,  y:24,  w:344, h:198 },   // brede hemel — kosmisch & vloot
-        mid:  { x:6,  y:118, w:348, h:200 },   // middenveld — bezoekers
-        face: { x:62, y:92,  w:236, h:138 },   // gezicht & sieraden — orakel
+      // ── Rariteit als emergente eigenschap ───────────────────────────────
+      const Rarity = {
+        fromProb(p){
+          p = Math.max(1e-6, Math.min(1, p));
+          const score = Math.max(0, Math.min(1, (-Math.log10(p)) / 4.2));
+          const stars = Math.max(1, Math.min(5, 1 + Math.floor(score * 4.999)));
+          return { p, score, stars };
+        },
+        fromStars(s){ return { p:null, score:(Math.max(1,Math.min(5,s))-1)/4, stars:s }; }
       };
-      function regionFor(id){
-        const e = byId[id]; const c = e ? e.c : '';
-        if (c === 'bezoekers') return REGIONS.mid;
-        if (c === 'orakel')    return REGIONS.face;
-        return REGIONS.sky;                    // kosmisch, vloot, en fallback
+
+      // ── Soort-metadata: categorie, naamstam, symbool, grondkans ─────────
+      // De kans voedt de rariteit. Lagere kans → zeldzamer → meer sterren.
+      const _cw = { comet:14,satellite:13,flash:12,debris:11,ripple:10,pulsar:9,meteorShower:7,riftGlow:6,aurora:4,driftMoon:2 };
+      const _cwTot = Object.values(_cw).reduce((a,b)=>a+b,0);
+      const _shipShare = { drone:.26,freighter:.22,saucer:.16,needle:.12,probe:.10,organic:.07,broken:.04,carrier:.03 };
+      const _visShare  = { cloaked:.34,traveler:.28,scholar:.20,ghost:.12,astronaut:.06 };
+      const _oracleP   = { slowClose:.007,wink:.004,fourthWall:.0025,cascade:.0016,rareTear:.0011,paletteFlash:.0008,notices:.0006,worldShift:.0004,visitor:.0002 };
+
+      const NOUN = {
+        comet:'komeet',satellite:'satelliet',flash:'lichtflits',debris:'puinregen',ripple:'rimpeling',
+        pulsar:'pulsar',meteorShower:'meteorenregen',riftGlow:'scheurgloed',aurora:'poollicht',driftMoon:'dwaalmaan',
+        drone:'verkenner',freighter:'vrachtschip',saucer:'schotel',needle:'naaldschip',probe:'sonde',
+        organic:'levend schip',broken:'wrak',carrier:'moederschip',
+        cloaked:'gesluierde',traveler:'reiziger',scholar:'geleerde',ghost:'geest',astronaut:'ruimtereiziger',
+        slowClose:'trage blik',wink:'knipoog',fourthWall:'doorbroken wand',cascade:'cascade',rareTear:'stille traan',
+        paletteFlash:'kleurbreuk',notices:'zij ziet je',worldShift:'wereldverschuiving',visitor:'aankondiging'
+      };
+      const SYM = {
+        kosmisch:'✦',vloot:'▷',bezoekers:'◧',orakel:'◉',verhaal:'❉'
+      };
+
+      function probFor(cat, key){
+        if (cat==='kosmisch') return (_cw[key]||6)/_cwTot;
+        if (cat==='vloot')    return (_shipShare[key]!=null?_shipShare[key]:.1) * 0.5;
+        if (cat==='bezoekers')return (_visShare[key]!=null?_visShare[key]:.15) * 0.02;
+        if (cat==='orakel')   return _oracleP[key]!=null?_oracleP[key]:.003;
+        return .1;
       }
 
-      // Maak een gecomprimeerde uitsnede van het hoofdcanvas met vignet.
+      // ── Lore: procedurele naamgeving uit parameters + seed ──────────────
+      const ADJ = {
+        kosmisch:['stille','trage','flikkerende','verre','heldere','vluchtige','koude','zilveren','bleke','gloeiende','spookachtige'],
+        vloot:['zwijgende','zware','gehavende','glanzende','trage','eenzame','vreemde','oude','dolende'],
+        bezoekers:['gesluierde','aarzelende','nieuwsgierige','zwijgzame','dwalende','verloren','tijdloze'],
+        orakel:['onverwachte','vluchtige','tedere','onpeilbare','breekbare','plechtige']
+      };
+      const LINE = {
+        kosmisch:['hoog boven de horizon','tussen de sterren door','aan de rand van de nacht','waar niemand keek','een ademtocht lang'],
+        vloot:['op weg naar nergens','met onbekende lading','stil als een gedachte','zonder ooit te stoppen','een schaduw in de leegte'],
+        bezoekers:['die even bleef staan','aan de rand van het beeld','en weer verdween','met ogen vol verte','zonder een woord'],
+        orakel:['alsof ze het wist','heel even maar','dieper dan het scherm','en toen weer weg','recht naar jou toe']
+      };
+      const Lore = {
+        name(cat, key, ev){
+          const noun = NOUN[key] || key;
+          const seed = (ev && ev.seed) ? ev.seed : (Date.now()%9973);
+          const h = (n)=> hash(seed*.0011 + n*7.3 + (key.length||1));
+          const adjList = ADJ[cat] || ADJ.kosmisch;
+          const adj = adjList[Math.floor(h(1)*adjList.length)];
+          // richting uit baan, indien aanwezig
+          let dir = '';
+          if (ev && ev.x0!=null && ev.x1!=null){
+            dir = ev.x1 > ev.x0 ? ' uit het westen' : ' uit het oosten';
+            if (h(5) > .6) dir = ''; // niet altijd
+          }
+          let title = adj.charAt(0).toUpperCase()+adj.slice(1) + ' ' + noun + dir;
+          if (cat==='orakel') title = noun.charAt(0).toUpperCase()+noun.slice(1);
+          const lineList = LINE[cat] || LINE.kosmisch;
+          const line = lineList[Math.floor(h(9)*lineList.length)];
+          return { title, line };
+        }
+      };
+
+      // ── Cutout-momentopnames (per waarneming) ───────────────────────────
+      const REGIONS = {
+        sky:  { x:8,  y:24,  w:344, h:198 },
+        mid:  { x:6,  y:118, w:348, h:200 },
+        face: { x:62, y:92,  w:236, h:138 },
+      };
+      function regionForCat(cat){
+        if (cat==='bezoekers') return REGIONS.mid;
+        if (cat==='orakel' || cat==='verhaal') return REGIONS.face;
+        return REGIONS.sky;
+      }
       function grabCutout(region){
         try{
           if (!canvas || !canvas.width) return null;
-          const OW = 240, OH = 138;
-          const oc = document.createElement('canvas'); oc.width = OW; oc.height = OH;
-          const o = oc.getContext('2d');
-          let { x, y, w, h } = region;
-          x = Math.max(0, Math.min(x, W - 8)); y = Math.max(0, Math.min(y, H - 8));
-          w = Math.min(w, W - x);             h = Math.min(h, H - y);
-          o.drawImage(canvas, x, y, w, h, 0, 0, OW, OH);
-          // filmische vignet aan de randen
-          const vg = o.createRadialGradient(OW/2, OH*0.46, OH*0.22, OW/2, OH/2, OH*0.82);
-          vg.addColorStop(0, 'rgba(0,0,0,0)');
-          vg.addColorStop(1, 'rgba(0,0,0,.46)');
-          o.fillStyle = vg; o.fillRect(0, 0, OW, OH);
-          o.fillStyle = 'rgba(255,255,255,.05)'; o.fillRect(0, 0, OW, 1);
-          return oc.toDataURL('image/jpeg', 0.62);
-        } catch(e){ return null; }
+          const OW=360, OH=207;
+          const oc=document.createElement('canvas'); oc.width=OW; oc.height=OH;
+          const o=oc.getContext('2d');
+          let {x,y,w,h}=region;
+          x=Math.max(0,Math.min(x,W-8)); y=Math.max(0,Math.min(y,H-8));
+          w=Math.min(w,W-x); h=Math.min(h,H-y);
+          o.drawImage(canvas, x,y,w,h, 0,0,OW,OH);
+          const vg=o.createRadialGradient(OW/2,OH*0.46,OH*0.22, OW/2,OH/2,OH*0.82);
+          vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.46)');
+          o.fillStyle=vg; o.fillRect(0,0,OW,OH);
+          o.fillStyle='rgba(255,255,255,.05)'; o.fillRect(0,0,OW,1);
+          return oc.toDataURL('image/jpeg',0.62);
+        }catch(e){ return null; }
       }
-
-      function persistThumbs(){ safeStorage.set(THUMBS_KEY, JSON.stringify(thumbs)); }
-
-      // Captures verlopen via een wachtrij die in de render-loop wordt geleegd,
-      // zodat elke uitsnede gegarandeerd een vers, zichtbaar frame vastlegt.
-      const _capQueue = [];
-      function enqueueCapture(id){
-        if (thumbs[id]) return;
-        _capQueue.push(id);
-      }
-      window._flushCaptures = function(){
-        if (!_capQueue.length) return;
-        let changed = false, guard = 0;
-        while (_capQueue.length && guard++ < 4){
-          const id = _capQueue.shift();
-          if (thumbs[id]) continue;
-          const shot = grabCutout(regionFor(id));
-          if (shot){ thumbs[id] = shot; changed = true; window._lastCapId = id; }
+      const _capQueue=[];
+      function enqueueCapture(entryId, cat){ _capQueue.push({ id:entryId, cat }); }
+      window._flushCaptures=function(){
+        if(!_capQueue.length) return;
+        let changed=false, guard=0;
+        while(_capQueue.length && guard++<3){
+          const job=_capQueue.shift();
+          const shot=grabCutout(regionForCat(job.cat));
+          if(shot){ Chronicle.attachThumb(job.id, shot); changed=true; window._lastCapId=job.id; }
         }
-        if (changed){
-          persistThumbs();
-          if (logEl && logEl.classList.contains('open')) renderLog();
-        }
+        if(changed && logEl && logEl.classList.contains('open')) renderLog();
       };
 
+      // ── Vector-portretten: events los & gecentreerd i.p.v. een cutout ────
+      // Schepen worden exact uit hun grid getekend; kosmische events als een
+      // representatieve 'studiofoto'. Beide op een sfeervolle hemel.
+      const POW=360, POH=207;
+      function portraitSky(o, seed){
+        const night = !!(WorldBrain.time && WorldBrain.time.isNight);
+        const g=o.createLinearGradient(0,0,0,POH);
+        if(night){ g.addColorStop(0,'#0c1838'); g.addColorStop(.6,'#0a1124'); g.addColorStop(1,'#060912'); }
+        else { g.addColorStop(0,'#2c4f80'); g.addColorStop(.6,'#34598a'); g.addColorStop(1,'#1d3148'); }
+        o.fillStyle=g; o.fillRect(0,0,POW,POH);
+        const hg=o.createRadialGradient(POW/2,POH*1.05,10, POW/2,POH*1.05,POH*0.95);
+        hg.addColorStop(0, night?'rgba(60,90,150,.22)':'rgba(160,190,230,.32)'); hg.addColorStop(1,'rgba(0,0,0,0)');
+        o.fillStyle=hg; o.fillRect(0,0,POW,POH);
+        if(night){ for(let i=0;i<34;i++){ const sx=hash(seed*.013+i*1.7)*POW, sy=hash(seed*.029+i*2.3)*POH*0.78;
+          o.globalAlpha=.25+hash(seed+i)*0.5; o.fillStyle='#ffffff'; o.fillRect(sx,sy,1,1);} o.globalAlpha=1; }
+      }
+      function portraitVignette(o){
+        const vg=o.createRadialGradient(POW/2,POH*0.46,POH*0.25, POW/2,POH/2,POH*0.85);
+        vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.5)');
+        o.fillStyle=vg; o.fillRect(0,0,POW,POH);
+        o.fillStyle='rgba(255,255,255,.05)'; o.fillRect(0,0,POW,1);
+      }
+      function newPortrait(seed){
+        const oc=document.createElement('canvas'); oc.width=POW; oc.height=POH;
+        const o=oc.getContext('2d'); portraitSky(o, seed||1); return {oc,o};
+      }
+      function shipPortrait(s){
+        try{
+          if(!s || !s.grid) return null;
+          const {oc,o}=newPortrait(s.seed||1);
+          const cell=2, gwp=s.gw*cell, ghp=s.gh*cell;
+          const scale=Math.max(2.4, Math.min((POW*0.6)/gwp, (POH*0.52)/ghp, 7.5));
+          o.save(); o.translate(POW/2, POH/2-4); o.scale(scale,scale); o.imageSmoothingEnabled=false;
+          const wp=WardrobeBrain.current || { accent:C.green1, line:C.cyan4 };
+          const t = s.tint || SHIP_TINTS[0];
+          const pal=[C.black, t.edge, t.mid, t.hi, wp.accent, t.eng, C.magenta];
+          const offX=-s.gw*cell/2, offY=-s.gh*cell/2;
+          if(s.archetype==='carrier'){ o.globalAlpha=.5; o.fillStyle=C.black; o.fillRect(offX-6,offY+1,gwp+12,ghp-2); o.globalAlpha=1; }
+          for(let y=0;y<s.gh;y++) for(let x=0;x<s.gw;x++){ const v=s.grid[y][x]; if(!v) continue; o.fillStyle=pal[v]||C.cyan4; o.fillRect(offX+x*cell,offY+y*cell,cell,cell); }
+          // kenmerkende motor-/sleepgloed
+          o.globalAlpha=.45;
+          if(s.archetype==='drone'){ o.fillStyle=C.green2; o.fillRect(-1,offY+ghp,2,13); }
+          if(s.archetype==='saucer'){ o.fillStyle=C.cyan4; o.beginPath(); o.moveTo(-5,offY+ghp); o.lineTo(5,offY+ghp); o.lineTo(9,offY+ghp+11); o.lineTo(-9,offY+ghp+11); o.closePath(); o.fill(); }
+          o.globalAlpha=1; o.restore();
+          portraitVignette(o);
+          return oc.toDataURL('image/jpeg',0.68);
+        }catch(e){ return null; }
+      }
+      function cosmicPortrait(ev){
+        try{
+          if(!ev) return null;
+          const {oc,o}=newPortrait(ev.seed||1);
+          const col=ev.color||C.cyan4, cx=POW/2, cy=POH/2-4;
+          const glow=(x,y,r,c,a)=>{ const g=o.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,c); g.addColorStop(1,'rgba(0,0,0,0)'); o.globalAlpha=a; o.fillStyle=g; o.beginPath(); o.arc(x,y,r,0,7); o.fill(); o.globalAlpha=1; };
+          switch(ev.type){
+            case 'comet': { o.save(); o.translate(cx+44,cy-28); o.rotate(2.5); const tg=o.createLinearGradient(0,0,150,0); tg.addColorStop(0,col); tg.addColorStop(1,'rgba(0,0,0,0)'); o.globalAlpha=.7; o.fillStyle=tg; o.fillRect(0,-3,150,6); o.restore(); glow(cx+44,cy-28,26,col,.9); o.fillStyle=C.white; o.beginPath(); o.arc(cx+44,cy-28,4,0,7); o.fill(); break; }
+            case 'pulsar': { glow(cx,cy,62,col,.7); o.strokeStyle=col; o.globalAlpha=.8; o.lineWidth=2; for(let a=0;a<6;a++){ const ang=a*Math.PI/3; o.beginPath(); o.moveTo(cx,cy); o.lineTo(cx+Math.cos(ang)*72,cy+Math.sin(ang)*72); o.stroke(); } o.globalAlpha=1; o.fillStyle=C.white; o.beginPath(); o.arc(cx,cy,7,0,7); o.fill(); break; }
+            case 'ripple': { o.strokeStyle=col; for(let i=0;i<4;i++){ o.globalAlpha=.7-i*.15; o.lineWidth=2; o.beginPath(); o.arc(cx,cy,16+i*22,0,7); o.stroke(); } o.globalAlpha=1; break; }
+            case 'aurora': { o.globalAlpha=.5; o.strokeStyle=col; o.lineWidth=14; o.beginPath(); for(let x=0;x<=POW;x+=8){ const y=cy+Math.sin(x*.03)*18; x===0?o.moveTo(x,y):o.lineTo(x,y); } o.stroke(); o.globalAlpha=1; break; }
+            case 'flash': { glow(cx,cy,72,col,.95); o.fillStyle=C.white; o.beginPath(); o.arc(cx,cy,6,0,7); o.fill(); break; }
+            case 'satellite': { glow(cx,cy,12,col,.8); o.globalAlpha=.4; o.strokeStyle=col; o.lineWidth=1; o.beginPath(); o.moveTo(cx-34,cy); o.lineTo(cx+34,cy); o.stroke(); o.globalAlpha=1; o.fillStyle=C.white; o.fillRect(cx-2,cy-2,4,4); break; }
+            case 'debris': { o.fillStyle=col; const bits=(ev.bits&&ev.bits.length)?ev.bits:Array.from({length:6}); bits.forEach((b,i)=>{ const x=cx+Math.cos(i*1.7)*(28+i*11), y=cy+Math.sin(i*2.1)*(18+i*6), sz=(b&&b.s)||2; o.fillRect(x,y,sz*2,sz*2); }); break; }
+            case 'meteorShower': { o.strokeStyle=col; o.lineWidth=2; o.globalAlpha=.85; for(let i=0;i<5;i++){ const x=40+i*64, y=28+((i*37)%56); o.beginPath(); o.moveTo(x,y); o.lineTo(x+22,y+34); o.stroke(); } o.globalAlpha=1; break; }
+            case 'riftGlow': { o.save(); o.translate(cx,cy); o.rotate(.3); const rg=o.createLinearGradient(0,-52,0,52); rg.addColorStop(0,'rgba(0,0,0,0)'); rg.addColorStop(.5,col); rg.addColorStop(1,'rgba(0,0,0,0)'); o.fillStyle=rg; o.globalAlpha=.85; o.fillRect(-6,-52,12,104); o.restore(); glow(cx,cy,40,col,.5); break; }
+            case 'driftMoon': { glow(cx,cy,52,'#aab8d8',.4); o.fillStyle='#cdd6e6'; o.beginPath(); o.arc(cx,cy,26,0,7); o.fill(); o.fillStyle='rgba(0,0,0,.12)'; o.beginPath(); o.arc(cx+8,cy-6,5,0,7); o.arc(cx-6,cy+8,4,0,7); o.fill(); break; }
+            default: glow(cx,cy,52,col,.7);
+          }
+          portraitVignette(o);
+          return oc.toDataURL('image/jpeg',0.68);
+        }catch(e){ return null; }
+      }
+
+      // ── Persistente staat ───────────────────────────────────────────────
+      const CH_KEY='wa_chronicle_v1', META_KEY='wa_chmeta_v1', SEEDS_KEY='wa_seeds_v1';
+      const CH_MAX=140;                 // tijdlijn-lengte
+      let chronicle=[], seeds=[];
+      let meta={ total:0, best:0, species:{}, opens:0, days:{}, stories:{} };
+      try{ chronicle=JSON.parse(safeStorage.get(CH_KEY)||'[]')||[]; }catch(e){ chronicle=[]; }
+      try{ seeds=JSON.parse(safeStorage.get(SEEDS_KEY)||'[]')||[]; }catch(e){ seeds=[]; }
+      try{ Object.assign(meta, JSON.parse(safeStorage.get(META_KEY)||'{}')||{}); }catch(e){}
+      meta.species=meta.species||{}; meta.days=meta.days||{}; meta.stories=meta.stories||{};
+
+      function persist(){
+        safeStorage.set(META_KEY, JSON.stringify(meta));
+        let ok = safeStorage.set(CH_KEY, JSON.stringify(chronicle));
+        if (ok===false){ // quota: gooi oudste foto's weg en probeer opnieuw
+          for (let i=chronicle.length-1; i>=0 && i>chronicle.length-40; i--){ chronicle[i].thumb=null; }
+          safeStorage.set(CH_KEY, JSON.stringify(chronicle));
+        }
+      }
+
+      // ── Het journaal ────────────────────────────────────────────────────
+      const THROTTLE={ kosmisch:12000, vloot:9000, bezoekers:4000, orakel:1500, verhaal:0 };
+      const _last={};
+      const Chronicle={
+        observe(cat, key, ev){
+          const now=Date.now();
+          if (THROTTLE[cat] && _last[key] && now-_last[key]<THROTTLE[cat]) return null;
+          _last[key]=now;
+          const isStory = cat==='verhaal';
+          const rar = (ev && ev.stars!=null) ? Rarity.fromStars(ev.stars) : Rarity.fromProb(probFor(cat,key));
+          const lore = (ev && ev.title) ? { title:ev.title, line:ev.line||'' } : Lore.name(cat,key,ev||{});
+          const id='e'+now.toString(36)+Math.floor(Math.random()*46656).toString(36);
+          // vloot & kosmisch: meteen een los vector-portret uit de live parameters
+          let thumb=null;
+          try{
+            if (cat==='vloot') thumb=shipPortrait(ev);
+            else if (cat==='kosmisch') thumb=cosmicPortrait(ev);
+          }catch(e){ thumb=null; }
+          const entry={ id, t:now, cat, key, title:lore.title, line:lore.line, stars:rar.stars, score:rar.score, sym:(ev&&ev.sym)||SYM[cat]||'✦', thumb };
+          chronicle.unshift(entry);
+          if (chronicle.length>CH_MAX) chronicle.length=CH_MAX;
+          meta.total++; meta.best=Math.max(meta.best, rar.stars);
+          meta.species[key]=(meta.species[key]||0)+1;
+          persist();
+          // bezoekers/orakel/verhaal: cutout van de scène (of fallback als portret faalde)
+          if (!thumb && (rar.stars>=2 || meta.species[key]===1 || isStory)) enqueueCapture(id, cat);
+          if (logEl && logEl.classList.contains('open')) renderLog();
+          return entry;
+        },
+        attachThumb(id, dataURL){
+          const e=chronicle.find(x=>x.id===id); if(!e) return;
+          e.thumb=dataURL; persist();
+        },
+        speciesCount(){ return Object.keys(meta.species).length; }
+      };
+      window.Chronicle=Chronicle; // beschikbaar voor latere fases
+
+      // ── StoryBrain: 50 handgemaakte verhaalmomenten ─────────────────────
+      // Voorlopig 8 volledig geschreven; de overige plekken vullen we samen.
+      // Elk verhaal heeft een conditie en verschijnt hoogstens één keer.
+      const STORIES=[
+        { id:'s_firstNight', title:'De Eerste Nacht', sym:'☾', stars:4,
+          line:'Voor het eerst keek je samen de duisternis in.',
+          cond:c=> c.isNight },
+        { id:'s_stormwatch', title:'Stilte voor de Storm', sym:'☔', stars:4,
+          line:'Regen tikte tegen de leegte terwijl zij wachtte.',
+          cond:c=> c.rain>.45 },
+        { id:'s_hundredEyes', title:'Honderd Ogen', sym:'❊', stars:5,
+          line:'Honderd waarnemingen, en zij telde mee.',
+          cond:c=> c.total>=100 },
+        { id:'s_midnight', title:'Het Middernachtsuur', sym:'◷', stars:5,
+          line:'Precies tussen twee dagen in stond de tijd even stil.',
+          cond:c=> c.hour===0 || c.hour===23 && c.min>=50 },
+        { id:'s_faithful', title:'Trouwe Waarnemer', sym:'✺', stars:4,
+          line:'Vijf dagen keerde je terug. Zij onthield het.',
+          cond:c=> c.dayCount>=5 },
+        { id:'s_longgaze', title:'De Lange Blik', sym:'⊚', stars:4,
+          line:'Je bleef. Lang. Zonder iets te vragen.',
+          cond:c=> c.sessionMin>=10 },
+        { id:'s_dawn', title:'Het Eerste Licht', sym:'☀', stars:3,
+          line:'De nacht brak en de kleuren keerden terug.',
+          cond:c=> !c.isNight && c.hour>=5 && c.hour<=7 },
+        { id:'s_collector', title:'De Verzamelaar', sym:'❖', stars:5,
+          line:'Twintig soorten ontdekt. Het universum werd vertrouwd.',
+          cond:c=> c.species>=20 },
+      ];
+      const _sessionStart=Date.now();
+      function storyContext(){
+        const d=new Date();
+        const today=''+(d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate());
+        return {
+          isNight: !!(WorldBrain.time && WorldBrain.time.isNight),
+          rain: (WorldBrain.weather && WorldBrain.weather.visual ? WorldBrain.weather.visual.rain : 0)||0,
+          hour: d.getHours(), min: d.getMinutes(),
+          total: meta.total, species: Chronicle.speciesCount(),
+          dayCount: Object.keys(meta.days).length,
+          sessionMin: (Date.now()-_sessionStart)/60000,
+          today
+        };
+      }
+      function checkStories(){
+        const ctx=storyContext();
+        for(const st of STORIES){
+          if (meta.stories[st.id]) continue;
+          let ok=false; try{ ok=st.cond(ctx); }catch(e){ ok=false; }
+          if(ok){
+            meta.stories[st.id]=Date.now();
+            Chronicle.observe('verhaal', st.id, { stars:st.stars, title:st.title, line:st.line, sym:st.sym });
+            break; // hooguit één verhaal per tik
+          }
+        }
+      }
+
+      // ── Tijd-helper ─────────────────────────────────────────────────────
+      function ago(t){
+        const s=(Date.now()-t)/1000;
+        if(s<45) return 'zojuist';
+        if(s<3600) return Math.round(s/60)+' min geleden';
+        if(s<86400) return Math.round(s/3600)+' u geleden';
+        const days=Math.round(s/86400);
+        if(days===1) return 'gisteren';
+        if(days<30) return days+' dagen geleden';
+        return new Date(t).toLocaleDateString('nl',{day:'numeric',month:'short'});
+      }
+
       // ── Logboek renderen ────────────────────────────────────────────────
+      let chFilter=0; // 0=alle, 3/4/5 = minimaal aantal sterren
+
+      // ── Detailweergave: tik op een item om het in het groot te zien ─────
+      let lb=document.getElementById('jr-lightbox');
+      if(!lb){
+        lb=document.createElement('div'); lb.id='jr-lightbox';
+        lb.innerHTML='<div class="lb-inner">'
+          +'<button class="lb-x" aria-label="Sluiten">✕</button>'
+          +'<div class="lb-media"></div><div class="lb-tag">❉ verhaal</div>'
+          +'<div class="lb-stars"></div><div class="lb-title"></div>'
+          +'<div class="lb-line"></div><div class="lb-meta"></div></div>';
+        document.body.appendChild(lb);
+        // buiten de inhoud klikken (of op ✕) sluit; op de inhoud klikken niet
+        lb.addEventListener('click',(ev)=>{
+          if(ev.target===lb || (ev.target.closest && ev.target.closest('.lb-x'))) lb.classList.remove('open');
+        });
+      }
+      function openDetail(e){
+        if(!e) return;
+        const media=lb.querySelector('.lb-media');
+        if(e.thumb){ media.className='lb-media'; media.innerHTML='<img alt=""/>'; media.querySelector('img').src=e.thumb; }
+        else { media.className='lb-media sym'; media.innerHTML='<span>'+e.sym+'</span>'; }
+        const tag=lb.querySelector('.lb-tag'); tag.style.display = e.cat==='verhaal' ? 'block' : 'none';
+        lb.querySelector('.lb-stars').textContent=STARS[e.stars];
+        lb.querySelector('.lb-title').textContent=e.title;
+        lb.querySelector('.lb-line').textContent=e.line||'';
+        lb.querySelector('.lb-meta').textContent=`${e.cat} · ${ago(e.t)}`;
+        lb.setAttribute('data-r', e.stars);
+        lb.querySelector('.lb-inner').scrollTop=0;
+        lb.classList.add('open');
+      }
+      const lbOpen=()=> lb.classList.contains('open');
+
       const renderLog=()=>{
         const body=document.getElementById('wa-log-body');
-        const found=CATALOG.filter(e=>seen[e.id]).length;
+        if(!body) return;
         const curId=SceneBrain.dayId;
         const savedHTML=seeds.length
           ? `<div class="seed-grid">${seeds.map((s,i)=>`
@@ -4514,11 +4966,35 @@
               </div>`).join('')}</div>`
           : `<div style="font-size:12px;color:rgba(105,255,243,.35);margin-top:6px;letter-spacing:.10em;">geen opgeslagen seeds</div>`;
 
+        const list = chronicle.filter(e=> chFilter? e.stars>=chFilter : true);
+        const rowsHTML = list.length ? list.map(e=>{
+          const fresh=(window._lastCapId===e.id)?' fresh':'';
+          const thumb = e.thumb
+            ? `<div class="jr-thumb has-shot" data-id="${e.id}"><img src="${e.thumb}" alt=""/></div>`
+            : `<div class="jr-thumb jr-thumb--sym"><span>${e.sym}</span></div>`;
+          return `<div class="jr-row${e.cat==='verhaal'?' story':''}${fresh}" data-r="${e.stars}" data-id="${e.id}">
+            ${thumb}
+            <div class="jr-txt">
+              <div class="jr-title">${e.title}</div>
+              <div class="jr-line">${e.line||''}</div>
+              <div class="jr-meta"><span class="jr-stars">${STARS[e.stars]}</span> · ${ago(e.t)}</div>
+            </div>
+          </div>`;
+        }).join('') : `<div class="jr-empty">Nog niets waargenomen onder dit filter.<br>Blijf kijken — de hemel is nooit twee keer hetzelfde.</div>`;
+
         body.innerHTML=`
-          <div class="lg-progress">
-            <div class="lg-count"><b>${found}</b> / ${CATALOG.length} <span>vondsten vastgelegd</span></div>
-            <div class="lg-bar"><div class="lg-bar-fill" style="width:${Math.round(found/CATALOG.length*100)}%"></div></div>
+          <div class="jr-summary" data-best="${meta.best||0}">
+            <div class="jr-sum-main"><b>${meta.total}</b> waarnemingen</div>
+            <div class="jr-sum-sub">${Chronicle.speciesCount()} soorten · zeldzaamste ${meta.best?`<span class="jr-stars">${STARS[meta.best]}</span>`:'—'}</div>
           </div>
+
+          <div class="jr-filters">
+            ${[['alle',0],['★★+',2],['★★★+',3],['★★★★+',4],['★★★★★',5]].map(([lbl,v])=>
+              `<div class="jr-chip${chFilter===v?' on':''}" data-f="${v}">${lbl}</div>`).join('')}
+          </div>
+
+          <div class="wa-sec">· waarnemingen ·</div>
+          <div class="jr-list">${rowsHTML}</div>
 
           <div class="wa-sec">· dagelijkse scène ·</div>
           <div style="font-size:13px;color:rgba(105,255,243,.5);margin-bottom:10px;">
@@ -4528,37 +5004,23 @@
           <button class="wa-btn gold" id="lg-save-seed">✦ bewaar deze seed</button>
           ${savedHTML}
 
-          ${['kosmisch','vloot','bezoekers','orakel'].map(cat=>{
-            const items=CATALOG.filter(e=>e.c===cat);
-            return `<div class="wa-sec">· ${cat} ·</div>
-            <div class="ev-grid">${items.map(e=>{
-              const sv=seen[e.id];
-              const shot=thumbs[e.id];
-              const d=sv?new Date(sv).toLocaleDateString('nl',{day:'numeric',month:'short'}):'';
-              const fresh=(window._lastCapId===e.id)?' fresh':'';
-              let thumbHTML;
-              if(shot){
-                thumbHTML=`<div class="ev-thumb has-shot"><img src="${shot}" alt="momentopname van ${e.l}" /><span class="ev-cap-tag">moment</span></div>`;
-              } else if(sv){
-                thumbHTML=`<div class="ev-thumb ev-thumb--symbol"><span class="ph-sym">${e.s}</span></div>`;
-              } else {
-                thumbHTML=`<div class="ev-thumb ev-thumb--locked"><span class="ph-sym">${e.s}</span><span class="ph-q">?</span></div>`;
-              }
-              const name=sv?e.l:'· verzegeld ·';
-              return `<div class="ev-card${sv?' seen':''}${fresh}" data-r="${e.r}">
-                ${thumbHTML}
-                <div class="ev-sym">${e.s}</div>
-                <div class="ev-name">${name}</div>
-                <div class="ev-stars">${STARS[e.r]}</div>
-                <div class="ev-badge">${sv?'gezien · '+d:'nog niet gezien'}</div>
-              </div>`;
-            }).join('')}</div>`;
-          }).join('')}
-          <button class="wa-btn danger" id="lg-reset" style="margin-top:18px;">opnieuw beginnen</button>`;
+          <button class="wa-btn danger" id="lg-reset" style="margin-top:18px;">journaal wissen</button>`;
         window._lastCapId=null;
 
-        // Seed-handlers
-        document.getElementById('lg-save-seed').addEventListener('click',()=>{
+        // filter-chips
+        document.querySelectorAll('.jr-chip').forEach(el=>{
+          el.addEventListener('click',()=>{ chFilter=Number(el.dataset.f)||0; renderLog(); });
+        });
+        // tik op een item → detailweergave
+        document.querySelectorAll('.jr-row').forEach(el=>{
+          el.addEventListener('click',()=>{
+            const e=chronicle.find(x=>x.id===el.dataset.id);
+            if(e) openDetail(e);
+          });
+        });
+        // seed-handlers
+        const ss=document.getElementById('lg-save-seed');
+        if(ss) ss.addEventListener('click',()=>{
           if(!seeds.find(s=>s.dayId===curId)){
             seeds.push({label:SceneBrain.biome, dayId:curId});
             safeStorage.set(SEEDS_KEY,JSON.stringify(seeds));
@@ -4568,62 +5030,89 @@
         document.querySelectorAll('.seed-pill').forEach(el=>{
           el.addEventListener('click',()=>{
             const s=seeds[Number(el.dataset.i)];
-            SceneBrain._override=true;
-            SceneBrain._gen(s.dayId);
-            renderLog();
+            SceneBrain._override=true; SceneBrain._gen(s.dayId); renderLog();
           });
         });
-
-        // Reset — twee tikken ter bevestiging (mobielvriendelijk, geen confirm-popup)
+        // reset — twee tikken
         const rb=document.getElementById('lg-reset');
         if(rb){
           let armed=false, armTimer=null;
           rb.addEventListener('click',()=>{
-            if(!armed){
-              armed=true; rb.textContent='tik nogmaals om te wissen';
-              clearTimeout(armTimer);
-              armTimer=setTimeout(()=>{ armed=false; rb.textContent='opnieuw beginnen'; },3000);
-              return;
-            }
+            if(!armed){ armed=true; rb.textContent='tik nogmaals om te wissen';
+              clearTimeout(armTimer); armTimer=setTimeout(()=>{armed=false; rb.textContent='journaal wissen';},3000); return; }
             clearTimeout(armTimer);
-            seen={}; thumbs={};
-            safeStorage.set(SEEN_KEY,'{}');
-            persistThumbs();
-            renderLog();
+            chronicle=[]; meta={ total:0, best:0, species:{}, opens:meta.opens, days:meta.days, stories:{} };
+            persist(); renderLog();
           });
         }
       };
 
       // ── Open/sluit ──────────────────────────────────────────────────────
       const logEl=document.getElementById('wa-log');
-      const openLog=()=>{ if(logEl.classList.contains('open'))return; renderLog(); logEl.classList.add('open'); };
+      const openLog=()=>{
+        if(logEl.classList.contains('open'))return;
+        meta.opens=(meta.opens||0)+1;
+        const d=new Date(); meta.days[''+(d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate())]=1;
+        persist();
+        renderLog(); logEl.classList.add('open');
+      };
       const closeLog=()=>logEl.classList.remove('open');
-      const toggleLog=()=>logEl.classList.contains('open') ? closeLog() : openLog();
+      const hc=document.getElementById('lg-head-close');
+      if(hc) hc.addEventListener('click',()=> closeLog());
 
-      // ── Enkele tap als toggle ────────────────────────────────────────────
-      // Eerste tap opent het logboek, de volgende tap sluit het weer. Geen aparte sluitknop.
-      let tapTimer=null, uiActive=false;
+      // ── Tap opent het logboek; sluiten gaat via een knop ─────────────────
+      // (zo botst tikken-om-te-openen niet met het aantikken van items)
+      let uiActive=false, downX=0, downY=0, downT=0;
       const waitU=setInterval(()=>{ if(!document.getElementById('enter')){ uiActive=true; clearInterval(waitU); }},300);
+      window.addEventListener('pointerdown',(ev)=>{ downX=ev.clientX; downY=ev.clientY; downT=Date.now(); });
       window.addEventListener('pointerup',(ev)=>{
         if(!uiActive)return;
-        const trg = ev.target;
-        if (trg && (trg.closest('#wa-log') || trg.closest('#enter'))) return;
-        clearTimeout(tapTimer);
-        tapTimer=setTimeout(toggleLog,120);
+        if(lbOpen()) return;                                     // detailweergave sluit zichzelf
+        if(logEl.classList.contains('open')) return;             // open: sluiten via knop
+        const trg=ev.target;
+        if(trg && trg.closest('#enter')) return;
+        if(trg && trg.closest('#jr-lightbox')) return;
+        const moved=Math.hypot(ev.clientX-downX, ev.clientY-downY);
+        const isTap=moved<10 && (Date.now()-downT)<600;
+        if(isTap) openLog();
       });
 
-      // ── Event-tracking hooks ────────────────────────────────────────────
+      // ── Waarnemings-hooks: lees de bestaande brains, noteer in het journaal ─
       let _ks=new Set(), _kc=new Set();
       setInterval(()=>{
-        (ShipBrain.ships||[]).forEach(s=>{ if(!_ks.has(s.id)){_ks.add(s.id);UIBrain.mark('ship_'+(s.archetype||'drone'));} });
-        (CosmicBrain.events||[]).forEach(e=>{ const k=e.id||e.type; if(!_kc.has(k)){_kc.add(k);UIBrain.mark(e.type);} });
-        if(VisitorBrain.phase==='visible'&&VisitorBrain.alpha>.5) UIBrain.mark('vis_'+(VisitorBrain.archetype||'cloaked'));
+        (ShipBrain.ships||[]).forEach(s=>{ if(!_ks.has(s.id)){ _ks.add(s.id); Chronicle.observe('vloot', s.archetype||'drone', s); }});
+        (CosmicBrain.events||[]).forEach(e=>{ const k=e.id||(e.type+'_'+e.start); if(!_kc.has(k)){ _kc.add(k); Chronicle.observe('kosmisch', e.type, e); }});
+        if(VisitorBrain.phase==='visible'&&VisitorBrain.alpha>.5){ const vk='vis_'+(VisitorBrain.archetype||'cloaked')+'_'+Math.floor(VisitorBrain.phaseStart||0); if(!_kc.has(vk)){ _kc.add(vk); Chronicle.observe('bezoekers', VisitorBrain.archetype||'cloaked', VisitorBrain); }}
+        checkStories();
       },800);
       const _rLast={};
       RarityBrain.tiers.forEach(t=>{_rLast[t.name]=t.lastAt;});
-      setInterval(()=>{ RarityBrain.tiers.forEach(t=>{ if(t.lastAt>(_rLast[t.name]||0)){_rLast[t.name]=t.lastAt;UIBrain.mark('r_'+t.name);} }); },500);
+      setInterval(()=>{ RarityBrain.tiers.forEach(t=>{ if(t.lastAt>(_rLast[t.name]||0)){ _rLast[t.name]=t.lastAt; Chronicle.observe('orakel', t.name, { seed:Math.floor(t.lastAt) }); }}); },500);
     })();
 
+    // ── Scherm wakker houden (voorkomt dat de iPhone na enige tijd dimt) ────
+    // Gebruikt de Screen Wake Lock API (iOS Safari 16.4+, Chrome, Edge…).
+    // Wordt automatisch vrijgegeven als het tabblad verborgen raakt, dus we
+    // vragen 'm opnieuw aan zodra de pagina weer zichtbaar is of bij interactie.
+    (() => {
+      let wakeLock = null, acquiring = false;
+      async function acquire(){
+        if (acquiring || wakeLock) return;
+        if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+        acquiring = true;
+        try{
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => { wakeLock = null; });
+        }catch(e){ /* niet ondersteund of geweigerd — stil negeren */ }
+        finally{ acquiring = false; }
+      }
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') acquire();
+      });
+      ['pointerdown','click','touchstart'].forEach(ev =>
+        window.addEventListener(ev, acquire, { passive:true }));
+      acquire();
+    })();
   })();
   </script>
 </body>
