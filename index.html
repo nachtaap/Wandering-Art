@@ -2257,7 +2257,7 @@
         if (t >= 1){
           V.phase='present'; V.phaseStart=now;
           V.gazeOverride = { tx:clamp((V.x-180)/70,-1.1,1.1), ty:.18 };
-          speech.nextAt = Math.min(speech.nextAt, now+rnd(900,2200));
+          speech.nextAt = Math.min(speech.nextAt, now+rnd(3500,6000));
           if (AudioBrain.started) AudioBrain.voice(AudioBrain.root*1.5, 3,'sine',{gain:.06,send:.9,attack:1.2});
         }
 
@@ -2640,13 +2640,15 @@
     ];
 
     function startGreetingSpeech(now){
-      speech.active   = true;
-      speech.start    = now + 140;
-      speech.duration = 5200;
-      speech.text     = pick(GREETING_LINES);
+      speech.active     = true;
+      speech.start      = now + 140;
+      speech.duration   = 7000;
+      speech.text       = pick(GREETING_LINES);
       speech.meaningful = true;
-      speech.phase    = Math.random() * 999;
-      speech.mood     = 'happy';
+      speech.bubbleType = 'speech';
+      speech.phase      = Math.random() * 999;
+      speech.mood       = 'happy';
+      speech.nextAt     = now + 7000 + 20000; // na de begroeting 20s rust
     }
 
     function updatePose(now, dt){
@@ -2724,25 +2726,33 @@
     function updateSpeech(now){
       if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') {
         speech.active = false;
-        speech.nextAt = Math.max(speech.nextAt, now + 5000);
+        speech.nextAt = Math.max(speech.nextAt, now + 18000);
         return;
       }
       const mood = dominantMood();
       if (!speech.active && now > speech.nextAt) {
         const data = generateSpeechText(mood);
+        // Ballon-type uit stemming kiezen — zoals in strips.
+        // Caption is gereserveerd voor story events (zie checkStories).
+        let bubbleType;
+        if (mood==='angry' || mood==='surprised') bubbleType='spiky';
+        else if (mood==='shy' || mood==='neutral') bubbleType = Math.random()<.42 ? 'thought' : 'speech';
+        else bubbleType='speech';
         speech.active = true;
         speech.start = now;
-        speech.duration = rnd(3000, 6000);
+        speech.duration = rnd(6500, 11000);
         speech.text = data.text;
         speech.mood = mood;
         speech.meaningful = data.meaningful;
+        speech.bubbleType = bubbleType;
         speech.phase = rnd(0,999);
         MemoryBrain.lastSpeechAt = now;
         AudioBrain.speak(data.text, mood);
       }
       if (speech.active && now > speech.start + speech.duration) {
         speech.active = false;
-        speech.nextAt = now + (rnd(8500, 22000) - emotion.arousal * 1600) / CONFIG.speechFrequency;
+        const cooldown = Math.max(15000, rnd(18000, 38000) - emotion.arousal * 2000);
+        speech.nextAt = now + cooldown / CONFIG.speechFrequency;
       }
     }
 
@@ -4391,31 +4401,104 @@
       const vis=visibleCanvasRect();
       const fontSize=15, padX=14, padY=11, lineH=19;
       const font=fontSize+'px monospace';
+      const type=speech.bubbleType||'speech';
 
-      // Ballon breed onder het gezicht; mag het lichaam overlappen.
       const x       = vis.left  + 8;
       const bubbleW = vis.right - vis.left - 16;
-      const chinY   = H * .415;   // net onder de kin / halorand
-
-      // Tekst wrappen op werkelijke pixelbreedte.
-      const lines = splitBubbleLines(speech.text, bubbleW - padX*2, font);
-      const bubbleH = padY*2 + lines.length*lineH;
-      const y = chinY + 6;   // ballon begint direct onder het gezicht
-
-      // Staartbasis centraal op ballon; punt leunt naar links richting haar mond.
-      const tailBaseX = x + bubbleW * .50;
-      const tailX     = x + bubbleW * .50;
-      const tailY     = y - 16;
+      const chinY   = H * .415;
 
       const wobX=Math.sin(now*.0013+speech.phase)*.6;
       const wobY=Math.sin(now*.002 +speech.phase)*.6;
 
       ctx.save(); ctx.globalAlpha=a*.94;
-      roundedBubble(x+wobX,y+wobY,bubbleW,bubbleH,9,tailX,tailY,'top',tailBaseX);
-      ctx.fillStyle=C.bubbleFill; ctx.fill();
-      ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
-      ctx.fillStyle=C.bubble; ctx.font=font; ctx.textBaseline='top';
-      for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],x+wobX+padX,y+wobY+padY+i*lineH);
+
+      if(type==='speech'){
+        // ── Gewone tekstballon — rechte rand, staart omhoog naar haar mond ──
+        const lines=splitBubbleLines(speech.text,bubbleW-padX*2,font);
+        const bubbleH=padY*2+lines.length*lineH;
+        const y=chinY+6;
+        const tailX=x+bubbleW*.50, tailY=y-16;
+        roundedBubble(x+wobX,y+wobY,bubbleW,bubbleH,9,tailX,tailY,'top',tailX);
+        ctx.fillStyle=C.bubbleFill; ctx.fill();
+        ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
+        ctx.fillStyle=C.bubble; ctx.font=font; ctx.textBaseline='top';
+        for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],x+wobX+padX,chinY+6+wobY+padY+i*lineH);
+
+      } else if(type==='thought'){
+        // ── Gedachteballon — wolkvorm: kleine bellen leiden omhoog naar haar hoofd ──
+        const lines=splitBubbleLines(speech.text,bubbleW-padX*2-8,font);
+        const bubbleH=padY*2+8+lines.length*lineH;
+        const bx=x+wobX, by=chinY+10+wobY;
+        const cx2=bx+bubbleW/2, cy2=by+bubbleH/2;
+        const rx=bubbleW/2+4, ry=bubbleH/2+4;
+        // Wolk: ellips met inkepingen (sinusoïde radiale variatie langs de rand)
+        ctx.beginPath();
+        const steps=64;
+        for(let i=0;i<=steps;i++){
+          const ang=(-Math.PI/2)+(i/steps)*2*Math.PI;
+          const bump=1+.13*Math.sin(ang*7+.4)+.06*Math.sin(ang*13+1.2);
+          ctx.lineTo(cx2+Math.cos(ang)*rx*bump, cy2+Math.sin(ang)*ry*bump);
+        }
+        ctx.closePath();
+        ctx.fillStyle=C.bubbleFill; ctx.fill();
+        ctx.lineWidth=2; ctx.strokeStyle=C.bubble; ctx.stroke();
+        // Kleine bolletjes als staart (van groot naar klein richting haar hoofd)
+        const dotX=cx2+bubbleW*.1, dotBaseY=by-8;
+        [[10,6],[6,4],[3.5,3]].forEach(([r2,step],i)=>{
+          ctx.beginPath(); ctx.arc(dotX,dotBaseY-i*step*3.5,r2,0,Math.PI*2);
+          ctx.fillStyle=C.bubbleFill; ctx.fill();
+          ctx.lineWidth=1.5; ctx.strokeStyle=C.bubble; ctx.stroke();
+        });
+        ctx.fillStyle=C.bubble; ctx.font=font; ctx.textBaseline='top';
+        for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],bx+padX+2,by+padY+i*lineH);
+
+      } else if(type==='spiky'){
+        // ── Uitroepballon — getande rand: boosheid, schrik, intensiteit ──
+        const lines=splitBubbleLines(speech.text,bubbleW-padX*2-12,font);
+        const bubbleH=padY*2+8+lines.length*lineH;
+        const bx=x+wobX, by=chinY+8+wobY;
+        const cx2=bx+bubbleW/2, cy2=by+bubbleH/2;
+        const rx=bubbleW/2+8, ry=bubbleH/2+8;
+        // Starburst: wissel grote/kleine stralen af
+        const spikes=18;
+        ctx.beginPath();
+        for(let i=0;i<spikes*2;i++){
+          const ang=-Math.PI/2+(i/(spikes*2))*Math.PI*2;
+          const r2=(i%2===0) ? 1 : (0.74+Math.sin(ang*3)*.06); // punten vs. dalen
+          ctx.lineTo(cx2+Math.cos(ang)*rx*r2, cy2+Math.sin(ang)*ry*r2);
+        }
+        ctx.closePath();
+        // Staart: driehoekje omhoog
+        ctx.moveTo(cx2-8, by-2);
+        ctx.lineTo(cx2+bubbleW*.05, by-20);
+        ctx.lineTo(cx2+8, by-2);
+        ctx.closePath();
+        ctx.fillStyle='rgba(255,49,89,.10)'; ctx.fill();
+        ctx.lineWidth=2.2;
+        ctx.strokeStyle=speech.mood==='angry'?'#ff3159':C.bubble; ctx.stroke();
+        ctx.fillStyle=speech.mood==='angry'?'#ff3159':C.bubble;
+        ctx.font=font; ctx.textBaseline='top';
+        for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],bx+padX+4,by+padY+i*lineH);
+
+      } else if(type==='caption'){
+        // ── Verhaalkapje — smal kader bovenin het scherm (alleen story events) ──
+        const lines=splitBubbleLines(speech.text,bubbleW-padX*2-10,font);
+        const capH=padY*1.6+lines.length*lineH;
+        const capY=vis.top+8+wobY*.3;
+        const cx=x+wobX;
+        ctx.fillStyle='rgba(5,12,16,.88)';
+        ctx.fillRect(cx,capY,bubbleW,capH);
+        // Dunne cyaan buitenrand
+        ctx.lineWidth=1.5; ctx.strokeStyle='rgba(213,166,77,.55)';
+        ctx.strokeRect(cx+0.75,capY+0.75,bubbleW-1.5,capH-1.5);
+        // Gouden balk links — BUITEN de strokeRect getekend zodat er geen overlap is
+        ctx.fillStyle='rgba(213,166,77,.82)';
+        ctx.fillRect(cx,capY,3,capH);
+        ctx.fillStyle='#ffd35d'; ctx.font=font; ctx.textBaseline='top';
+        for(let i=0;i<lines.length;i++)
+          ctx.fillText(lines[i],cx+padX+4,capY+padY*.8+i*lineH);
+      }
+
       ctx.restore();
     }
 
@@ -5497,7 +5580,9 @@
             if (st.say && !(WardrobeBrain.phase && WardrobeBrain.phase!=='present')){
               const t=performance.now();
               speech.active=true; speech.start=t; speech.duration=rnd(4200,6200);
-              speech.text=st.say; speech.mood='curious'; speech.meaningful=true; speech.phase=rnd(0,999);
+              speech.text=st.say; speech.mood='curious'; speech.meaningful=true;
+              speech.bubbleType='caption';
+              speech.phase=rnd(0,999);
               MemoryBrain.lastSpeechAt=t;
               AudioBrain.speak(st.say,'curious');
             }
