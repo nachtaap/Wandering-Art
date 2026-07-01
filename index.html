@@ -4764,6 +4764,7 @@
         }
         ctx.globalAlpha=1;
       })();
+      AccessoryBrain.draw(now);
       ctx.restore();
     }
 
@@ -4819,6 +4820,7 @@
       updateEmotion(now,dt);
       updateMemory(dt);
       updateWardrobe(now,dt);
+      AccessoryBrain.step(now);
       updateBlink(now);
       updatePupils(now, dt);
       updateEyeBrain(now);
@@ -5040,6 +5042,210 @@
       }
     };
 
+
+    // ── AccessoryBrain: zeldzame, tijdelijke hoofd-accessoires ────────────
+    // Geïsoleerd: eigen lifecycle + eigen draw, één aanroep binnen drawEntity.
+    const AccessoryBrain = {
+      active:false, type:null, t0:0, dur:0, nextAt:0, seed:0,
+      TYPES:['bril','hoed','helm'],
+
+      spawn(now){
+        if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') {
+          this.nextAt = now + rnd(30000, 70000);
+          return;
+        }
+        this.active=true;
+        this.t0=now;
+        this.dur=rnd(30000, 70000);
+        this.seed=rnd(1,9999);
+        this.type=this.TYPES[Math.floor(hash(this.seed*1.7)*this.TYPES.length) % this.TYPES.length];
+
+        const t0=this.t0, type=this.type, seed=this.seed;
+        setTimeout(()=>{
+          if (typeof window==='undefined' || !window.Chronicle || this.t0!==t0 || !this.active) return;
+          const seenKey='wa_accessories_seen_v3';
+          let seen={};
+          try{ seen=JSON.parse(safeStorage.get(seenKey)||'{}')||{}; }catch(e){ seen={}; }
+          if (seen[type]) return;
+          const NAME={
+            bril:{ title:'De Gouden Bril', line:'een dun gouden montuur ving het licht', sym:'◎' },
+            hoed:{ title:'De Sterrenhoed', line:'een rituele hoed schoof over de kruin', sym:'△' },
+            helm:{ title:'De Glazen Helm', line:'een cyaan glazen bol sloot zich om haar gezicht', sym:'◌' }
+          };
+          const n=NAME[type]||NAME.bril;
+          const entry=window.Chronicle.observe('accessoire', type, { title:n.title, line:n.line, sym:n.sym, seed });
+          if (entry){
+            seen[type]=Date.now();
+            try{ safeStorage.set(seenKey, JSON.stringify(seen)); }catch(e){}
+          }
+        }, 3600);
+      },
+
+      step(now){
+        if(!this.nextAt) this.nextAt = now + 25000;
+        if(this.active){
+          if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') {
+            this.active=false;
+            this.nextAt = now + rnd(180000, 420000);
+            return;
+          }
+          if(now - this.t0 > this.dur){
+            this.active=false;
+            this.nextAt = now + rnd(240000, 600000);
+          }
+        } else if(now >= this.nextAt){ this.spawn(now); }
+      },
+
+      envelope(now){
+        if(!this.active) return 0;
+        const fadeIn=600, fadeOut=800;
+        let env=1;
+        const inT=(now-this.t0)/fadeIn;
+        if(inT<1) env=inT*inT*(3-2*inT);
+        const outT=(this.dur-(now-this.t0))/fadeOut;
+        if(outT<1) env=Math.min(env, Math.max(0, outT*outT*(3-2*outT)));
+        return clamp(env,0,1);
+      },
+
+      draw(now){
+        if(!this.active) return;
+        if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') return;
+        const env=this.envelope(now);
+        if(env<=.001) return;
+        ctx.save();
+        ctx.globalAlpha *= env;
+        if(this.type==='bril') this.drawGlasses(now, env);
+        else if(this.type==='hoed') this.drawHat(now, env);
+        else if(this.type==='helm') this.drawHelmet(now, env);
+        ctx.restore();
+      },
+
+      drawGlasses(now, env){
+        const gold='#d5a64d', goldLo='#57370a';
+        const glass=mixHex(C.cyan4, C.white, .32);
+        const wob=Math.sin(now*.002 + this.seed)*.55;
+        ctx.save();
+        ctx.lineCap='round'; ctx.lineJoin='round';
+
+        // Glas: bijna transparant, net genoeg om als accessoire te lezen.
+        ctx.globalAlpha*=.13;
+        ellipse(146,107+wob,25,21,glass);
+        ellipse(207,107-wob*.2,25,21,glass);
+
+        // Montuur: dun goud draadwerk rond de vaste oogcentra.
+        ctx.globalAlpha=.96*env;
+        ctx.strokeStyle=gold; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.ellipse(146,107+wob,25,21,0,0,Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(207,107-wob*.2,25,21,0,0,Math.PI*2); ctx.stroke();
+        ctx.strokeStyle=goldLo; ctx.lineWidth=.8;
+        ctx.beginPath(); ctx.ellipse(146,107+wob,21,17,0,Math.PI*.12,Math.PI*1.18); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(207,107-wob*.2,21,17,0,Math.PI*1.82,Math.PI*.88); ctx.stroke();
+
+        // Brug + pootjes naar de slapen.
+        ctx.strokeStyle=gold; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(171,107); ctx.quadraticCurveTo(180,101,182,107); ctx.quadraticCurveTo(185,112,182,115); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(121,105); ctx.lineTo(111,99); ctx.moveTo(232,105); ctx.lineTo(242,99); ctx.stroke();
+
+        // Kleine highlights in het glas.
+        ctx.globalAlpha=.52*env; ctx.strokeStyle=mixHex(C.cyan4,C.white,.72); ctx.lineWidth=1.1;
+        ctx.beginPath(); ctx.moveTo(136,96); ctx.quadraticCurveTo(143,92,153,94); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(197,96); ctx.quadraticCurveTo(204,92,214,94); ctx.stroke();
+        ctx.restore();
+      },
+
+      drawHat(now, env){
+        const gold='#d5a64d', goldLo='#57370a';
+        const ink=mixHex(mixHex(C.cyan1, C.black, .62), C.magenta, .18);
+        const inkHi=mixHex(ink, C.cyan4, .18);
+        const starBlue=mixHex(C.cyan4, '#7b62ff', .30);
+        const sway=Math.sin(now*.0012+this.seed)*1.2;
+        ctx.save();
+        ctx.lineJoin='round'; ctx.lineCap='round';
+
+        // Brede, licht asymmetrische rand net over de kruin.
+        ctx.globalAlpha=.90*env;
+        ctx.fillStyle=ink;
+        ctx.beginPath();
+        ctx.ellipse(181+sway*.25,42,77,18,-0.04,0,Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle=gold; ctx.lineWidth=2;
+        ctx.stroke();
+
+        // Puntige rituele kap, donker en elegant.
+        ctx.fillStyle=mixHex(ink, C.black, .12);
+        ctx.beginPath();
+        ctx.moveTo(136,42);
+        ctx.quadraticCurveTo(158,9,182+sway,-4);
+        ctx.quadraticCurveTo(213,10,226,43);
+        ctx.quadraticCurveTo(181,56,136,42);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle=gold; ctx.lineWidth=1.8;
+        ctx.stroke();
+
+        // Gouden band.
+        ctx.fillStyle=mixHex(goldLo, C.black, .16);
+        ctx.beginPath();
+        ctx.ellipse(181,43,61,9,-0.035,0,Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle=gold; ctx.lineWidth=1.4; ctx.stroke();
+
+        // Sterrenmotief, minder druk bij reduced motion.
+        const stars=REDUCED ? [[181,27,3.5]] : [[162,29,3],[181,18,4.2],[205,31,2.8],[190,43,2.6]];
+        for(const [sx,sy,r] of stars){
+          ctx.strokeStyle=(hash(this.seed+sx)>.45)?gold:starBlue;
+          ctx.globalAlpha=.72*env;
+          ctx.beginPath();
+          ctx.moveTo(sx,sy-r); ctx.lineTo(sx,sy+r);
+          ctx.moveTo(sx-r,sy); ctx.lineTo(sx+r,sy);
+          ctx.moveTo(sx-r*.7,sy-r*.7); ctx.lineTo(sx+r*.7,sy+r*.7);
+          ctx.moveTo(sx+r*.7,sy-r*.7); ctx.lineTo(sx-r*.7,sy+r*.7);
+          ctx.stroke();
+        }
+
+        // Subtiele stof-highlight.
+        ctx.globalAlpha=.18*env; ctx.strokeStyle=inkHi; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(159,39); ctx.quadraticCurveTo(177,23,199,39); ctx.stroke();
+        ctx.restore();
+      },
+
+      drawHelmet(now, env){
+        const visor=mixHex(C.cyan2 || C.cyan3, C.white, .10);
+        const rim=mixHex(C.cyan4, C.white, .18);
+        ctx.save();
+        ctx.lineCap='round'; ctx.lineJoin='round';
+
+        // Transparante glazen bol rond het gezicht.
+        const cx=180, cy=102, rx=78, ry=92;
+        const g=ctx.createRadialGradient(cx-24,cy-38,18,cx,cy,rx);
+        g.addColorStop(0,'rgba(247,255,248,.10)');
+        g.addColorStop(.42,'rgba(19,225,223,.045)');
+        g.addColorStop(1,'rgba(8,127,137,.10)');
+        ctx.globalAlpha=.90*env;
+        ctx.fillStyle=g;
+        ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); ctx.fill();
+
+        // Zachte cyaan rand.
+        ctx.strokeStyle='rgba(105,255,243,.70)'; ctx.lineWidth=2.2;
+        ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); ctx.stroke();
+        if(!REDUCED){
+          ctx.globalAlpha=.30*env; ctx.strokeStyle='rgba(105,255,243,.35)'; ctx.lineWidth=5;
+          ctx.beginPath(); ctx.ellipse(cx,cy,rx+2,ry+2,0,0,Math.PI*2); ctx.stroke();
+        }
+
+        // Glas-reflectie linksboven.
+        ctx.globalAlpha=.48*env; ctx.strokeStyle='rgba(247,255,248,.72)'; ctx.lineWidth=2.2;
+        ctx.beginPath(); ctx.moveTo(134,49); ctx.quadraticCurveTo(151,23,178,21); ctx.stroke();
+        ctx.globalAlpha=.25*env; ctx.strokeStyle=visor; ctx.lineWidth=1.4;
+        ctx.beginPath(); ctx.moveTo(130,138); ctx.quadraticCurveTo(180,151,230,138); ctx.stroke();
+
+        // Kleine HUD-lijn onderin, niet te sci-fi/fel.
+        ctx.globalAlpha=.50*env; ctx.strokeStyle='rgba(105,255,243,.58)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(149,161); ctx.lineTo(211,161); ctx.stroke();
+        ctx.restore();
+      }
+    };
+
     function render(now){
       update(now);
       drawBackground(now);
@@ -5146,6 +5352,7 @@
       const _shipShare = { drone:.26,freighter:.22,saucer:.16,needle:.12,probe:.10,organic:.07,broken:.04,carrier:.03 };
       const _visShare  = { cloaked:.34,traveler:.28,scholar:.20,ghost:.12,astronaut:.06 };
       const _oracleP   = { slowClose:.007,wink:.004,fourthWall:.0025,cascade:.0016,rareTear:.0011,paletteFlash:.0008,notices:.0006,worldShift:.0004,visitor:.0002,breach:.00008 };
+      const _accessoireP = { bril:.0018, hoed:.0009, helm:.00028 };
 
       const NOUN = {
         comet:'komeet',satellite:'satelliet',flash:'lichtflits',debris:'puinregen',ripple:'rimpeling',
@@ -5154,10 +5361,11 @@
         organic:'levend schip',broken:'wrak',carrier:'moederschip',
         cloaked:'gesluierde',traveler:'reiziger',scholar:'geleerde',ghost:'geest',astronaut:'ruimtereiziger',
         slowClose:'trage blik',wink:'knipoog',fourthWall:'doorbroken wand',cascade:'cascade',rareTear:'stille traan',
-        paletteFlash:'kleurbreuk',notices:'zij ziet je',worldShift:'wereldverschuiving',visitor:'aankondiging',breach:'gescheurde wand'
+        paletteFlash:'kleurbreuk',notices:'zij ziet je',worldShift:'wereldverschuiving',visitor:'aankondiging',breach:'gescheurde wand',
+        bril:'gouden bril',hoed:'sterrenhoed',helm:'glazen helm'
       };
       const SYM = {
-        kosmisch:'✦',vloot:'▷',bezoekers:'◧',orakel:'◉',verhaal:'❉',hemel:'✵'
+        kosmisch:'✦',vloot:'▷',bezoekers:'◧',orakel:'◉',verhaal:'❉',hemel:'✵',accessoire:'◎'
       };
 
       // Hemel — de grote, zeldzame set-pieces (poollicht, kolossale planeet).
@@ -5173,6 +5381,7 @@
         if (cat==='bezoekers')return (_visShare[key]!=null?_visShare[key]:.15) * 0.02;
         if (cat==='orakel')   return _oracleP[key]!=null?_oracleP[key]:.003;
         if (cat==='hemel')    return _hemelP[key]!=null?_hemelP[key]:.002;
+        if (cat==='accessoire') return _accessoireP[key]!=null?_accessoireP[key]:.0015;
         return .1;
       }
 
@@ -5181,13 +5390,15 @@
         kosmisch:['stille','trage','flikkerende','verre','heldere','vluchtige','koude','zilveren','bleke','gloeiende','spookachtige'],
         vloot:['zwijgende','zware','gehavende','glanzende','trage','eenzame','vreemde','oude','dolende'],
         bezoekers:['gesluierde','aarzelende','nieuwsgierige','zwijgzame','dwalende','verloren','tijdloze'],
-        orakel:['onverwachte','vluchtige','tedere','onpeilbare','breekbare','plechtige']
+        orakel:['onverwachte','vluchtige','tedere','onpeilbare','breekbare','plechtige'],
+        accessoire:['gouden','rituele','transparante','nachtelijke','vluchtige','stille']
       };
       const LINE = {
         kosmisch:['hoog boven de horizon','tussen de sterren door','aan de rand van de nacht','waar niemand keek','een ademtocht lang'],
         vloot:['op weg naar nergens','met onbekende lading','stil als een gedachte','zonder ooit te stoppen','een schaduw in de leegte'],
         bezoekers:['die even bleef staan','aan de rand van het beeld','en weer verdween','met ogen vol verte','zonder een woord'],
-        orakel:['alsof ze het wist','heel even maar','dieper dan het scherm','en toen weer weg','recht naar jou toe']
+        orakel:['alsof ze het wist','heel even maar','dieper dan het scherm','en toen weer weg','recht naar jou toe'],
+        accessoire:['op haar gezicht','boven haar kruin','als een tijdelijk teken','zonder uitleg','en toen weer weg']
       };
       const Lore = {
         name(cat, key, ev){
