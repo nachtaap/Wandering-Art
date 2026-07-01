@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — WA-2026.07.01-milandes-v1.5.1</title>
+  <title>Wandering Art — WA-2026.07.01-milandes-v1.5.2</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -793,7 +793,7 @@
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = 'WA-2026.07.01-milandes-v1.5.1';
+    const APP_VERSION = 'WA-2026.07.01-milandes-v1.5.2';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -1185,6 +1185,7 @@
       drone:null, droneGain:null, droneLP:null, pad:null, padGain:null,
       noiseGain:null, noiseBP:null,
       started:false, enabled:!AUDIO_OFF, root:55, lastTick:0,
+      voiceDuckingUntil:0, voiceRestoreTimer:null,
 
       makeIR(sec, decay){
         const ctx=this.ctx, rate=ctx.sampleRate, len=Math.floor(rate*sec);
@@ -1256,25 +1257,58 @@
         if(this.drone){ const t=this.ctx.currentTime, m=[1,1.004,0.5]; this.drone.forEach((o,i)=>o.frequency.setTargetAtTime(r*m[i],t,6)); }
       },
 
+      isVoiceActive(){
+        return (typeof performance!=='undefined') && performance.now() < this.voiceDuckingUntil;
+      },
+
+      duckVoice(ms=1800){
+        if(!this.started || !this.ctx) return;
+        const until=(typeof performance!=='undefined'?performance.now():Date.now()) + ms;
+        this.voiceDuckingUntil=Math.max(this.voiceDuckingUntil||0, until);
+        const t=this.ctx.currentTime;
+        // Muziek krijgt expliciet ruimte onder de stem. Ambient wordt in tick()
+        // tijdelijk lager gezet, zodat korte animalese-lettergrepen echt bovenop liggen.
+        if(typeof MusicBrain!=='undefined' && MusicBrain.bus){
+          MusicBrain.bus.gain.cancelScheduledValues(t);
+          MusicBrain.bus.gain.setTargetAtTime(.14, t, .045);
+        }
+        if(this.voiceRestoreTimer) clearTimeout(this.voiceRestoreTimer);
+        this.voiceRestoreTimer=setTimeout(()=>{
+          if(!this.ctx) return;
+          const now=(typeof performance!=='undefined'?performance.now():Date.now());
+          if(now < this.voiceDuckingUntil-40) return;
+          const tt=this.ctx.currentTime;
+          if(typeof MusicBrain!=='undefined' && MusicBrain.bus){
+            MusicBrain.bus.gain.setTargetAtTime(.54, tt, 1.1);
+          }
+        }, ms+90);
+      },
+
       tick(now){
         if(!this.started || !this.ctx || now-this.lastTick<90) return;
         this.lastTick=now;
         const ctx=this.ctx, t=ctx.currentTime, w=WorldBrain.weather.visual, em=emotion;
         const night=WorldBrain.time.isNight?1:0;
         this.setRoot();
+        const vduck=this.isVoiceActive()? .30 : 1;
         this.droneLP.frequency.setTargetAtTime(clamp(240+em.valence*520+(1-night)*220-w.fog*120,120,1400), t, .6);
-        this.droneGain.gain.setTargetAtTime(clamp(.12+em.arousal*.05-night*.02,.05,.22), t, 1.4);
+        this.droneGain.gain.setTargetAtTime(clamp(.12+em.arousal*.05-night*.02,.05,.22)*vduck, t, .18);
         if(this.pad){ this.pad[0].frequency.setTargetAtTime(this.root*(em.sadness>.4?1.2:1.5), t, 4); }
-        this.padGain.gain.setTargetAtTime(clamp(.025+em.curiosity*.025,.01,.07), t, 3);
-        this.noiseGain.gain.setTargetAtTime(clamp(w.wind*.09+w.rain*.15+w.storm*.20+w.fog*.03,0,.35), t, .8);
+        this.padGain.gain.setTargetAtTime(clamp(.025+em.curiosity*.025,.01,.07)*vduck, t, .25);
+        this.noiseGain.gain.setTargetAtTime(clamp(w.wind*.09+w.rain*.15+w.storm*.20+w.fog*.03,0,.35)*vduck*.75, t, .16);
         this.noiseBP.frequency.setTargetAtTime(clamp(300+w.wind*900+w.rain*1300,150,3000), t, 1);
         this.noiseBP.Q.setTargetAtTime(w.storm>.3?.4:.9, t, 1);
         this.revSend.gain.setTargetAtTime(clamp(.6+em.shyness*.4+w.fog*.4,.4,1.6), t, 2);
+        if(typeof MusicBrain!=='undefined' && MusicBrain.bus){
+          MusicBrain.bus.gain.setTargetAtTime(this.isVoiceActive()? .14 : .54, t, this.isVoiceActive()? .07 : 1.4);
+        }
       },
 
       voice(freq, dur, type, o={}){
         if(!this.started || !this.ctx) return;
-        const ctx=this.ctx, t=ctx.currentTime, gain=o.gain==null?.12:o.gain, send=o.send==null?.6:o.send, attack=o.attack==null?.02:o.attack;
+        const ctx=this.ctx, t=ctx.currentTime;
+        const voiceBoost=o.voice ? 1.38 : 1;
+        const gain=(o.gain==null?.12:o.gain)*voiceBoost, send=o.send==null?.6:o.send, attack=o.attack==null?.02:o.attack;
         const osc=ctx.createOscillator(); osc.type=type||'sine'; osc.frequency.value=freq;
         const g=ctx.createGain(); g.gain.value=0; let node=osc;
         if(o.filter){ const f=ctx.createBiquadFilter(); f.type=o.filter; f.frequency.value=freq*(o.freqMul||1.6); if(o.q)f.Q.value=o.q; osc.connect(f); node=f; }
@@ -1338,10 +1372,10 @@
           : letters;
 
         const STYLE = {
-          speech:  { pitch:1.00, gain:1.00, send:1.00, gap:1.00, dur:1.00, type:null,      q:5, freq:1.6 },
-          spiky:   { pitch:1.18, gain:1.16, send:.78, gap:.72, dur:.82, type:'sawtooth', q:7, freq:1.9 },
-          thought: { pitch:.82,  gain:.72, send:1.55, gap:1.35, dur:1.28, type:'sine',    q:8, freq:1.35 },
-          caption: { pitch:.70,  gain:.88, send:1.85, gap:1.65, dur:1.55, type:'triangle',q:4, freq:1.2 }
+          speech:  { pitch:1.08, gain:2.45, send:.70, gap:.92, dur:.92, type:null,      q:8, freq:2.25 },
+          spiky:   { pitch:1.28, gain:2.65, send:.48, gap:.68, dur:.76, type:'sawtooth', q:9, freq:2.55 },
+          thought: { pitch:.92,  gain:2.05, send:1.05, gap:1.18, dur:1.08, type:'sine',    q:9, freq:2.05 },
+          caption: { pitch:.78,  gain:2.25, send:1.18, gap:1.34, dur:1.20, type:'triangle',q:7, freq:1.95 }
         };
         const sty = STYLE[voiceStyle] || STYLE.speech;
         const baseMul = mood==='shy' ? 5.3 : mood==='angry' ? 3.6 : mood==='sad' ? 4.1
@@ -1349,15 +1383,22 @@
         const base = this.root * baseMul * sty.pitch;
         const type = sty.type || (mood==='angry' ? 'sawtooth' : 'square');
         let gap=0;
-        chars.forEach(ch=>{
+        chars.forEach((ch,i)=>{
           const code = ch.toLowerCase().charCodeAt(0);
-          const pitchMul = 0.78 + ((code*37)%100)/100 * 0.55;
-          const jitter = 0.94 + Math.random()*0.12;
+          const pitchMul = 0.82 + ((code*37)%100)/100 * 0.62;
+          const jitter = 0.93 + Math.random()*0.14;
           const f = base * pitchMul * jitter;
-          const d = (0.07 + Math.random()*0.03) * sty.dur;
-          setTimeout(()=>this.voice(f,d,type,{gain:.05*sty.gain,send:.35*sty.send,attack:.004,filter:'bandpass',q:sty.q, freqMul:sty.freq}), gap);
-          gap += (30 + Math.random()*22) * sty.gap;
+          const d = (0.082 + Math.random()*0.032) * sty.dur;
+          // Stem zit bewust vóór in de mix: meer gain, minder lange galm,
+          // bandpass-formant hoger zodat hij door de muziek heen prikt.
+          setTimeout(()=>this.voice(f,d,type,{voice:true,gain:.105*sty.gain,send:.24*sty.send,attack:.003,filter:'bandpass',q:sty.q, freqMul:sty.freq}), gap);
+          // Kleine dubbellaag op klinkerachtige letters geeft meer "animalese".
+          if(/[aeiouyàáèéëïíóöúü]/i.test(ch) && i%3===0){
+            setTimeout(()=>this.voice(f*1.012,d*.72,type,{voice:true,gain:.035*sty.gain,send:.18*sty.send,attack:.002,filter:'bandpass',q:sty.q+1, freqMul:sty.freq*1.08}), gap+12);
+          }
+          gap += (26 + Math.random()*18) * sty.gap;
         });
+        this.duckVoice(Math.min(5200, gap + 950));
       },
 
       suspend(){ if(this.ctx && this.ctx.state==='running') this.ctx.suspend(); },
@@ -2570,7 +2611,7 @@
       const M=MusicBrain, ac=AudioBrain.ctx;
       M.bus=ac.createGain(); M.bus.gain.value=.0001;
       M.bus.connect(AudioBrain.master);
-      M.bus.gain.setTargetAtTime(.82, ac.currentTime, 4);
+      M.bus.gain.setTargetAtTime(.54, ac.currentTime, 4);
       M.rootHz=mu_selectRoot();
       M.scale=mu_selectScale();
       M.bpm=mu_selectBPM();
@@ -6299,6 +6340,7 @@
           <div class="jr-filters compact">
             ${[['stil','stil'],['zacht','zacht'],['vol','vol']].map(([lbl,v])=>
               `<div class="jr-chip audio-chip${AudioSettings.mode===v?' on':''}" data-a="${v}">${lbl}</div>`).join('')}
+            <div class="jr-chip voice-test-chip">test stem</div>
           </div>
 
           <div class="jr-filter-title">rarity</div>
@@ -6328,6 +6370,14 @@
         // audio + filter-chips
         document.querySelectorAll('.audio-chip').forEach(el=>{
           el.addEventListener('click',()=>{ if(logTapLocked()) return; AudioSettings.set(el.dataset.a); renderLog(); });
+        });
+        const voiceTest=document.querySelector('.voice-test-chip');
+        if(voiceTest) voiceTest.addEventListener('click',()=>{
+          if(logTapLocked()) return;
+          if(AudioSettings.mode==='stil') AudioSettings.set('zacht');
+          AudioBrain.start();
+          if(AudioBrain.ctx && AudioBrain.ctx.state==='suspended') AudioBrain.resume();
+          AudioBrain.speak('welkom reiziger', 'happy', 'speech');
         });
         document.querySelectorAll('.rarity-chip').forEach(el=>{
           el.addEventListener('click',()=>{ if(logTapLocked()) return; chFilter=Number(el.dataset.f)||0; renderLog(); });
