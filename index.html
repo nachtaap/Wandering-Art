@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — WA-2026.07.01-accessory-v1</title>
+  <title>Wandering Art — WA-2026.07.01-accessory-v1.1</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -785,8 +785,8 @@
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = 'WA-2026.07.01-accessory-v1';
-    const APP_BUILD_LABEL = 'accessory brain · logboek versie';
+    const APP_VERSION = 'WA-2026.07.01-accessory-v1.1';
+    const APP_BUILD_LABEL = 'accessory brain · helm uitgeschakeld';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -5061,7 +5061,8 @@
     // Geïsoleerd: eigen lifecycle + eigen draw, één aanroep binnen drawEntity.
     const AccessoryBrain = {
       active:false, type:null, t0:0, dur:0, nextAt:0, seed:0,
-      TYPES:['bril','hoed','helm'],
+      // Helm is visueel te dominant gebleken; bril + hoed blijven als elegante hoofdaccessoires.
+      TYPES:['bril','hoed'],
 
       spawn(now){
         if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') {
