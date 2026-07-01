@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — WA-2026.07.01-startscreen-image-v1.8.3</title>
+  <title>Wandering Art — WA-2026.07.01-music-arrangement-v1.9.0</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -880,7 +880,7 @@
     const FRAME_MIN_MS = TARGET_FPS ? (1000 / TARGET_FPS) : 0;
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = 'WA-2026.07.01-startscreen-image-v1.8.3';
+    const APP_VERSION = 'WA-2026.07.01-music-arrangement-v1.9.0';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -1599,6 +1599,11 @@
       rootHz: 55,           // A1 default, wordt bijgewerkt
       scale: 'aeolian',
       section: 0, sectionBeat: 0, sectionLen: 32,
+      // Arrangement (v1.9.0): lange dynamische boog over minuten heen
+      intensityPhase: Math.random()*Math.PI*2,  // fase van de ~5-min intensiteitsgolf
+      breakdown: false,     // sectie met alleen pad+bas (ademruimte)
+      voicing: 0,           // akkoord-inversie (0..2), wisselt per akkoord
+      swing: 0,             // 0..~.16 — offbeat-vertraging, per sectie gekozen
       // Mood-vlaggen voor speciale events
       forceChord: null,     // forceer volgend akkoord (bijv. bij fourthWall)
       forceScale: null,     // forceer toonladder (bijv. bij worldShift)
@@ -2526,7 +2531,7 @@
       g.gain.setTargetAtTime(0,time+dur*.6,.08);
     }
 
-    function mu_melo(freq, time, dur){
+    function mu_melo(freq, time, dur, gain=.062){
       if (!AudioBrain.ctx) return;
       const ac=AudioBrain.ctx, bus=MusicBrain.bus;
       const o=ac.createOscillator(); o.type='sine'; o.frequency.value=freq;
@@ -2534,8 +2539,41 @@
       o.connect(g); g.connect(bus); g.connect(AudioBrain.revSend);
       o.start(time); o.stop(time+dur+1.2);
       g.gain.setValueAtTime(0,time);
-      g.gain.setTargetAtTime(.062,time,.22);
+      g.gain.setTargetAtTime(gain,time,.22);
       g.gain.setTargetAtTime(0,time+dur,.42);
+    }
+
+    // Bel: sine + inharmonische partial (2.76x), korte aanslag, veel reverb.
+    // Zeldzaam accent op akkoordwisselingen — de klank die eruit springt.
+    function mu_bell(freq, time, gain=.055){
+      if (!AudioBrain.ctx) return;
+      const ac=AudioBrain.ctx, bus=MusicBrain.bus;
+      const g=ac.createGain(); g.gain.value=0;
+      [[1,'sine',1],[2.76,'sine',.34],[5.4,'sine',.10]].forEach(([mul,ty,amp])=>{
+        const o=ac.createOscillator(); o.type=ty; o.frequency.value=freq*mul;
+        const pg=ac.createGain(); pg.gain.value=amp;
+        o.connect(pg).connect(g); o.start(time); o.stop(time+5);
+      });
+      g.connect(bus);
+      const s=ac.createGain(); s.gain.value=1.4; g.connect(s); s.connect(AudioBrain.revSend);
+      g.gain.setValueAtTime(0,time);
+      g.gain.linearRampToValueAtTime(gain,time+.010);
+      g.gain.setTargetAtTime(0,time+.05,1.1);
+    }
+
+    // Zachte perc-tick: gefilterde ruis, nauwelijks hoorbaar maar geeft beweging.
+    // Alleen bij hoge intensiteit.
+    function mu_tickPerc(time, vel=.028, hz=3200){
+      if (!AudioBrain.ctx) return;
+      const ac=AudioBrain.ctx, bus=MusicBrain.bus;
+      const src=ac.createBufferSource(); src.buffer=AudioBrain.makeNoise(.08);
+      const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=hz; bp.Q.value=2.2;
+      const g=ac.createGain(); g.gain.value=0;
+      src.connect(bp).connect(g); g.connect(bus); g.connect(AudioBrain.revSend);
+      src.start(time);
+      g.gain.setValueAtTime(0,time);
+      g.gain.linearRampToValueAtTime(vel,time+.004);
+      g.gain.setTargetAtTime(0,time+.012,.020);
     }
 
     // ── Muzieklogica: mood → muziekparameters ────────────────────
@@ -2583,9 +2621,12 @@
     function mu_chordNotes(chordKey){
       const ch=MU_CHORDS[chordKey]; if (!ch) return [];
       const root=MusicBrain.rootHz*4;  // 2 oktaven boven bas-root
+      // Voicing: rotatie/inversie zodat hetzelfde akkoord niet altijd
+      // in dezelfde ligging klinkt (0 = grondligging, 1..2 = inversies)
+      const tones=ch.t.map((s,i)=> i<MusicBrain.voicing ? s+12 : s);
       const notes=[];
       [0,12,24].forEach(oct=>{
-        ch.t.forEach(s=>{ const fr=muf(root,s+oct); if(fr>140&&fr<4000) notes.push(fr); });
+        tones.forEach(s=>{ const fr=muf(root,s+oct); if(fr>140&&fr<4000) notes.push(fr); });
       });
       return notes.sort((a,b)=>a-b);
     }
@@ -2623,19 +2664,63 @@
       return pick(['gentle','gentle','sparse','lift']); // gentle meest waarschijnlijk
     }
 
+    // Intensiteit 0..1: trage golf (~5 min) + mood. Stuurt welke lagen klinken,
+    // hoe druk de arp is en hoe hard de noten zijn. Dit is de lange boog.
+    function mu_intensity(){
+      const M=MusicBrain;
+      if (!AudioBrain.ctx) return .5;
+      const wave=.5+.5*Math.sin(AudioBrain.ctx.currentTime*2*Math.PI/300 + M.intensityPhase);
+      let v = wave*.55
+        + emotion.arousal*.30
+        + emotion.curiosity*.10
+        + WorldBrain.weather.visual.storm*.18
+        - emotion.sadness*.12;
+      if (M.breakdown) v=Math.min(v,.16); // breakdown: alles valt weg behalve pad+bas
+      return clamp(v,0,1);
+    }
+
+    // Melodische frase: 3–6 noten die stapsgewijs door de toonladder wandelen
+    // (niet alleen akkoordtonen). Vervangt de losse eenzame melodienoot.
+    function mu_phrase(time){
+      const M=MusicBrain;
+      const scale=MU_SCALES[M.scale]||MU_SCALES.aeolian;
+      const beatDur=60/M.bpm;
+      const len=rndInt(3,6);
+      let deg=rndInt(scale.length, scale.length*2-1); // middenregister
+      let t=time+.20;
+      for(let i=0;i<len;i++){
+        const oct=Math.floor(deg/scale.length);
+        const s=scale[mod(deg,scale.length)]+12*oct;
+        const f=muf(M.rootHz*2, s);
+        if (f>150&&f<950){
+          const g=.052+(i===0?.012:0)-(i===len-1?.010:0); // eerste noot iets sterker
+          mu_melo(f, t, beatDur*rnd(1.1,2.0), Math.max(.03,g));
+        }
+        t+=beatDur*pick([.5,.5,1,1,1.5]);
+        deg=clamp(deg+pick([-2,-1,-1,1,1,2]), 3, scale.length*3-1);
+      }
+    }
+
     function mu_newChord(time){
       const M=MusicBrain;
       M.chord=mu_pickChord();
       M.chordBeat=0;
       M.chordDur=Math.random()<.28?4:Math.random()<.62?8:12;
+      M.voicing=rndInt(0,2); // andere ligging per akkoord
       M.patNotes=mu_chordNotes(M.chord);
       M.pattern=mu_selectPattern();
+      const inten=mu_intensity();
       // Bas op akkoordwisseling
       const bassHz=muf(M.rootHz*2, MU_CHORDS[M.chord].t[0]);
       mu_bass(bassHz, time, (M.chordDur*60)/M.bpm);
-      // Pad: laagste 2 noten
-      const padGain=.038+emotion.valence*.016+(VisitorBrain.phase==='present'?.010:0);
-      mu_pad(M.patNotes.slice(0,2), time, (M.chordDur*60)/M.bpm, padGain);
+      // Pad: laagste 2 noten; in breakdown 3 noten en iets voller (het pad draagt dan alles)
+      const padGain=(M.breakdown?.052:.038)+emotion.valence*.016+(VisitorBrain.phase==='present'?.010:0);
+      mu_pad(M.patNotes.slice(0, M.breakdown?3:2), time, (M.chordDur*60)/M.bpm, padGain);
+      // Bel-accent: zeldzaam, alleen bij voldoende intensiteit — het glinstermoment
+      if (!M.breakdown && inten>.42 && Math.random()<.22){
+        const hi=M.patNotes[Math.min(M.patNotes.length-1, Math.floor(M.patNotes.length*.7))];
+        if (hi>200&&hi<2400) mu_bell(hi, time+.02, .045+inten*.02);
+      }
     }
 
     function mu_syncToMood(){
@@ -2659,22 +2744,41 @@
       const pat=pats[M.pattern]||Object.values(pats)[0];
       const beatDur=60/M.bpm;
       const notes=M.patNotes; if (!notes.length) return;
+      const inten=mu_intensity();
 
       pat.forEach(([pos,ni])=>{
         if (Math.floor(pos)!==beatInBar) return;
-        const t=time+(pos-beatInBar)*beatDur;
+        // Dichtheid: bij lage intensiteit vallen noten weg — het patroon dunt
+        // uit tot losse aanzetten i.p.v. een mechanische machine.
+        // In breakdown zwijgt de arp vrijwel volledig (heel af en toe één noot).
+        if (Math.random() > (M.breakdown ? .08 : .28+inten*.78)) return;
+        // Swing: offbeats (x.5-posities) iets naar achteren
+        const frac=pos-Math.floor(pos);
+        const swingOff=(frac>.24&&frac<.76)?M.swing*beatDur:0;
+        const t=time+(pos-beatInBar)*beatDur+swingOff;
         if (t<AudioBrain.ctx.currentTime) return;
         const maxIdx=Math.floor(notes.length*.80); // bovenste 20% overslaan
-        const idx=Math.min(Math.max(0,ni),maxIdx-1);
-        const vel=.055+Math.random()*.028+emotion.arousal*.030+emotion.curiosity*.012;
+        let idx=Math.min(Math.max(0,ni),maxIdx-1);
+        // Bij lage intensiteit zakt de arp een register: intiemer, minder tingelig
+        if (inten<.40&&idx>=3) idx-=3;
+        const vel=(.055+Math.random()*.028+emotion.arousal*.030+emotion.curiosity*.012)
+                  *(.55+inten*.65);
         mu_arp(notes[idx], t+(Math.random()-.5)*.009, beatDur*.44, vel);
       });
 
-      // Melodie: zeldzaam, alleen op beat 0, middenregister (max ~900Hz om pieptonen te vermijden)
-      if (beatInBar===0&&M.beat>4&&Math.random()<.07+(emotion.curiosity*.05)){
-        const hi=Math.floor(notes.length*.25+Math.random()*notes.length*.35);
-        const mf=notes[Math.min(hi,notes.length-1)];
-        if (mf>140&&mf<900) mu_melo(mf, time+.22, (60/M.bpm)*2.8);
+      // Perc-tick: pas bij hoge intensiteit, subtiel op de offbeat
+      if (inten>.62&&!M.breakdown){
+        if (beatInBar%2===1&&Math.random()<.55)
+          mu_tickPerc(time, .020+inten*.014, 2800+Math.random()*1200);
+        if (Math.random()<.14)
+          mu_tickPerc(time+beatDur*.5, .014, 4200);
+      }
+
+      // Melodie: frase van 3–6 noten i.p.v. één losse toon.
+      // Kans schaalt met intensiteit; onder de .35 zwijgt de melodie.
+      if (beatInBar===0&&M.beat>8&&inten>.35&&
+          Math.random()<.06+inten*.07+emotion.curiosity*.05){
+        mu_phrase(time);
       }
     }
 
@@ -2690,6 +2794,11 @@
         M.nextBeat+=beatDur;
         if (M.sectionBeat>=M.sectionLen){
           M.sectionBeat=0; M.section++;
+          // Breakdown: ~1 op 5 secties valt terug op alleen pad+bas.
+          // Ademruimte — daarna klinkt de terugkeer van de arp weer als iets.
+          M.breakdown = !M.breakdown && M.section>2 && Math.random()<.22;
+          // Swing per sectie: soms strak, soms licht slepend
+          M.swing = Math.random()<.4 ? 0 : rnd(.06,.15);
           mu_syncToMood(); // toonladder/root bijwerken op sectieovergang
         }
       }
@@ -5011,7 +5120,7 @@
         'eye ' + EyeBrain.state + '  pupL ' + PupilBrain.left.toFixed(2) + '  pupR ' + PupilBrain.right.toFixed(2),
         'ships ' + ShipBrain.ships.length + ' cosmic ' + CosmicBrain.events.length + ' news ' + NewsBrain.keywords.length,
         'audio ' + (AudioBrain.enabled ? (AudioBrain.started ? ('on root ' + AudioBrain.root.toFixed(1) + 'Hz') : 'wacht op gesture') : 'uit'),
-        'music ' + (MusicBrain.initialized ? (MusicBrain.scale + ' ' + (MU_CHORDS[MusicBrain.chord]?.n||'—') + ' ' + MusicBrain.bpm + 'bpm ' + MusicBrain.bpb + '/4 pat:' + MusicBrain.pattern) : 'init...'),
+        'music ' + (MusicBrain.initialized ? (MusicBrain.scale + ' ' + (MU_CHORDS[MusicBrain.chord]?.n||'—') + ' ' + MusicBrain.bpm + 'bpm ' + MusicBrain.bpb + '/4 pat:' + MusicBrain.pattern + ' int:' + mu_intensity().toFixed(2) + (MusicBrain.breakdown?' BRK':'') + (MusicBrain.swing?' sw:'+MusicBrain.swing.toFixed(2):'')) : 'init...'),
         'visitor ' + VisitorBrain.phase + ' ' + VisitorBrain.archetype,
       ].join('\n');
     }
