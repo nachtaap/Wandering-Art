@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — WA-2026.07.01-milandes-v1.5</title>
+  <title>Wandering Art — WA-2026.07.01-milandes-v1.5.1</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -793,7 +793,7 @@
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = 'WA-2026.07.01-milandes-v1.5';
+    const APP_VERSION = 'WA-2026.07.01-milandes-v1.5.1';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -5666,6 +5666,43 @@
         accessoire:['op haar gezicht','boven haar kruin','als een tijdelijk teken','zonder uitleg','en toen weer weg'],
         milandes:['tussen hagen en sterren','als een veer in de lucht','onder bleek kasteellicht','langs een vergeten tuinpad','met pauwenoog-groen']
       };
+      // Nederlandse titelgrammatica voor procedurele logboeknamen.
+      // Zonder lidwoord krijgen het-woorden meestal een onverbogen bijvoeglijk
+      // naamwoord: "zwijgend vrachtschip", niet "zwijgende vrachtschip".
+      const HET_NOUN_KEYS = new Set(['freighter','needle','organic','broken','carrier','aurora']);
+      const ADJ_BASE = {
+        stille:'stil', trage:'traag', flikkerende:'flikkerend', verre:'ver', heldere:'helder',
+        vluchtige:'vluchtig', koude:'koud', bleke:'bleek', gloeiende:'gloeiend',
+        spookachtige:'spookachtig', zwijgende:'zwijgend', zware:'zwaar', gehavende:'gehavend',
+        glanzende:'glanzend', eenzame:'eenzaam', vreemde:'vreemd', oude:'oud',
+        dolende:'dolend', onverwachte:'onverwacht', tedere:'teer', onpeilbare:'onpeilbaar',
+        breekbare:'breekbaar', plechtige:'plechtig', rituele:'ritueel', transparante:'transparant',
+        nachtelijke:'nachtelijk', groene:'groen', dromende:'dromend', franse:'frans',
+        verwaaide:'verwaaid', zachte:'zacht', fluitende:'fluitend', digitale:'digitaal',
+        kleine:'klein', gesluierde:'gesluierd', aarzelende:'aarzelend',
+        nieuwsgierige:'nieuwsgierig', zwijgzame:'zwijgzaam', dwalende:'dwalend',
+        tijdloze:'tijdloos'
+      };
+      function isHetTitleNoun(key, noun){
+        return HET_NOUN_KEYS.has(key) || /\b(schip|wrak|poollicht)\b$/i.test(String(noun||''));
+      }
+      function fitDutchAdj(adj, key, noun){
+        if(!isHetTitleNoun(key, noun)) return adj;
+        const a=String(adj||'');
+        return ADJ_BASE[a] || a;
+      }
+      function capFirst(s){ s=String(s||''); return s.charAt(0).toUpperCase()+s.slice(1); }
+      function displayTitle(e){
+        if(!e || !e.title || e.cat==='orakel' || e.cat==='verhaal') return e && e.title ? e.title : '';
+        const noun = NOUN[e.key] || e.key || '';
+        if(!isHetTitleNoun(e.key, noun)) return e.title;
+        const first = String(e.title).split(/\s+/)[0] || '';
+        const lower = first.toLowerCase();
+        const fixed = fitDutchAdj(lower, e.key, noun);
+        if(fixed===lower) return e.title;
+        return capFirst(fixed) + String(e.title).slice(first.length);
+      }
+
       const Lore = {
         name(cat, key, ev){
           const noun = NOUN[key] || key;
@@ -5679,8 +5716,9 @@
             dir = ev.x1 > ev.x0 ? ' uit het westen' : ' uit het oosten';
             if (h(5) > .6) dir = ''; // niet altijd
           }
-          let title = adj.charAt(0).toUpperCase()+adj.slice(1) + ' ' + noun + dir;
-          if (cat==='orakel') title = noun.charAt(0).toUpperCase()+noun.slice(1);
+          const titleAdj = fitDutchAdj(adj, key, noun);
+          let title = capFirst(titleAdj) + ' ' + noun + dir;
+          if (cat==='orakel') title = capFirst(noun);
           const lineList = LINE[cat] || LINE.kosmisch;
           const line = lineList[Math.floor(h(9)*lineList.length)];
           return { title, line };
@@ -6211,7 +6249,7 @@
         else { media.className='lb-media sym'; media.innerHTML='<span>'+e.sym+'</span>'; }
         const tag=lb.querySelector('.lb-tag'); tag.style.display = e.cat==='verhaal' ? 'block' : 'none';
         lb.querySelector('.lb-stars').textContent=STARS[e.stars];
-        lb.querySelector('.lb-title').textContent=e.title;
+        lb.querySelector('.lb-title').textContent=displayTitle(e);
         lb.querySelector('.lb-line').textContent=e.line||'';
         lb.querySelector('.lb-meta').textContent=`${e.cat} · ${ago(e.t)}`;
         lb.setAttribute('data-r', e.stars);
@@ -6242,7 +6280,7 @@
           return `<div class="jr-row${e.cat==='verhaal'?' story':''}${fresh}" data-r="${e.stars}" data-id="${e.id}">
             ${thumb}
             <div class="jr-txt">
-              <div class="jr-title">${e.title}</div>
+              <div class="jr-title">${displayTitle(e)}</div>
               <div class="jr-line">${e.line||''}</div>
               <div class="jr-meta"><span class="jr-stars">${STARS[e.stars]}</span> · ${ago(e.t)}</div>
             </div>
