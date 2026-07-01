@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — WA-2026.07.01-milandes-v1.5.2</title>
+  <title>Wandering Art — WA-2026.07.01-milandes-v1.5.4</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -793,7 +793,7 @@
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = 'WA-2026.07.01-milandes-v1.5.2';
+    const APP_VERSION = 'WA-2026.07.01-milandes-v1.5.4';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -985,7 +985,8 @@
 
     const speech = {
       active:false, start:0, duration:0, nextAt:performance.now() + rnd(4500, 9000),
-      text:'', mood:'neutral', meaningful:false, bubbleType:'speech', phase:rnd(0,999)
+      text:'', mood:'neutral', meaningful:false, bubbleType:'speech', phase:rnd(0,999),
+      voicePlayed:false, voiceTryAt:0, voiceKey:''
     };
 
     // Verhaalmomenten kunnen tegelijk vrijkomen. Ze worden daarom in een
@@ -2772,6 +2773,22 @@
       }, 900);
     }
 
+    function maybeSpeakVisibleSpeech(now, alpha){
+      // Robuuste koppeling: de stem start pas als de tekstballon werkelijk
+      // zichtbaar is. Daardoor missen we geen ballon wanneer beginSpeech()
+      // te vroeg viel, de audio-context nog sliep, of iOS pas later resume't.
+      if(!speech.active || !speech.text || speech.voicePlayed) return;
+      if(now < (speech.voiceTryAt || speech.start + 180)) return;
+      if((alpha==null ? speechAlpha(now) : alpha) < .08) return;
+      if(AudioSettings.level()<=0) return;
+      if(!AudioBrain.started) return; // geen autoplay forceren; test/begroeten start audio
+      if(AudioBrain.ctx && AudioBrain.ctx.state==='suspended') AudioBrain.resume();
+      if(AudioBrain.ctx && AudioBrain.ctx.state && AudioBrain.ctx.state!=='running') return;
+      speech.voicePlayed=true;
+      AudioBrain.speak(speech.text, speech.mood, speech.bubbleType);
+      maybeRecordVoiceHeard(speech.bubbleType);
+    }
+
     function beginSpeech(now, text, mood='neutral', bubbleType='speech', meaningful=false){
       const minDur = readableSpeechDuration(text, bubbleType);
       speech.active = true;
@@ -2782,9 +2799,10 @@
       speech.meaningful = meaningful;
       speech.bubbleType = bubbleType;
       speech.phase = rnd(0,999);
+      speech.voicePlayed = false;
+      speech.voiceTryAt = now + 220;
+      speech.voiceKey = String(text||'') + '|' + bubbleType + '|' + Math.round(now);
       MemoryBrain.lastSpeechAt = now;
-      AudioBrain.speak(text, mood, bubbleType);
-      maybeRecordVoiceHeard(bubbleType);
     }
 
     function queueStorySpeech(st){
@@ -4582,6 +4600,7 @@
 
     function drawSpeechBubble(now){
       const a=speechAlpha(now); if(a<=.001) return;
+      maybeSpeakVisibleSpeech(now, a);
       const vis=visibleCanvasRect();
       const fontSize=15, padX=14, padY=11, lineH=19;
       const font=fontSize+'px monospace';
@@ -6340,7 +6359,6 @@
           <div class="jr-filters compact">
             ${[['stil','stil'],['zacht','zacht'],['vol','vol']].map(([lbl,v])=>
               `<div class="jr-chip audio-chip${AudioSettings.mode===v?' on':''}" data-a="${v}">${lbl}</div>`).join('')}
-            <div class="jr-chip voice-test-chip">test stem</div>
           </div>
 
           <div class="jr-filter-title">rarity</div>
@@ -6370,14 +6388,6 @@
         // audio + filter-chips
         document.querySelectorAll('.audio-chip').forEach(el=>{
           el.addEventListener('click',()=>{ if(logTapLocked()) return; AudioSettings.set(el.dataset.a); renderLog(); });
-        });
-        const voiceTest=document.querySelector('.voice-test-chip');
-        if(voiceTest) voiceTest.addEventListener('click',()=>{
-          if(logTapLocked()) return;
-          if(AudioSettings.mode==='stil') AudioSettings.set('zacht');
-          AudioBrain.start();
-          if(AudioBrain.ctx && AudioBrain.ctx.state==='suspended') AudioBrain.resume();
-          AudioBrain.speak('welkom reiziger', 'happy', 'speech');
         });
         document.querySelectorAll('.rarity-chip').forEach(el=>{
           el.addEventListener('click',()=>{ if(logTapLocked()) return; chFilter=Number(el.dataset.f)||0; renderLog(); });
