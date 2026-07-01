@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — Living Pixel World v13 — Ethereal Oracle</title>
+  <title>Wandering Art — WA-2026.07.01-accessory-v1</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -446,6 +446,16 @@
 
     /* samenvatting */
     .jr-summary{ margin-bottom:16px; }
+    .wa-version{
+      margin:-2px 0 14px;
+      display:inline-flex; align-items:center; gap:7px;
+      padding:5px 10px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.055);
+      color:rgba(255,255,255,.62);
+      font-size:11px; letter-spacing:.14em; text-transform:lowercase;
+    }
+    .wa-version b{ color:#ffd87a; font-weight:700; letter-spacing:.10em; }
     .jr-sum-main{ font-size:17px; letter-spacing:.02em; color:#fff; }
     .jr-sum-main b{ color:#fff; font-size:30px; font-weight:800; }
     .jr-sum-sub{ font-size:14px; letter-spacing:.04em; color:rgba(255,255,255,.7); margin-top:4px; }
@@ -773,6 +783,10 @@
     // Audio standaard aan (na de drempel-gesture). ?audio=off of ?mute = pure stille versie.
     // Bij reduced-motion standaard uit, tenzij ?audio=on.
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
+
+    // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
+    const APP_VERSION = 'WA-2026.07.01-accessory-v1';
+    const APP_BUILD_LABEL = 'accessory brain · logboek versie';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -5967,6 +5981,8 @@
         }).join('') : `<div class="jr-empty">Nog niets waargenomen onder dit filter.<br>Blijf kijken — de hemel is nooit twee keer hetzelfde.</div>`;
 
         body.innerHTML=`
+          <div class="wa-version">build <b>${APP_VERSION}</b> · ${APP_BUILD_LABEL}</div>
+
           <div class="jr-summary" data-best="${meta.best||0}">
             <div class="jr-sum-main"><b>${meta.total}</b> waarnemingen</div>
             <div class="jr-sum-sub">${Chronicle.speciesCount()} soorten · zeldzaamste ${meta.best?`<span class="jr-stars">${STARS[meta.best]}</span>`:'—'}</div>
