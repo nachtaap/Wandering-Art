@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — WA-2026.07.01-accessory-v1.1</title>
+  <title>Wandering Art — WA-2026.07.01-milandes-v1.5</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -472,6 +472,14 @@
     }
     .jr-chip.on{ color:#0a0e15; background:var(--rc,#fff); border-color:var(--rc,#fff);
       box-shadow:0 0 16px -3px var(--rc,#fff); }
+    .jr-filter-title{ font-size:11px; letter-spacing:.18em; text-transform:lowercase; color:rgba(255,255,255,.42); margin:12px 0 7px; }
+    .jr-filters.compact{ gap:6px; margin-bottom:10px; }
+    .jr-filters.compact .jr-chip{ font-size:12px; padding:7px 11px; }
+    .jr-chip.cat-chip.on, .jr-chip.audio-chip.on{ --rc:#69fff3; }
+    .jr-chip.audio-chip[data-a="stil"].on{ --rc:#eef2f7; }
+    .jr-chip.audio-chip[data-a="vol"].on{ --rc:#ffd87a; }
+    .wa-version{ cursor:pointer; touch-action:none; }
+    .wa-version:active{ border-color:rgba(255,216,122,.55); background:rgba(255,216,122,.10); }
 
     /* waarnemingen-lijst */
     .jr-list{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
@@ -785,8 +793,7 @@
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = 'WA-2026.07.01-accessory-v1.1';
-    const APP_BUILD_LABEL = 'accessory brain · helm uitgeschakeld';
+    const APP_VERSION = 'WA-2026.07.01-milandes-v1.5';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -870,6 +877,28 @@
         set(key, value){ try { if (ok) localStorage.setItem(key, value); else memory[key] = value; } catch(e){ memory[key] = value; } }
       };
     })();
+
+
+    const AudioSettings = {
+      KEY:'wa_audio_mode_v1',
+      mode:'zacht',
+      load(){
+        const v=safeStorage.get(this.KEY);
+        if(v==='stil'||v==='zacht'||v==='vol') this.mode=v;
+      },
+      level(){ return this.mode==='stil' ? 0 : (this.mode==='zacht' ? .42 : 1); },
+      set(mode){
+        if(!(mode==='stil'||mode==='zacht'||mode==='vol')) return;
+        this.mode=mode;
+        safeStorage.set(this.KEY, mode);
+        this.apply();
+      },
+      apply(){
+        if(!AudioBrain || !AudioBrain.started || !AudioBrain.ctx || !AudioBrain.master) return;
+        AudioBrain.master.gain.setTargetAtTime(.42 * this.level(), AudioBrain.ctx.currentTime, .35);
+      }
+    };
+    AudioSettings.load();
 
     const PROTO = {
       neutral:    { eye:.84, smile:.05, open:.04, brow:.05, anger:0,    sad:0,    blush:0,    tear:0,    gazeX:0,     gazeY:0,     accent:0 },
@@ -1211,7 +1240,7 @@
         noiseSrc.connect(noiseBP).connect(noiseGain); noiseGain.connect(master); noiseGain.connect(revSend); noiseSrc.start();
 
         const t=ctx.currentTime;
-        master.gain.setTargetAtTime(.42, t, 6);
+        master.gain.setTargetAtTime(.42 * AudioSettings.level(), t, 6);
         droneGain.gain.setTargetAtTime(.14, t, 8);
         padGain.gain.setTargetAtTime(.04, t, 10);
         // Muzieklaag opstarten (na korte vertraging zodat drone eerst klinkt)
@@ -1248,7 +1277,7 @@
         const ctx=this.ctx, t=ctx.currentTime, gain=o.gain==null?.12:o.gain, send=o.send==null?.6:o.send, attack=o.attack==null?.02:o.attack;
         const osc=ctx.createOscillator(); osc.type=type||'sine'; osc.frequency.value=freq;
         const g=ctx.createGain(); g.gain.value=0; let node=osc;
-        if(o.filter){ const f=ctx.createBiquadFilter(); f.type=o.filter; f.frequency.value=freq*1.6; if(o.q)f.Q.value=o.q; osc.connect(f); node=f; }
+        if(o.filter){ const f=ctx.createBiquadFilter(); f.type=o.filter; f.frequency.value=freq*(o.freqMul||1.6); if(o.q)f.Q.value=o.q; osc.connect(f); node=f; }
         node.connect(g); g.connect(this.master);
         if(send>0){ const s=ctx.createGain(); s.gain.value=send; g.connect(s); s.connect(this.revSend); }
         if(o.slideTo!=null) osc.frequency.setTargetAtTime(o.slideTo, t, dur*.4);
@@ -1297,30 +1326,37 @@
       },
 
       // ── Stem: een Animal Crossing-achtige "animalese" gemompel, ──────────
-      // gesynthetiseerd per letter (geen sample nodig). Toonhoogte verschilt
-      // per letter (zoals het origineel) zodat elk woord een herkenbaar
-      // ritme krijgt; stemming bepaalt grondtoon en timbre.
-      speak(text, mood){
-        if(!this.started || !this.ctx || !text) return;
+      // gesynthetiseerd per letter (geen sample nodig). De ballonkleur stuurt
+      // nu ook de stemkleur: verhaal trager/galmend, arousal scherper, mysterie zachter.
+      speak(text, mood, voiceStyle='speech'){
+        if(!this.started || !this.ctx || !text || AudioSettings.level()<=0) return;
         const letters = text.replace(/[^\p{L}\p{N}]+/gu,' ').split('').filter(c=>c!==' ');
         if(!letters.length) return;
         const MAX=58; // performance- en lengtegrens: lange zinnen niet eindeloos laten mompelen
         const chars = letters.length>MAX
           ? letters.filter((_,i)=> i % Math.ceil(letters.length/MAX) === 0)
           : letters;
+
+        const STYLE = {
+          speech:  { pitch:1.00, gain:1.00, send:1.00, gap:1.00, dur:1.00, type:null,      q:5, freq:1.6 },
+          spiky:   { pitch:1.18, gain:1.16, send:.78, gap:.72, dur:.82, type:'sawtooth', q:7, freq:1.9 },
+          thought: { pitch:.82,  gain:.72, send:1.55, gap:1.35, dur:1.28, type:'sine',    q:8, freq:1.35 },
+          caption: { pitch:.70,  gain:.88, send:1.85, gap:1.65, dur:1.55, type:'triangle',q:4, freq:1.2 }
+        };
+        const sty = STYLE[voiceStyle] || STYLE.speech;
         const baseMul = mood==='shy' ? 5.3 : mood==='angry' ? 3.6 : mood==='sad' ? 4.1
                        : mood==='happy' ? 6.5 : mood==='curious' ? 5.9 : 5.4;
-        const base = this.root * baseMul;
-        const type = mood==='angry' ? 'sawtooth' : 'square';
+        const base = this.root * baseMul * sty.pitch;
+        const type = sty.type || (mood==='angry' ? 'sawtooth' : 'square');
         let gap=0;
         chars.forEach(ch=>{
           const code = ch.toLowerCase().charCodeAt(0);
-          const pitchMul = 0.78 + ((code*37)%100)/100 * 0.55;     // per-letter toonhoogte, zoals het origineel
+          const pitchMul = 0.78 + ((code*37)%100)/100 * 0.55;
           const jitter = 0.94 + Math.random()*0.12;
           const f = base * pitchMul * jitter;
-          const d = 0.07 + Math.random()*0.03;
-          setTimeout(()=>this.voice(f,d,type,{gain:.05,send:.35,attack:.004,filter:'bandpass',q:5}), gap);
-          gap += 30 + Math.random()*22;
+          const d = (0.07 + Math.random()*0.03) * sty.dur;
+          setTimeout(()=>this.voice(f,d,type,{gain:.05*sty.gain,send:.35*sty.send,attack:.004,filter:'bandpass',q:sty.q, freqMul:sty.freq}), gap);
+          gap += (30 + Math.random()*22) * sty.gap;
         });
       },
 
@@ -2676,6 +2712,25 @@
       return clamp(base + len * perChar, minDur, maxDur);
     }
 
+    function maybeRecordVoiceHeard(bubbleType){
+      if(!AudioBrain.started || AudioSettings.level()<=0) return;
+      const key='wa_voice_seen_v1';
+      if(safeStorage.get(key)==='done' || safeStorage.get(key)==='pending') return;
+      safeStorage.set(key,'pending');
+      setTimeout(()=>{
+        if(safeStorage.get(key)==='done') return;
+        if(!window.Chronicle){ safeStorage.set(key,''); return; }
+        const entry=window.Chronicle.observe('stem','animalese',{
+          stars:2,
+          title:'De Eerste Stem',
+          line:'haar stem klonk als korte, vreemde lettergrepen',
+          sym:'♪',
+          seed:Date.now()
+        });
+        safeStorage.set(key, entry ? 'done' : '');
+      }, 900);
+    }
+
     function beginSpeech(now, text, mood='neutral', bubbleType='speech', meaningful=false){
       const minDur = readableSpeechDuration(text, bubbleType);
       speech.active = true;
@@ -2687,7 +2742,8 @@
       speech.bubbleType = bubbleType;
       speech.phase = rnd(0,999);
       MemoryBrain.lastSpeechAt = now;
-      AudioBrain.speak(text, mood);
+      AudioBrain.speak(text, mood, bubbleType);
+      maybeRecordVoiceHeard(bubbleType);
     }
 
     function queueStorySpeech(st){
@@ -5057,12 +5113,150 @@
     };
 
 
+
+    // ── MilandesBrain: Dordogne/Milandes-droomlaag ───────────────────────
+    // Zeldzame achtergrondlaag, geïnspireerd op Franse tuinstructuur, pauwenveren
+    // en een elegante Joséphine-echo. Geïsoleerd: eigen timer + eigen draw.
+    const MilandesBrain = {
+      active:false, t0:0, dur:0, nextAt:0, seed:0, mode:'garden',
+      MODES:['garden','peacock','feather','echo'],
+
+      spawn(now){
+        this.active=true;
+        this.t0=now;
+        this.dur=rnd(36000, 76000);
+        this.seed=rnd(1,9999);
+        this.mode=this.MODES[Math.floor(hash(this.seed*1.9)*this.MODES.length) % this.MODES.length];
+
+        const t0=this.t0, mode=this.mode, seed=this.seed;
+        setTimeout(()=>{
+          if (typeof window==='undefined' || !window.Chronicle || !this.active || this.t0!==t0) return;
+          const MAP={
+            garden:{ key:'milandes_garden', title:'De Tuin van Milandes', line:'geometrische hagen verschenen in het donker', sym:'♛' },
+            peacock:{ key:'milandes_peacock', title:'De Pauwenschaduw', line:'iets trots en groens liep door de verte', sym:'◉' },
+            feather:{ key:'milandes_feather', title:'De Vallende Veer', line:'een veer daalde alsof de lucht haar bewaarde', sym:'☄' },
+            echo:{ key:'josephine_echo', title:'Joséphines Echo', line:'een oude grandeur trilde door de sterren', sym:'♪' }
+          };
+          const m=MAP[mode]||MAP.garden;
+          window.Chronicle.observe('milandes', m.key, { title:m.title, line:m.line, sym:m.sym, seed });
+        }, 5200);
+      },
+
+      step(now){
+        if(!this.nextAt) this.nextAt = now + 52000;
+        if(this.active){
+          if(now-this.t0 > this.dur){
+            this.active=false;
+            this.nextAt = now + rnd(540000, 1200000); // daarna zeldzaam: 9–20 min
+          }
+        } else if(now >= this.nextAt){
+          this.spawn(now);
+        }
+        this.draw(now);
+      },
+
+      envelope(now){
+        if(!this.active) return 0;
+        const fadeIn=4200, fadeOut=7000;
+        let env=1;
+        const inT=(now-this.t0)/fadeIn;
+        if(inT<1) env=inT*inT*(3-2*inT);
+        const outT=(this.dur-(now-this.t0))/fadeOut;
+        if(outT<1) env=Math.min(env, Math.max(0, outT*outT*(3-2*outT)));
+        return clamp(env,0,1);
+      },
+
+      draw(now){
+        if(!this.active) return;
+        const env=this.envelope(now);
+        if(env<=.001) return;
+        const t=now*.001, gnd=H*.80;
+        const gold='#d5a64d';
+        const leaf=mixHex('#0c3b2a', C.cyan1, .26);
+        const stone=mixHex('#d8c29b', C.black, .50);
+        const teal=mixHex(C.cyan4, '#1c6b5a', .42);
+        const blue=mixHex(C.cyan4, '#3c4cff', .36);
+
+        ctx.save();
+
+        const horizon=gnd-118;
+        ctx.strokeStyle=mixHex(gold, C.black, .35);
+        ctx.lineWidth=1;
+        for(let i=-2;i<=2;i++){
+          const x0=180+i*24;
+          const x1=180+i*92;
+          ctx.globalAlpha=(.11+Math.abs(i)*.018)*env;
+          ctx.beginPath(); ctx.moveTo(x0,horizon); ctx.lineTo(x1,H+8); ctx.stroke();
+        }
+
+        ctx.globalAlpha=.18*env;
+        ctx.fillStyle=leaf;
+        for(let side=-1; side<=1; side+=2){
+          for(let j=0;j<4;j++){
+            const y=horizon+22+j*42;
+            const w=34+j*28;
+            const x=180+side*(58+j*36);
+            ctx.beginPath();
+            ctx.ellipse(x,y,w,7+j*1.6,0,0,Math.PI*2);
+            ctx.fill();
+          }
+        }
+
+        if(this.mode==='garden' || this.mode==='echo'){
+          ctx.globalAlpha=.13*env;
+          ctx.fillStyle=stone;
+          ctx.beginPath();
+          ctx.moveTo(93,horizon+8);
+          ctx.lineTo(267,horizon+8);
+          ctx.lineTo(252,horizon+52);
+          ctx.lineTo(108,horizon+52);
+          ctx.closePath(); ctx.fill();
+          ctx.globalAlpha=.20*env; ctx.strokeStyle=gold; ctx.lineWidth=1;
+          for(let k=0;k<5;k++){
+            const x=116+k*32;
+            ctx.beginPath(); ctx.moveTo(x,horizon+9); ctx.lineTo(x,horizon+48); ctx.stroke();
+          }
+        }
+
+        if(this.mode==='peacock' || this.mode==='feather'){
+          const cx=76+Math.sin(t*.33+this.seed)*10;
+          const cy=152+Math.sin(t*.21+this.seed)*8;
+          ctx.globalAlpha=.32*env;
+          ctx.strokeStyle=gold; ctx.lineWidth=1.2;
+          ctx.beginPath(); ctx.moveTo(cx+26,cy+78); ctx.quadraticCurveTo(cx+8,cy+38,cx,cy); ctx.stroke();
+          ctx.globalAlpha=.20*env; ellipse(cx,cy,24,33,teal);
+          ctx.globalAlpha=.24*env; ellipse(cx,cy,14,21,blue);
+          ctx.globalAlpha=.34*env; ellipse(cx,cy,6,9,mixHex('#22e64f', C.cyan4, .25));
+        }
+
+        if(this.mode==='echo'){
+          ctx.globalAlpha=.20*env;
+          ctx.strokeStyle=gold; ctx.lineWidth=1.1;
+          const cx=286, cy=90;
+          for(let i=0;i<9;i++){
+            const a=-Math.PI*.85+i*Math.PI*.10;
+            ctx.beginPath();
+            ctx.moveTo(cx,cy);
+            ctx.lineTo(cx+Math.cos(a)*(18+i%3*5), cy+Math.sin(a)*(18+i%3*5));
+            ctx.stroke();
+          }
+          ctx.globalAlpha=.18*env;
+          ctx.font='12px monospace';
+          ctx.fillStyle=gold;
+          ctx.fillText('·· milandes ··', 220, 125);
+        }
+
+        ctx.restore();
+      }
+    };
+
+
     // ── AccessoryBrain: zeldzame, tijdelijke hoofd-accessoires ────────────
     // Geïsoleerd: eigen lifecycle + eigen draw, één aanroep binnen drawEntity.
     const AccessoryBrain = {
       active:false, type:null, t0:0, dur:0, nextAt:0, seed:0,
       // Helm is visueel te dominant gebleken; bril + hoed blijven als elegante hoofdaccessoires.
-      TYPES:['bril','hoed'],
+      TYPES:['bril','hoed','veer'],
 
       spawn(now){
         if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') {
@@ -5071,7 +5265,7 @@
         }
         this.active=true;
         this.t0=now;
-        this.dur=rnd(30000, 70000);
+        this.dur=rnd(22000, 46000);
         this.seed=rnd(1,9999);
         this.type=this.TYPES[Math.floor(hash(this.seed*1.7)*this.TYPES.length) % this.TYPES.length];
 
@@ -5085,7 +5279,8 @@
           const NAME={
             bril:{ title:'De Gouden Bril', line:'een dun gouden montuur ving het licht', sym:'◎' },
             hoed:{ title:'De Sterrenhoed', line:'een rituele hoed schoof over de kruin', sym:'△' },
-            helm:{ title:'De Glazen Helm', line:'een cyaan glazen bol sloot zich om haar gezicht', sym:'◌' }
+            helm:{ title:'De Glazen Helm', line:'een cyaan glazen bol sloot zich om haar gezicht', sym:'◌' },
+            veer:{ title:'De Pauwenveer', line:'een iriserende veer bleef even in haar haar hangen', sym:'☄' }
           };
           const n=NAME[type]||NAME.bril;
           const entry=window.Chronicle.observe('accessoire', type, { title:n.title, line:n.line, sym:n.sym, seed });
@@ -5097,7 +5292,7 @@
       },
 
       step(now){
-        if(!this.nextAt) this.nextAt = now + 25000;
+        if(!this.nextAt) this.nextAt = now + 35000;
         if(this.active){
           if (WardrobeBrain.phase && WardrobeBrain.phase !== 'present') {
             this.active=false;
@@ -5106,7 +5301,7 @@
           }
           if(now - this.t0 > this.dur){
             this.active=false;
-            this.nextAt = now + rnd(240000, 600000);
+            this.nextAt = now + rnd(360000, 900000);
           }
         } else if(now >= this.nextAt){ this.spawn(now); }
       },
@@ -5128,10 +5323,11 @@
         const env=this.envelope(now);
         if(env<=.001) return;
         ctx.save();
-        ctx.globalAlpha *= env;
+        ctx.globalAlpha *= env * .78;
         if(this.type==='bril') this.drawGlasses(now, env);
         else if(this.type==='hoed') this.drawHat(now, env);
         else if(this.type==='helm') this.drawHelmet(now, env);
+        else if(this.type==='veer') this.drawPeacockFeather(now, env);
         ctx.restore();
       },
 
@@ -5148,7 +5344,7 @@
         ellipse(207,107-wob*.2,25,21,glass);
 
         // Montuur: dun goud draadwerk rond de vaste oogcentra.
-        ctx.globalAlpha=.96*env;
+        ctx.globalAlpha=.70*env;
         ctx.strokeStyle=gold; ctx.lineWidth=2;
         ctx.beginPath(); ctx.ellipse(146,107+wob,25,21,0,0,Math.PI*2); ctx.stroke();
         ctx.beginPath(); ctx.ellipse(207,107-wob*.2,25,21,0,0,Math.PI*2); ctx.stroke();
@@ -5178,7 +5374,7 @@
         ctx.lineJoin='round'; ctx.lineCap='round';
 
         // Brede, licht asymmetrische rand net over de kruin.
-        ctx.globalAlpha=.90*env;
+        ctx.globalAlpha=.72*env;
         ctx.fillStyle=ink;
         ctx.beginPath();
         ctx.ellipse(181+sway*.25,42,77,18,-0.04,0,Math.PI*2);
@@ -5221,6 +5417,50 @@
         // Subtiele stof-highlight.
         ctx.globalAlpha=.18*env; ctx.strokeStyle=inkHi; ctx.lineWidth=1;
         ctx.beginPath(); ctx.moveTo(159,39); ctx.quadraticCurveTo(177,23,199,39); ctx.stroke();
+        ctx.restore();
+      },
+
+      drawPeacockFeather(now, env){
+        const gold='#d5a64d';
+        const teal=mixHex(C.cyan4, '#1c6b5a', .44);
+        const blue=mixHex(C.cyan4, '#3c4cff', .36);
+        const emerald=mixHex('#22e64f', C.cyan4, .28);
+        const sway=Math.sin(now*.0016+this.seed)*1.3;
+        ctx.save();
+        ctx.lineCap='round'; ctx.lineJoin='round';
+
+        // Kleine pauwenveer als haarornament, net linksboven in het haar.
+        // Bewust subtiel: geen groot kleurvlak, vooral goudlijn + iriserend oog.
+        ctx.globalAlpha=.72*env;
+        ctx.strokeStyle=gold; ctx.lineWidth=1.8;
+        ctx.beginPath();
+        ctx.moveTo(154,49);
+        ctx.quadraticCurveTo(137+sway,23,126+sway*.5,7);
+        ctx.stroke();
+
+        const ribs=REDUCED ? 5 : 9;
+        for(let i=0;i<ribs;i++){
+          const f=i/(ribs-1);
+          const y=43 - f*31;
+          const x=151 - f*24 + Math.sin(f*5+this.seed)*1.0;
+          const side=i%2===0 ? -1 : 1;
+          const len=7 + f*12;
+          ctx.globalAlpha=(.28 + f*.22)*env;
+          ctx.strokeStyle=i%3===0 ? teal : gold;
+          ctx.lineWidth=.8;
+          ctx.beginPath();
+          ctx.moveTo(x,y);
+          ctx.quadraticCurveTo(x+side*len*.45, y-4, x+side*len, y-7);
+          ctx.stroke();
+        }
+
+        ctx.globalAlpha=.76*env; ellipse(126+sway*.5,7,10,13,teal);
+        ctx.globalAlpha=.58*env; ellipse(126+sway*.5,7,6.5,8.5,blue);
+        ctx.globalAlpha=.82*env; ellipse(126+sway*.5,7,3.2,4.4,emerald);
+        ctx.globalAlpha=.9*env; ellipse(124+sway*.5,5,1.2,1.2,C.white);
+
+        ctx.globalAlpha=.88*env;
+        ellipse(154,49,4.2,3.1,gold);
         ctx.restore();
       },
 
@@ -5267,6 +5507,7 @@
       AuroraBrain.step(now);
       ColossusBrain.step(now);
       drawNature(now);
+      MilandesBrain.step(now);
       drawCosmic(now);
       drawMoodAura(now);
       drawVisitor(now);
@@ -5367,7 +5608,7 @@
       const _shipShare = { drone:.26,freighter:.22,saucer:.16,needle:.12,probe:.10,organic:.07,broken:.04,carrier:.03 };
       const _visShare  = { cloaked:.34,traveler:.28,scholar:.20,ghost:.12,astronaut:.06 };
       const _oracleP   = { slowClose:.007,wink:.004,fourthWall:.0025,cascade:.0016,rareTear:.0011,paletteFlash:.0008,notices:.0006,worldShift:.0004,visitor:.0002,breach:.00008 };
-      const _accessoireP = { bril:.0018, hoed:.0009, helm:.00028 };
+      const _accessoireP = { bril:.0018, hoed:.0009, helm:.00028, veer:.00055 };
 
       const NOUN = {
         comet:'komeet',satellite:'satelliet',flash:'lichtflits',debris:'puinregen',ripple:'rimpeling',
@@ -5377,10 +5618,10 @@
         cloaked:'gesluierde',traveler:'reiziger',scholar:'geleerde',ghost:'geest',astronaut:'ruimtereiziger',
         slowClose:'trage blik',wink:'knipoog',fourthWall:'doorbroken wand',cascade:'cascade',rareTear:'stille traan',
         paletteFlash:'kleurbreuk',notices:'zij ziet je',worldShift:'wereldverschuiving',visitor:'aankondiging',breach:'gescheurde wand',
-        bril:'gouden bril',hoed:'sterrenhoed',helm:'glazen helm'
+        bril:'gouden bril',hoed:'sterrenhoed',helm:'glazen helm',veer:'pauwenveer',milandes_garden:'tuin van milandes',milandes_peacock:'pauwenschaduw',milandes_feather:'vallende veer',josephine_echo:'joséphines echo'
       };
       const SYM = {
-        kosmisch:'✦',vloot:'▷',bezoekers:'◧',orakel:'◉',verhaal:'❉',hemel:'✵',accessoire:'◎'
+        kosmisch:'✦',vloot:'▷',bezoekers:'◧',orakel:'◉',verhaal:'❉',hemel:'✵',accessoire:'◎',stem:'♪',milandes:'♛'
       };
 
       // Hemel — de grote, zeldzame set-pieces (poollicht, kolossale planeet).
@@ -5390,6 +5631,12 @@
         aurora_groen:.0030, aurora_cyaan:.0017, aurora_violet:.0012, aurora_magenta:.00035,
         colossus_banded:.0022, colossus_moon:.0026, colossus_crescent:.00038, colossus_ring:.00032
       };
+      const _milandesP = {
+        milandes_garden:.0011,
+        milandes_peacock:.00075,
+        milandes_feather:.0014,
+        josephine_echo:.00042
+      };
       function probFor(cat, key){
         if (cat==='kosmisch') return (_cw[key]||6)/_cwTot;
         if (cat==='vloot')    return (_shipShare[key]!=null?_shipShare[key]:.1) * 0.5;
@@ -5397,6 +5644,7 @@
         if (cat==='orakel')   return _oracleP[key]!=null?_oracleP[key]:.003;
         if (cat==='hemel')    return _hemelP[key]!=null?_hemelP[key]:.002;
         if (cat==='accessoire') return _accessoireP[key]!=null?_accessoireP[key]:.0015;
+        if (cat==='milandes') return _milandesP[key]!=null?_milandesP[key]:.001;
         return .1;
       }
 
@@ -5406,14 +5654,17 @@
         vloot:['zwijgende','zware','gehavende','glanzende','trage','eenzame','vreemde','oude','dolende'],
         bezoekers:['gesluierde','aarzelende','nieuwsgierige','zwijgzame','dwalende','verloren','tijdloze'],
         orakel:['onverwachte','vluchtige','tedere','onpeilbare','breekbare','plechtige'],
-        accessoire:['gouden','rituele','transparante','nachtelijke','vluchtige','stille']
+        accessoire:['gouden','rituele','transparante','nachtelijke','vluchtige','stille'],
+        milandes:['gouden','stille','groene','dromende','franse','verwaaide'],
+        stem:['vreemde','zachte','fluitende','digitale','kleine']
       };
       const LINE = {
         kosmisch:['hoog boven de horizon','tussen de sterren door','aan de rand van de nacht','waar niemand keek','een ademtocht lang'],
         vloot:['op weg naar nergens','met onbekende lading','stil als een gedachte','zonder ooit te stoppen','een schaduw in de leegte'],
         bezoekers:['die even bleef staan','aan de rand van het beeld','en weer verdween','met ogen vol verte','zonder een woord'],
         orakel:['alsof ze het wist','heel even maar','dieper dan het scherm','en toen weer weg','recht naar jou toe'],
-        accessoire:['op haar gezicht','boven haar kruin','als een tijdelijk teken','zonder uitleg','en toen weer weg']
+        accessoire:['op haar gezicht','boven haar kruin','als een tijdelijk teken','zonder uitleg','en toen weer weg'],
+        milandes:['tussen hagen en sterren','als een veer in de lucht','onder bleek kasteellicht','langs een vergeten tuinpad','met pauwenoog-groen']
       };
       const Lore = {
         name(cat, key, ev){
@@ -5859,6 +6110,20 @@
           line:'Elk zeldzaam gezicht dat ze kon tonen, had ze nu getoond.',
           say:'... ik heb alles laten zien ...',
           cond:c=> ['slowClose','wink','fourthWall','cascade','rareTear','paletteFlash','notices','worldShift','visitor'].every(k=>(meta.species[k]||0)>0) },
+
+        // ── Milandes Pack v1 — Dordogne-herinneringen ─────────────────────
+        { id:'s_milandesGarden', title:'De Dordogne-Tuin', sym:'♛', stars:4,
+          line:'Hagen, steen en goudlicht schoven even door haar wereld.',
+          say:'... een tuin ... uit een andere plaats ...',
+          cond:c=> (meta.species['milandes_garden']||0)>0 },
+        { id:'s_milandesPeacock', title:'Het Pauwenoog', sym:'◉', stars:5,
+          line:'Een iriserend oog keek terug vanuit een veer.',
+          say:'... groen ... blauw ... goud ...',
+          cond:c=> (meta.species['milandes_peacock']||0)>0 || (meta.species['veer']||0)>0 },
+        { id:'s_josephineEcho', title:'Joséphines Echo', sym:'♪', stars:5,
+          line:'Een oude ster bleef heel even zingen in de tuin.',
+          say:'... iemand danste hier ... lang geleden ...',
+          cond:c=> (meta.species['josephine_echo']||0)>0 },
       ];
       const _sessionStart=Date.now();
       function storyContext(){
@@ -5921,7 +6186,8 @@
       }
 
       // ── Logboek renderen ────────────────────────────────────────────────
-      let chFilter=0; // 0=alle, 3/4/5 = minimaal aantal sterren
+      let chFilter=0; // 0=alle, 1..5 = exacte rarity-tier
+      let catFilter='alle'; // alle | categorie-key
 
       // ── Detailweergave: tik op een item om het in het groot te zien ─────
       let lb=document.getElementById('jr-lightbox');
@@ -5954,6 +6220,8 @@
       }
       const lbOpen=()=> lb.classList.contains('open');
 
+      const CAT_LABELS={ alle:'alle', hemel:'hemel', kosmisch:'kosmisch', vloot:'vloot', orakel:'orakel', verhaal:'verhaal', accessoire:'accessoire', milandes:'milandes', stem:'stem', bezoekers:'bezoekers' };
+
       const renderLog=()=>{
         const body=document.getElementById('wa-log-body');
         if(!body) return;
@@ -5965,7 +6233,7 @@
               </div>`).join('')}</div>`
           : `<div style="font-size:12px;color:rgba(105,255,243,.35);margin-top:6px;letter-spacing:.10em;">geen opgeslagen seeds</div>`;
 
-        const list = chronicle.filter(e=> chFilter? e.stars>=chFilter : true);
+        const list = chronicle.filter(e=> (chFilter ? e.stars===chFilter : true) && (catFilter==='alle' ? true : e.cat===catFilter));
         const rowsHTML = list.length ? list.map(e=>{
           const fresh=(window._lastCapId===e.id)?' fresh':'';
           const thumb = e.thumb
@@ -5979,19 +6247,32 @@
               <div class="jr-meta"><span class="jr-stars">${STARS[e.stars]}</span> · ${ago(e.t)}</div>
             </div>
           </div>`;
-        }).join('') : `<div class="jr-empty">Nog niets waargenomen onder dit filter.<br>Blijf kijken — de hemel is nooit twee keer hetzelfde.</div>`;
+        }).join('') : `<div class="jr-empty">Nog niets waargenomen met deze filters.<br>Blijf kijken — de hemel is nooit twee keer hetzelfde.</div>`;
 
         body.innerHTML=`
-          <div class="wa-version">build <b>${APP_VERSION}</b> · ${APP_BUILD_LABEL}</div>
+          <div class="wa-version"><b>${APP_VERSION}</b></div>
 
           <div class="jr-summary" data-best="${meta.best||0}">
             <div class="jr-sum-main"><b>${meta.total}</b> waarnemingen</div>
             <div class="jr-sum-sub">${Chronicle.speciesCount()} soorten · zeldzaamste ${meta.best?`<span class="jr-stars">${STARS[meta.best]}</span>`:'—'}</div>
           </div>
 
-          <div class="jr-filters">
-            ${[['alle',0],['★★+',2],['★★★+',3],['★★★★+',4],['★★★★★',5]].map(([lbl,v])=>
-              `<div class="jr-chip${chFilter===v?' on':''}" data-f="${v}">${lbl}</div>`).join('')}
+          <div class="jr-filter-title">audio</div>
+          <div class="jr-filters compact">
+            ${[['stil','stil'],['zacht','zacht'],['vol','vol']].map(([lbl,v])=>
+              `<div class="jr-chip audio-chip${AudioSettings.mode===v?' on':''}" data-a="${v}">${lbl}</div>`).join('')}
+          </div>
+
+          <div class="jr-filter-title">rarity</div>
+          <div class="jr-filters compact">
+            ${[['alle',0],['★',1],['★★',2],['★★★',3],['★★★★',4],['★★★★★',5]].map(([lbl,v])=>
+              `<div class="jr-chip rarity-chip${chFilter===v?' on':''}" data-f="${v}">${lbl}</div>`).join('')}
+          </div>
+
+          <div class="jr-filter-title">categorie</div>
+          <div class="jr-filters compact">
+            ${['alle','hemel','kosmisch','vloot','orakel','verhaal','accessoire','milandes','stem','bezoekers'].map(v=>
+              `<div class="jr-chip cat-chip${catFilter===v?' on':''}" data-c="${v}">${CAT_LABELS[v]||v}</div>`).join('')}
           </div>
 
           <div class="wa-sec">· waarnemingen ·</div>
@@ -6006,13 +6287,47 @@
           ${savedHTML}`;
         window._lastCapId=null;
 
-        // filter-chips
-        document.querySelectorAll('.jr-chip').forEach(el=>{
-          el.addEventListener('click',()=>{ chFilter=Number(el.dataset.f)||0; renderLog(); });
+        // audio + filter-chips
+        document.querySelectorAll('.audio-chip').forEach(el=>{
+          el.addEventListener('click',()=>{ if(logTapLocked()) return; AudioSettings.set(el.dataset.a); renderLog(); });
         });
+        document.querySelectorAll('.rarity-chip').forEach(el=>{
+          el.addEventListener('click',()=>{ if(logTapLocked()) return; chFilter=Number(el.dataset.f)||0; renderLog(); });
+        });
+        document.querySelectorAll('.cat-chip').forEach(el=>{
+          el.addEventListener('click',()=>{ if(logTapLocked()) return; catFilter=el.dataset.c||'alle'; renderLog(); });
+        });
+        function resetLogbookFromVersion(){
+          if(!confirm('Logboek leegmaken?')) return;
+          const now=Date.now();
+          chronicle=[]; seeds=[];
+          meta={
+            total:0, best:0, species:{}, opens:0, days:{}, stories:{}, biomes:{}, opensByDay:{},
+            lastLegendaryAt:now, lastStoryAt:now, suppressUntil:now+60000, createdAt:now
+          };
+          chFilter=0; catFilter='alle';
+          safeStorage.set(CH_KEY, JSON.stringify(chronicle));
+          safeStorage.set(SEEDS_KEY, JSON.stringify(seeds));
+          safeStorage.set(META_KEY, JSON.stringify(meta));
+          safeStorage.set('wa_accessories_seen_v3', '{}');
+          safeStorage.set('wa_voice_seen_v1', '');
+          persist();
+          renderLog();
+        }
+        const versionEl=document.querySelector('.wa-version');
+        if(versionEl){
+          let pressTimer=null;
+          const cancel=()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } };
+          versionEl.addEventListener('pointerdown',()=>{ if(logTapLocked()) return; cancel(); pressTimer=setTimeout(()=>{ pressTimer=null; resetLogbookFromVersion(); }, 1300); });
+          versionEl.addEventListener('pointerup',cancel);
+          versionEl.addEventListener('pointerleave',cancel);
+          versionEl.addEventListener('pointercancel',cancel);
+        }
+
         // tik op een item → detailweergave
         document.querySelectorAll('.jr-row').forEach(el=>{
           el.addEventListener('click',()=>{
+            if(logTapLocked()) return;
             const e=chronicle.find(x=>x.id===el.dataset.id);
             if(e) openDetail(e);
           });
@@ -6020,6 +6335,7 @@
         // seed-handlers
         const ss=document.getElementById('lg-save-seed');
         if(ss) ss.addEventListener('click',()=>{
+          if(logTapLocked()) return;
           if(!seeds.find(s=>s.dayId===curId)){
             seeds.push({label:SceneBrain.biome, dayId:curId});
             safeStorage.set(SEEDS_KEY,JSON.stringify(seeds));
@@ -6028,6 +6344,7 @@
         });
         document.querySelectorAll('.seed-pill').forEach(el=>{
           el.addEventListener('click',()=>{
+            if(logTapLocked()) return;
             const s=seeds[Number(el.dataset.i)];
             SceneBrain._override=true; SceneBrain._gen(s.dayId); renderLog();
           });
@@ -6036,6 +6353,8 @@
 
       // ── Open/sluit ──────────────────────────────────────────────────────
       const logEl=document.getElementById('wa-log');
+      let logTapLockUntil=0;
+      const logTapLocked=()=> Date.now() < logTapLockUntil;
       const openLog=()=>{
         if(logEl.classList.contains('open'))return;
         meta.opens=(meta.opens||0)+1;
@@ -6043,9 +6362,20 @@
         meta.days[todayKey]=1;
         meta.opensByDay=meta.opensByDay||{}; meta.opensByDay[todayKey]=(meta.opensByDay[todayKey]||0)+1;
         persist();
+        // De pointerup die het logboek opent kan op mobiel nog een synthetische click
+        // veroorzaken op de nieuw verschenen laag. Deze korte lock voorkomt dat
+        // hetzelfde tikje meteen een item/detailkaart opent.
+        logTapLockUntil = Date.now() + 700;
         renderLog(); logEl.classList.add('open');
       };
       const closeLog=()=>logEl.classList.remove('open');
+      // Capture-fase: blokkeer alleen de nasleep van de open-tap, niet normale logboekkliks.
+      if(logEl) logEl.addEventListener('click',(ev)=>{
+        if(logTapLocked()){
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+      }, true);
       const hc=document.getElementById('lg-head-close');
       if(hc) hc.addEventListener('click',()=> closeLog());
 
