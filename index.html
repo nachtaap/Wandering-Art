@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — WA-2026.07.01-milandes-v1.5.4</title>
+  <title>Wandering Art — WA-2026.07.01-mobilefps-v1.6</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -792,8 +792,23 @@
     // Bij reduced-motion standaard uit, tenzij ?audio=on.
     const AUDIO_OFF = PARAMS.get('audio') === 'off' || PARAMS.has('mute') || (REDUCED && PARAMS.get('audio') !== 'on');
 
+    // Performancebeleid:
+    // desktop/laptop blijft onbeperkt op requestAnimationFrame/full power.
+    // mobiel verlaagt alleen de renderframerate; alle details, audio en effecten blijven aan.
+    const IS_MOBILE_VIEW = (() => {
+      try {
+        return (navigator.maxTouchPoints > 0 && matchMedia('(hover: none), (pointer: coarse)').matches)
+          || /iphone|ipad|ipod|android/i.test(navigator.userAgent || '');
+      } catch(e) {
+        return /iphone|ipad|ipod|android/i.test(navigator.userAgent || '');
+      }
+    })();
+    const FPS_PARAM = Number(PARAMS.get('fps') || 0);
+    const TARGET_FPS = FPS_PARAM > 0 ? clamp(FPS_PARAM, 12, 120) : (IS_MOBILE_VIEW ? 30 : 0);
+    const FRAME_MIN_MS = TARGET_FPS ? (1000 / TARGET_FPS) : 0;
+
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = 'WA-2026.07.01-milandes-v1.5.4';
+    const APP_VERSION = 'WA-2026.07.01-mobilefps-v1.6';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -5592,8 +5607,23 @@
     }
 
     let rafId = null;
-    function frame(now){ render(now); rafId = requestAnimationFrame(frame); }
-    function startLoop(){ if (rafId == null) { lastNow = performance.now(); rafId = requestAnimationFrame(frame); } }
+    let lastRenderAt = 0;
+    function frame(now){
+      // Mobiel: 30 fps cap. Desktop/laptop: iedere rAF renderen.
+      // We blijven wel iedere rAF luisteren, zodat animaties direct hervatten na pauze/tap.
+      if (!FRAME_MIN_MS || !lastRenderAt || now - lastRenderAt >= FRAME_MIN_MS - 1.5) {
+        lastRenderAt = now;
+        render(now);
+      }
+      rafId = requestAnimationFrame(frame);
+    }
+    function startLoop(){
+      if (rafId == null) {
+        lastNow = performance.now();
+        lastRenderAt = 0;
+        rafId = requestAnimationFrame(frame);
+      }
+    }
     function stopLoop(){ if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
     // Voor de breach-module (losse script-scope): canvas pauzeren/hervatten tijdens een scène.
     window.WA_pauseRender = stopLoop;
