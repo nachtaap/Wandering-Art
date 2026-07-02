@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — 1.11.0</title>
+  <title>Wandering Art — 1.11.1</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -136,7 +136,7 @@
       position:fixed;
       left:calc(8px + env(safe-area-inset-left, 0px));
       bottom:calc(8px + env(safe-area-inset-bottom, 0px));
-      z-index:5;
+      z-index:25; /* boven de log-overlay (20): toggle geeft direct feedback */
       display:none; white-space:pre; pointer-events:none;
       font:10px/1.35 monospace; color:#69fff3; opacity:.72;
       text-shadow:0 0 4px #000;
@@ -423,6 +423,22 @@
       background:rgba(255,255,255,.08);
       border:1.5px solid rgba(255,255,255,.22);
       color:#fff;
+    }
+    /* De dbg-toggle erft .wa-close (absoluut op right:14px) — zonder eigen
+       offset liggen beide knoppen exact op elkaar en vangt het kruisje de
+       tik. Eigen plek links van het kruisje, als pil i.p.v. cirkel. */
+    #wa-log #lg-debug-toggle{
+      right:62px;
+      width:auto; height:32px; padding:0 13px; border-radius:18px;
+      font-size:12px; letter-spacing:.14em;
+      color:rgba(255,255,255,.75);
+      border-color:rgba(255,255,255,.16);
+    }
+    #wa-log #lg-debug-toggle.active{
+      background:rgba(105,255,243,.16);
+      border-color:rgba(105,255,243,.55);
+      color:#69fff3;
+      box-shadow:0 0 10px rgba(105,255,243,.30);
     }
     #wa-log .wa-close:active{ background:rgba(255,255,255,.16); }
     #wa-log .wa-body{
@@ -988,7 +1004,7 @@
     const FRAME_MIN_MS = TARGET_FPS ? (1000 / TARGET_FPS) : 0;
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = '1.11.0';
+    const APP_VERSION = '1.11.1';
     // Versienummer op het startscherm — gevoed vanuit APP_VERSION zodat
     // er maar één plek is om te bumpen (naast de <title>).
     { const sv=document.getElementById('start-version'); if (sv) sv.textContent='v'+APP_VERSION; }
@@ -6591,7 +6607,12 @@
       // ── Persistente staat ───────────────────────────────────────────────
       // Stabiele startversie: echt leeg logboek + opwarmfase.
       // Oude testdata uit v1/v2 blijft lokaal staan, maar deze build leest v3.
-      const CH_KEY='wa_chronicle_v3', META_KEY='wa_chmeta_v3', SEEDS_KEY='wa_seeds_v3', RESET_KEY='wa_clean_start_v3';
+      const CH_KEY='wa_chronicle_v3', META_KEY='wa_chmeta_v3', SEEDS_KEY='wa_seeds_v3';
+      // Reset-sleutel afgeleid van APP_VERSION: elke nieuwe versie begint
+      // met een leeg logboek en verse verhaal-unlocks. Het geheugen van het
+      // orakel (EchoBrain/MotifBrain) blijft bewust wél bewaard — de
+      // biografie overleeft releases, de waarnemingen niet.
+      const RESET_KEY='wa_clean_start_'+APP_VERSION;
       const nowBoot=Date.now();
       const CH_MAX=140;                 // tijdlijn-lengte
       let chronicle=[], seeds=[];
