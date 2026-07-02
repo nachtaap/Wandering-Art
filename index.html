@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — 1.10.3</title>
+  <title>Wandering Art — 1.11.0</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -133,7 +133,10 @@
         radial-gradient(circle at center, transparent 0 82%, rgba(0,0,0,.14) 100%);
     }
     #dbg{
-      position:fixed; left:8px; top:8px; z-index:5;
+      position:fixed;
+      left:calc(8px + env(safe-area-inset-left, 0px));
+      bottom:calc(8px + env(safe-area-inset-bottom, 0px));
+      z-index:5;
       display:none; white-space:pre; pointer-events:none;
       font:10px/1.35 monospace; color:#69fff3; opacity:.72;
       text-shadow:0 0 4px #000;
@@ -143,7 +146,10 @@
       position:fixed; inset:0; z-index:30;
       display:flex; align-items:center; justify-content:center;
       pointer-events:auto; opacity:0;
-      background:#020207;
+      /* Gradient in de gesamplede randkleuren van de plaat
+         (boven ≈ #090a22, onder ≈ #010818) zodat de letterbox-balken
+         naadloos in de afbeelding overlopen. */
+      background:linear-gradient(180deg, #090a22 0%, #070920 42%, #030d1d 78%, #010818 100%);
       transition:opacity 2.6s ease;
       overflow:hidden;
     }
@@ -176,6 +182,10 @@
       transform-origin:center center;
       animation:startPlateBreathe 14s ease-in-out infinite alternate;
       filter:drop-shadow(0 20px 42px rgba(0,0,0,.34));
+      /* Boven- en onderrand vervagen zacht de achtergrond in — samen met
+         de gradient hierboven verdwijnt de harde naad van de letterbox. */
+      -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 34px, #000 calc(100% - 34px), transparent 100%);
+      mask-image:linear-gradient(180deg, transparent 0, #000 34px, #000 calc(100% - 34px), transparent 100%);
     }
     #enter .start-art::after{
       content:'';
@@ -213,13 +223,13 @@
     #enter .ring:focus-visible{
       box-shadow:0 0 0 2px rgba(213,166,77,.82), 0 0 24px rgba(213,166,77,.45);
     }
-    /* Versienummer: verticaal gecentreerd in de zwarte letterbox-balk
-       onder de plaat. De balkhoogte is (100vh − plaathoogte) / 2, met
-       dezelfde formule als .start-art; bottom op een kwart + translateY(50%)
-       legt het nummer precies in het midden van die balk. De max() met
-       safe-area is de vloer voor schermen zónder balk (landscape/desktop),
-       zodat het nummer nooit óp de plaat of onder de home-indicator valt. */
-    #enter .start-version{
+    /* Meta-regel op het startscherm: versienummer + info-link, verticaal
+       gecentreerd in de zwarte letterbox-balk onder de plaat. De balkhoogte
+       is (100vh − plaathoogte) / 2, met dezelfde formule als .start-art;
+       bottom op een kwart + translateY(50%) legt de regel precies in het
+       midden van die balk. De max() met safe-area is de vloer voor schermen
+       zónder balk (landscape/desktop). */
+    #enter .start-meta{
       position:absolute;
       z-index:2;
       left:50%;
@@ -228,12 +238,39 @@
         calc(10px + env(safe-area-inset-bottom, 0px))
       );
       transform:translate(-50%, 50%);
+      display:flex;
+      align-items:center;
+      gap:10px;
       font:11px/1 monospace;
       letter-spacing:.18em;
       color:rgba(213,166,77,.48);
       text-shadow:0 0 6px rgba(0,0,0,.8);
       pointer-events:none;
       user-select:none;
+    }
+    #enter .start-meta-sep{ opacity:.6; }
+    #enter .start-info-link{
+      pointer-events:auto;
+      background:none; border:0; padding:8px 6px; margin:-8px -6px; /* groter tikvlak */
+      font:inherit; letter-spacing:inherit;
+      color:rgba(213,166,77,.72);
+      text-decoration:underline dotted rgba(213,166,77,.45);
+      text-underline-offset:3px;
+      cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    #enter .start-info-link:active{ color:rgba(213,166,77,1); }
+    /* Info-overlay moet bóven het startscherm (z-index 30) liggen */
+    #wa-info.wa-overlay{ z-index:40; }
+    #wa-info .wa-body{ max-width:640px; margin:0 auto; width:100%; box-sizing:border-box; }
+    #wa-info h3{
+      margin:20px 0 7px; font-size:12px; font-weight:normal;
+      letter-spacing:.24em; text-transform:lowercase; color:#69fff3;
+    }
+    #wa-info h3:first-child{ margin-top:6px; }
+    #wa-info p{
+      margin:0 0 12px; font-size:12.5px; line-height:1.7;
+      color:rgba(155,255,245,.82);
     }
     @keyframes startPlateBreathe{
       0%{ transform:translate3d(0,-2px,0) scale(1); }
@@ -283,6 +320,11 @@
       padding:5px 10px; border-radius:20px; cursor:pointer;
     }
     .wa-close:active{ background:rgba(105,255,243,.1); }
+    .wa-head-btns{ display:flex; gap:8px; }
+    #lg-debug-toggle.active{
+      background:rgba(105,255,243,.16);
+      box-shadow:0 0 8px rgba(105,255,243,.35);
+    }
 
     /* scrollable body */
     .wa-body{ flex:1 1 auto; overflow-y:auto; padding:14px 16px 30px; }
@@ -858,14 +900,51 @@
     <div class="start-art" aria-hidden="true">
       <button class="ring" type="button" aria-label="Treedt binnen">Treedt binnen</button>
     </div>
-    <div class="start-version" id="start-version" aria-hidden="true"></div>
+    <div class="start-meta">
+      <span id="start-version" aria-hidden="true"></span>
+      <span class="start-meta-sep" aria-hidden="true">·</span>
+      <button class="start-info-link" id="start-info-link" type="button" aria-label="Over dit werk">info</button>
+    </div>
+  </div>
+
+  <!-- Infopagina: de werking en mechanismen achter het werk -->
+  <div id="wa-info" class="wa-overlay" role="dialog" aria-label="Over dit werk">
+    <div class="wa-head">
+      <h2>· over dit werk ·</h2>
+      <button class="wa-close" id="info-close" aria-label="Sluiten">✕</button>
+    </div>
+    <div class="wa-body">
+      <h3>het wezen</h3>
+      <p>Wandering Art is een levend, procedureel kunstwerk. Er is geen opname, geen loop, geen script dat zich herhaalt: alles wat je ziet en hoort wordt op dit moment berekend, en geen twee minuten zijn ooit gelijk. Het orakel heeft een emotionele binnenwereld — energie, spanning, nieuwsgierigheid, verdriet — die traag golft en doorwerkt in haar gezicht, houding, blik en stem.</p>
+
+      <h3>de wereld</h3>
+      <p>Haar wereld leest de echte wereld mee. Het weer buiten wordt haar weer; dag en nacht volgen de zon; flarden uit het nieuws sijpelen door in haar stemming en haar woorden. Elke dag genereert een unieke achtergrondscène — bos, hoogland, vallei, heide of kust — uit de datum als zaadje. Aan de hemel passeren schepen, kometen, satellieten, poollicht en, heel zelden, een dwaalmaan. Zij kijkt ernaar; volg haar blik.</p>
+
+      <h3>zeldzaamheid</h3>
+      <p>Schaarste is alles. Gebeurtenissen zijn geordend in tiers van gewoon tot legendarisch: een trage oogsluiting, een knipoog, het moment dat ze recht in de camera kijkt, een enkele traan, een bezoeker die uit de leegte nadert. De zeldzaamste gebeurtenissen hebben cooldowns van uren. Wie lang kijkt, ziet dingen die anderen nooit zullen zien.</p>
+
+      <h3>de muziek</h3>
+      <p>De soundtrack wordt noot voor noot gecomponeerd terwijl je luistert. Toonladder en tempo volgen haar stemming — dorisch als ze hoopvol is, frygisch als het stormt vanbinnen. Akkoorden kiezen elkaar via kansen, en een trage intensiteitsgolf van minuten bepaalt hoe druk of hoe leeg het klinkt; soms valt bijna alles weg en draagt alleen een pad de ruimte. Bezoekers en zeldzame verschijnselen hebben een eigen leidmotief dat bij elke terugkeer klinkt — en héél soms één noot muteert, zoals een herinnering langzaam verandert.</p>
+
+      <h3>het geheugen</h3>
+      <p>Ze onthoudt. Wat samen gebeurt, raakt in haar geheugen verbonden: kwam er ooit een bezoeker tijdens een storm, dan kleurt storm voortaan haar verwachting. Die associaties vervagen over weken als ze niet worden gevoed — wat maanden overleeft, is per definitie betekenisvol. Haar geheugen stuurt haar stemming, haar blik naar de horizon, en soms haar woorden: "net als toen". Elke installatie van dit werk groeit zo uit tot een ander individu.</p>
+
+      <h3>het logboek</h3>
+      <p>Tik één keer op het scherm om het logboek te openen. Daarin verzamelen zich je waarnemingen — met sterren voor zeldzaamheid — en ontgrendelen zich verhaalmomenten: vijftig geschreven scènes die elk maar één keer kunnen vallen, als de omstandigheden kloppen.</p>
+
+      <h3>het maaksel</h3>
+      <p>Alles leeft in één bestand: geen frameworks, geen engine, geen assets buiten de titelplaat. Het beeld is canvas, de klank is pure WebAudio-synthese, het geheugen woont in je eigen browser. Installeerbaar als app en volledig offline te ervaren.</p>
+    </div>
   </div>
 
   <!-- Publiek: event-logboek (enkele tap) -->
   <div id="wa-log" class="wa-overlay" role="dialog" aria-label="Logboek">
     <div class="wa-head">
       <h2>· logboek ·</h2>
-      <button class="wa-close" id="lg-head-close" aria-label="Sluiten">✕</button>
+      <span class="wa-head-btns">
+        <button class="wa-close" id="lg-debug-toggle" aria-label="Debug-weergave" aria-pressed="false">dbg</button>
+        <button class="wa-close" id="lg-head-close" aria-label="Sluiten">✕</button>
+      </span>
     </div>
     <div class="wa-body" id="wa-log-body"></div>
   </div>
@@ -909,10 +988,18 @@
     const FRAME_MIN_MS = TARGET_FPS ? (1000 / TARGET_FPS) : 0;
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = '1.10.3';
+    const APP_VERSION = '1.11.0';
     // Versienummer op het startscherm — gevoed vanuit APP_VERSION zodat
     // er maar één plek is om te bumpen (naast de <title>).
     { const sv=document.getElementById('start-version'); if (sv) sv.textContent='v'+APP_VERSION; }
+    // Infopagina: open via de link op het startscherm, sluiten via ✕.
+    {
+      const il=document.getElementById('start-info-link');
+      const ov=document.getElementById('wa-info');
+      const ic=document.getElementById('info-close');
+      if (il&&ov) il.addEventListener('click',(e)=>{ e.stopPropagation(); ov.classList.add('open'); });
+      if (ic&&ov) ic.addEventListener('click',()=> ov.classList.remove('open'));
+    }
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -950,35 +1037,16 @@
     const ctx = canvas.getContext('2d', { alpha:false });
     const dbgEl = document.getElementById('dbg');
 
-    // ── Debug-HUD toggle: ?debug in de URL óf triple-tap + wachtwoord ──
-    // Drie snelle tikken (binnen 600ms, dicht bij elkaar) op het scherm
-    // vragen om het wachtwoord en tonen de HUD; nogmaals triple-tappen
-    // verbergt hem weer (zonder wachtwoord). Handig op mobiel.
+    // ── Debug-HUD: ?debug in de URL óf de dbg-knop in het logboek ──
+    // De logboek-code leeft in een apart scriptblok, dus de toggle wordt
+    // via window gedeeld. Geen wachtwoord — geheim was het toch niet.
     let HUD_VISIBLE = DEBUG;
-    const HUD_PIN = 'orakel';   // ← wachtwoord hier aanpassen
     if (HUD_VISIBLE && dbgEl) dbgEl.style.display = 'block';
-    (() => {
-      let taps = [];
-      window.addEventListener('pointerdown', (e) => {
-        const now = performance.now();
-        taps = taps.filter(t => now - t.t < 600);
-        if (taps.length && (Math.abs(e.clientX - taps[0].x) > 60 || Math.abs(e.clientY - taps[0].y) > 60)) taps = [];
-        taps.push({ t: now, x: e.clientX, y: e.clientY });
-        if (taps.length >= 3){
-          taps = [];
-          if (HUD_VISIBLE){
-            HUD_VISIBLE = false;
-            if (dbgEl) dbgEl.style.display = 'none';
-          } else {
-            const pin = prompt('wachtwoord');
-            if (pin === HUD_PIN){
-              HUD_VISIBLE = true;
-              if (dbgEl) dbgEl.style.display = 'block';
-            }
-          }
-        }
-      }, { passive: true });
-    })();
+    window.toggleDebugHud = () => {
+      HUD_VISIBLE = !HUD_VISIBLE;
+      if (dbgEl) dbgEl.style.display = HUD_VISIBLE ? 'block' : 'none';
+      return HUD_VISIBLE;
+    };
 
     const W = canvas.width;
     const H = canvas.height;
@@ -3122,6 +3190,15 @@
       const M=MusicBrain;
       if (!M.initialized||!AudioBrain.ctx) return;
       const beatDur=60/M.bpm;
+      // Vangrail: als de JS-thread lang bevroren was (dialoog, OS-stall),
+      // loopt nextBeat ver achter. Zonder resync plant de while-lus dan in
+      // één klap tientallen akkoorden (elk 6+ oscillators) — een vloed die
+      // de audio smoort. Bij >1s achterstand: opnieuw uitlijnen op nu.
+      if (M.nextBeat < AudioBrain.ctx.currentTime - 1){
+        M.nextBeat = AudioBrain.ctx.currentTime + .2;
+        M.chordBeat = M.chordDur; // vers akkoord op het nieuwe startpunt
+        M.beatInBar = 0;
+      }
       while (M.nextBeat<AudioBrain.ctx.currentTime+M.LOOK){
         if (M.chordBeat>=M.chordDur) mu_newChord(M.nextBeat);
         mu_scheduleBeat(M.beatInBar, M.nextBeat);
@@ -7060,6 +7137,14 @@
       }, true);
       const hc=document.getElementById('lg-head-close');
       if(hc) hc.addEventListener('click',()=> closeLog());
+      // Debug-HUD toggle: brug naar het hoofdscript (window.toggleDebugHud)
+      const dt=document.getElementById('lg-debug-toggle');
+      if(dt) dt.addEventListener('click',(ev)=>{
+        ev.stopPropagation();
+        const on = window.toggleDebugHud ? window.toggleDebugHud() : false;
+        dt.setAttribute('aria-pressed', on?'true':'false');
+        dt.classList.toggle('active', on);
+      });
 
       // ── Tap opent het logboek; sluiten gaat via een knop ─────────────────
       // (zo botst tikken-om-te-openen niet met het aantikken van items)
