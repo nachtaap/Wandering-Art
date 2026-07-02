@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — 1.10.2</title>
+  <title>Wandering Art — 1.10.3</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -213,18 +213,24 @@
     #enter .ring:focus-visible{
       box-shadow:0 0 0 2px rgba(213,166,77,.82), 0 0 24px rgba(213,166,77,.45);
     }
-    /* Versienummer: onopvallend onderin het startscherm, in de goud/teal
-       familie van de plaat. env(safe-area-inset-bottom) houdt hem boven
-       de home-indicator op moderne telefoons. */
+    /* Versienummer: verticaal gecentreerd in de zwarte letterbox-balk
+       onder de plaat. De balkhoogte is (100vh − plaathoogte) / 2, met
+       dezelfde formule als .start-art; bottom op een kwart + translateY(50%)
+       legt het nummer precies in het midden van die balk. De max() met
+       safe-area is de vloer voor schermen zónder balk (landscape/desktop),
+       zodat het nummer nooit óp de plaat of onder de home-indicator valt. */
     #enter .start-version{
       position:absolute;
       z-index:2;
       left:50%;
-      bottom:calc(10px + env(safe-area-inset-bottom, 0px));
-      transform:translateX(-50%);
-      font:10px/1 monospace;
+      bottom:max(
+        calc((100vh - min(100vh, 100vw * 1672 / 941)) / 4),
+        calc(10px + env(safe-area-inset-bottom, 0px))
+      );
+      transform:translate(-50%, 50%);
+      font:11px/1 monospace;
       letter-spacing:.18em;
-      color:rgba(213,166,77,.42);
+      color:rgba(213,166,77,.48);
       text-shadow:0 0 6px rgba(0,0,0,.8);
       pointer-events:none;
       user-select:none;
@@ -903,7 +909,7 @@
     const FRAME_MIN_MS = TARGET_FPS ? (1000 / TARGET_FPS) : 0;
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = '1.10.2';
+    const APP_VERSION = '1.10.3';
     // Versienummer op het startscherm — gevoed vanuit APP_VERSION zodat
     // er maar één plek is om te bumpen (naast de <title>).
     { const sv=document.getElementById('start-version'); if (sv) sv.textContent='v'+APP_VERSION; }
