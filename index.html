@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — 1.11.1</title>
+  <title>Wandering Art — 2.0.1</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -262,7 +262,20 @@
     #enter .start-info-link:active{ color:rgba(213,166,77,1); }
     /* Info-overlay moet bóven het startscherm (z-index 30) liggen */
     #wa-info.wa-overlay{ z-index:40; }
-    #wa-info .wa-body{ max-width:640px; margin:0 auto; width:100%; box-sizing:border-box; }
+    /* De pagina loopt onder de statusbalk door (viewport-fit=cover), dus de
+       header heeft safe-area-padding nodig — anders botsen titel en kruisje
+       met klok en batterij, en valt het kruisje deels buiten tikbereik. */
+    #wa-info .wa-head{
+      padding-top:calc(16px + env(safe-area-inset-top, 0px));
+      position:relative;
+    }
+    /* Kruisje als volwaardig tikdoel: 40px rond, net als in het logboek */
+    #wa-info .wa-close{
+      width:40px; height:40px; padding:0; border-radius:50%;
+      display:grid; place-items:center; font-size:15px;
+    }
+    #wa-info .wa-body{ max-width:640px; margin:0 auto; width:100%; box-sizing:border-box;
+      padding-bottom:calc(30px + env(safe-area-inset-bottom, 0px)); }
     #wa-info h3{
       margin:20px 0 7px; font-size:12px; font-weight:normal;
       letter-spacing:.24em; text-transform:lowercase; color:#69fff3;
@@ -945,6 +958,9 @@
       <h3>het geheugen</h3>
       <p>Ze onthoudt. Wat samen gebeurt, raakt in haar geheugen verbonden: kwam er ooit een bezoeker tijdens een storm, dan kleurt storm voortaan haar verwachting. Die associaties vervagen over weken als ze niet worden gevoed — wat maanden overleeft, is per definitie betekenisvol. Haar geheugen stuurt haar stemming, haar blik naar de horizon, en soms haar woorden: "net als toen". Elke installatie van dit werk groeit zo uit tot een ander individu.</p>
 
+      <h3>de dromen</h3>
+      <p>'s Nachts, heel zelden, als de muziek is weggezakt en er lang niets gebeurd is, vallen haar ogen dicht. Wat je dan ziet is haar geheugen dat zichzelf herschikt: de sterkste herinneringen verschijnen verkeerd geënsceneerd, motieven klinken omgekeerd en vertraagd. En dromen laten sporen na — bij het ontwaken zijn er verbindingen gelegd tussen dingen die nooit samen gebeurd zijn, alleen samen gedroomd. Ook als niemand kijkt droomt ze door: kom je na dagen terug, dan vind je haar droomverslagen in het logboek, en is zij een beetje iemand anders geworden. En wie 's nachts binnenkomt, kan haar slapend aantreffen — tot je aanwezigheid doorsijpelt en ze ontwaakt.</p>
+
       <h3>het logboek</h3>
       <p>Tik één keer op het scherm om het logboek te openen. Daarin verzamelen zich je waarnemingen — met sterren voor zeldzaamheid — en ontgrendelen zich verhaalmomenten: vijftig geschreven scènes die elk maar één keer kunnen vallen, als de omstandigheden kloppen.</p>
 
@@ -1004,7 +1020,7 @@
     const FRAME_MIN_MS = TARGET_FPS ? (1000 / TARGET_FPS) : 0;
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = '1.11.1';
+    const APP_VERSION = '2.0.1';
     // Versienummer op het startscherm — gevoed vanuit APP_VERSION zodat
     // er maar één plek is om te bumpen (naast de <title>).
     { const sv=document.getElementById('start-version'); if (sv) sv.textContent='v'+APP_VERSION; }
@@ -1265,6 +1281,7 @@
         if(now-this._lastAmbient>20000){
           this._lastAmbient=now;
           this._ambientTags=this.ambientNow();
+          try{ safeStorage.set('wa_lastseen', String(Date.now())); }catch(e){}
           // Ambient-tags verbinden NIET onderling — alleen events verbinden
           // met ambient. Anders verwatert het netwerk tot één klont.
         }
@@ -1330,31 +1347,231 @@
         m.deg[i]=clamp(m.deg[i]+pick([-1,1]),2,13);
         m.gen++;
       },
-      play(key, gain=.06){
+      play(key, gain=.06, dreamed=false){
         if(!MusicBrain.initialized||!AudioBrain.ctx) return;
         const now=performance.now();
         if(now-this._lastPlay<8000) return; // motieven verdringen elkaar niet
         this._lastPlay=now;
         let m=this.motifs[key];
         if(!m){ m=this._birth(); this.motifs[key]=m; }
-        else if(Math.random()<.22) this._mutate(m);
-        this.save();
+        else if(!dreamed&&Math.random()<.22) this._mutate(m);
+        if(!dreamed) this.save();
         const scale=MU_SCALES[MusicBrain.scale]||MU_SCALES.aeolian;
         const beatDur=60/MusicBrain.bpm;
         let t=AudioBrain.ctx.currentTime+.15;
-        m.deg.forEach((d,i)=>{
+        // Gedroomd: omgekeerde volgorde, dubbel zo traag, zachter, licht
+        // ontstemd — hetzelfde motief, gehoord door slaap heen.
+        const deg=dreamed?m.deg.slice().reverse():m.deg;
+        const rhy=dreamed?m.rhy.map(r=>r*2):m.rhy;
+        const dt=dreamed?.985:1;
+        deg.forEach((d,i)=>{
           const oct=Math.floor(d/scale.length);
           const s=scale[mod(d,scale.length)]+12*oct;
-          const f=muf(MusicBrain.rootHz*2,s);
+          const f=muf(MusicBrain.rootHz*2,s)*dt;
           if(f>140&&f<1100){
-            mu_melo(f,t,beatDur*m.rhy[i]*1.4,gain*(i===0?1.15:1));
-            if(i===0) mu_bell(f*2,t,.020); // signatuur-glinster op de eerste noot
+            mu_melo(f,t,beatDur*rhy[i]*1.4,gain*(i===0?1.15:1));
+            if(i===0&&!dreamed) mu_bell(f*2,t,.020); // signatuur-glinster op de eerste noot
           }
-          t+=beatDur*m.rhy[i];
+          t+=beatDur*rhy[i];
         });
       }
     };
     MotifBrain.load();
+
+    // ════════════════════════════════════════════════════════════
+    //  DreamBrain — zij droomt. 's Nachts, zeldzaam, als de muziek
+    //  laag staat en er niets gebeurt, glijdt ze weg. De droom is
+    //  geen nieuwe content: het is haar geheugen dat zichzelf
+    //  herschikt — de sterkste associaties verschijnen verkeerd
+    //  geënsceneerd, motieven klinken omgekeerd en vertraagd.
+    //  Bij het ontwaken schrijft de droom nieuwe, zwakke randen
+    //  terug in EchoBrain: associaties tussen dingen die nooit
+    //  samen gebeurd zijn, alleen samen gedroomd. Geheugen voedt
+    //  dromen; dromen vervormen geheugen. Vanaf hier ontwikkelt
+    //  haar temperament zich voorbij de werkelijkheid.
+    //
+    //  En als de app dicht is, droomt ze door: bij het openen wordt
+    //  de verstreken tijd verwerkt — per afwezige nacht een kans op
+    //  een droom die haar geheugen écht heeft herschreven, met
+    //  gedateerde droomverslagen in het logboek als bewijs.
+    // ════════════════════════════════════════════════════════════
+    const DreamBrain = {
+      phase:'awake',          // awake | sinking | dreaming | waking
+      depth:0,                // 0..1 — stuurt visuals, muziek en oogleden
+      since:0, dur:0,
+      lastDreamAt:0,
+      seedTags:[],            // loregenamen die in de droom verschijnen
+      nextMotifAt:0,
+      dreamCount:0
+    };
+
+    // Droombeelden: de sterkste geheugenranden leveren de hoofdrolspelers
+    function dreamSeeds(){
+      const E=EchoBrain, out=[];
+      const eks=Object.keys(E.edges).sort((a,b)=>E.edges[b]-E.edges[a]);
+      for(const k of eks){
+        const i=k.indexOf('|');
+        for(const t of [k.slice(0,i),k.slice(i+1)]){
+          const n=GrammarBrain.LORE[t];
+          if(n&&out.indexOf(n)<0) out.push(n);
+        }
+        if(out.length>=3) break;
+      }
+      while(out.length<2) out.push(pick(['een deur','de maan','het water','een stem','de trap']));
+      return out.slice(0,3);
+    }
+
+    // Cryptisch droomverslag voor logboek en ontwaak-spraak
+    function dreamLine(){
+      const known=Object.keys(EchoBrain.nodes).filter(t=>GrammarBrain.LORE[t]);
+      const a=known.length?GrammarBrain.LORE[pick(known)]:pick(['een deur','de maan','iets zonder naam']);
+      const b=pick(['in de sneeuw','ondersteboven','dubbel','veel te groot','zonder gezicht','op de plek van de maan','achter glas','van heel dichtbij','in de verkeerde kleur']);
+      const c=pick(['en het klopte niet','maar niemand schrok','en ik bleef kijken','tot het licht brak','en toen was het weg','alsof het altijd zo was','en het kende mijn naam']);
+      return '... ik droomde ... '+a+' ... '+b+' ... '+c+' ...';
+    }
+
+    // De feedbacklus: de droom schrijft terug in het geheugen.
+    // 1–2 zwakke "droomranden" tussen knopen die nooit samen optraden,
+    // plus een kleine perturbatie van bestaande randen. Klein per droom,
+    // onnavolgbaar over maanden.
+    function dreamRewrite(){
+      const E=EchoBrain;
+      const nodes=Object.keys(E.nodes);
+      if(nodes.length>=2){
+        const n=1+(Math.random()<.4?1:0);
+        for(let i=0;i<n;i++){
+          const a=pick(nodes), b=pick(nodes);
+          if(a!==b){ const k=E._ekey(a,b); E.edges[k]=Math.min(1,(E.edges[k]||0)+rnd(.06,.14)); }
+        }
+        const eks=Object.keys(E.edges);
+        if(eks.length){
+          const k1=pick(eks); E.edges[k1]=Math.min(1,E.edges[k1]*rnd(1.05,1.2));
+          const k2=pick(eks); E.edges[k2]*=rnd(.80,.95);
+        }
+        E._dirty=true;
+      }
+      DreamBrain.dreamCount++;
+    }
+
+    // ── Afwezigheid: de wereld liep door terwijl de app dicht was ──
+    // Per afgewezen nacht ~75% kans op een droom (met echte herschrijving),
+    // motieven muteren langzaam door, en het logboek krijgt gedateerde
+    // verslagen. EchoBrain-verval gebeurt al bij load.
+    let _absenceDone=false;
+    function processAbsence(){
+      const last=parseInt(safeStorage.get('wa_lastseen')||'0',10);
+      const now=Date.now();
+      if(last>0 && now>last){
+        const gapH=(now-last)/3600000;
+        if(gapH>=8){
+          const nights=Math.max(1,Math.min(21,Math.round(gapH/24)||1));
+          let dreams=0;
+          for(let n=0;n<nights;n++) if(Math.random()<.75){ dreams++; dreamRewrite(); }
+          // motieven driften door in haar slaap
+          const mKeys=Object.keys(MotifBrain.motifs);
+          mKeys.forEach(k=>{ if(Math.random()<.12*Math.min(nights,7)) MotifBrain._mutate(MotifBrain.motifs[k]); });
+          if(mKeys.length) MotifBrain.save();
+          if(dreams) EchoBrain.save(true);
+          // gedateerde droomverslagen (max 4, chronologisch tussen toen en nu)
+          const show=Math.min(dreams,4);
+          for(let i=0;i<show;i++){
+            const t=Math.round(last + ((i+1)*(now-last)/(show+1)));
+            if(window.Chronicle) Chronicle.observe('droom','droom_afwezig',
+              { force:true, t, stars:3, sym:'☽', title:'Droom in je afwezigheid', line:dreamLine() });
+          }
+        }
+        // Aankomstdroom: open je de app 's nachts na ≥3 uur afwezigheid,
+        // dan tref je haar dromend aan — ogen dicht, sluier, motieven
+        // door slaap heen. Jouw aanwezigheid sijpelt door: na 1–2,5 min
+        // ontwaakt ze langs het normale waking-pad (herschrijving,
+        // logboek-entry, droomverslag op de lippen).
+        const nightNow=((WorldBrain.time&&WorldBrain.time.phaseName)||'').indexOf('night')>=0;
+        if(gapH>=3 && nightNow){
+          const D=DreamBrain;
+          D.phase='dreaming'; D.depth=1;
+          D.since=performance.now();       // zelfde klok als dreamTick
+          D.dur=rnd(65000,150000);
+          D.seedTags=dreamSeeds();
+          D.nextMotifAt=performance.now()+9000;
+        }
+      }
+      safeStorage.set('wa_lastseen', String(now));
+    }
+
+    // ── De levende droomcyclus ──
+    function dreamTick(now){
+      const D=DreamBrain;
+      if(!_absenceDone){ _absenceDone=true; try{ processAbsence(); }catch(e){} }
+      const night=((WorldBrain.time&&WorldBrain.time.phaseName)||'').indexOf('night')>=0;
+      if(D.phase==='awake'){
+        if(night && MusicBrain.initialized && mu_intensity()<.38
+           && VisitorBrain.phase!=='present'
+           && now-D.lastDreamAt > (DEBUG?60000:5400000)
+           && Math.random() < (DEBUG?3e-4:2e-6)){
+          D.phase='sinking'; D.since=now;
+          D.dur=rnd(45000,95000);
+          D.seedTags=dreamSeeds();
+        }
+      } else if(D.phase==='sinking'){
+        D.depth=clamp((now-D.since)/9000,0,1);
+        if(D.depth>=1){ D.phase='dreaming'; D.since=now; D.nextMotifAt=now+6000; }
+      } else if(D.phase==='dreaming'){
+        D.depth=1;
+        if(now>D.nextMotifAt){
+          D.nextMotifAt=now+rnd(11000,20000);
+          const ks=Object.keys(MotifBrain.motifs);
+          if(ks.length) MotifBrain.play(pick(ks), .045, true); // gedroomd: omgekeerd + traag
+        }
+        if(now-D.since>D.dur){
+          D.phase='waking'; D.since=now;
+          dreamRewrite();
+          EchoBrain.save(true);
+          if(window.Chronicle) Chronicle.observe('droom','droom',
+            { force:true, stars:4, sym:'☽', title:'Zij droomde', line:dreamLine() });
+          // Bij het ontwaken vertelt ze — half — wat ze zag
+          beginSpeech(now+4200, dreamLine(), 'curious', 'caption', true);
+        }
+      } else if(D.phase==='waking'){
+        D.depth=clamp(1-(now-D.since)/6000,0,1);
+        if(D.depth<=0){ D.depth=0; D.phase='awake'; D.lastDreamAt=now; }
+      }
+    }
+
+    // ── Droomvisual: sluier, geheugennamen als verschijningen, orbs ──
+    function drawDream(now){
+      const D=DreamBrain; if(D.depth<=0) return;
+      const a=D.depth, t=now*.001;
+      ctx.save();
+      // sluier: diepviolet, ademend
+      const g=ctx.createRadialGradient(W/2,H*.45,20,W/2,H*.45,W*.78);
+      g.addColorStop(0,'rgba(28,10,54,'+(.10*a).toFixed(3)+')');
+      g.addColorStop(.6,'rgba(12,6,40,'+(.34*a).toFixed(3)+')');
+      g.addColorStop(1,'rgba(2,2,14,'+(.56*a).toFixed(3)+')');
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      // verschijningen: haar sterkste herinneringen, verkeerd geënsceneerd —
+      // drijvend, flakkerend, met een gespiegelde dubbelganger eronder
+      ctx.font='15px monospace'; ctx.textAlign='center';
+      D.seedTags.forEach((s,i)=>{
+        const ph=t*.12+i*2.1;
+        const x=W/2+Math.sin(ph)*W*.28;
+        const y=H*.26+Math.cos(ph*.7+i)*H*.13;
+        const fl=.5+.5*Math.sin(t*.5+i*1.7);
+        ctx.fillStyle='rgba(182,150,255,'+((.10+.16*fl)*a).toFixed(3)+')';
+        ctx.fillText(s,x,y);
+        ctx.save(); ctx.translate(x,y+13); ctx.scale(1,-1);
+        ctx.fillStyle='rgba(120,190,255,'+((.05+.08*fl)*a).toFixed(3)+')';
+        ctx.fillText(s,0,0); ctx.restore();
+      });
+      // trage droomorbs
+      for(let i=0;i<5;i++){
+        const ph=t*.06+i*1.3;
+        const x=(Math.sin(ph*1.3+i)*.5+.5)*W;
+        const y=(Math.cos(ph+i*2)*.5+.5)*H;
+        ctx.beginPath(); ctx.arc(x,y,2.4+Math.sin(t+i)*1.2,0,6.2832);
+        ctx.fillStyle='rgba(150,120,255,'+(.10*a).toFixed(3)+')'; ctx.fill();
+      }
+      ctx.restore();
+    }
 
     // ════════════════════════════════════════════════════════════
     //  GrammarBrain — combinatorische micro-verhalen. Fragmenten
@@ -2662,6 +2879,10 @@
       }
       const b = clamp(1 - Math.abs(now - (blink.until - 76)) / 78, 0, 1);
       blink.strength = Math.max(blink.strength * .65, b);
+      // Droom: oogleden volgen de droomdiepte — sinking sluit ze langzaam,
+      // waking opent ze weer. Boven de normale knipperlogica.
+      if (typeof DreamBrain!=='undefined'&&DreamBrain.depth>0)
+        blink.strength = Math.max(blink.strength, DreamBrain.depth*.97);
     }
 
     function updatePupils(now, dt){
@@ -2923,6 +3144,9 @@
     }
 
     function mu_arp(freq, time, dur, vel=.082){
+      // Droom: elke noot een fractie ontstemd, als door slaap heen gehoord
+      if (typeof DreamBrain!=='undefined'&&DreamBrain.depth>0)
+        freq*=1+(Math.random()-.5)*.014*DreamBrain.depth;
       if (!AudioBrain.ctx) return;
       const ac=AudioBrain.ctx, bus=MusicBrain.bus;
       const o=ac.createOscillator(); o.type='triangle'; o.frequency.value=freq;
@@ -3082,6 +3306,8 @@
         + WorldBrain.weather.visual.storm*.18
         - emotion.sadness*.12;
       if (M.breakdown) v=Math.min(v,.16); // breakdown: alles valt weg behalve pad+bas
+      // Droom: de muziek zakt met haar mee weg — arp dunt uit, register daalt
+      if (typeof DreamBrain!=='undefined'&&DreamBrain.depth>0) v*=1-DreamBrain.depth*.80;
       return clamp(v,0,1);
     }
 
@@ -5610,6 +5836,7 @@
         'audio ' + (AudioBrain.enabled ? (AudioBrain.started ? ('on root ' + AudioBrain.root.toFixed(1) + 'Hz') : 'wacht op gesture') : 'uit'),
         'music ' + (MusicBrain.initialized ? (MusicBrain.scale + ' ' + (MU_CHORDS[MusicBrain.chord]?.n||'—') + ' ' + MusicBrain.bpm + 'bpm ' + MusicBrain.bpb + '/4 pat:' + MusicBrain.pattern + ' int:' + mu_intensity().toFixed(2) + (MusicBrain.breakdown?' BRK':'') + (MusicBrain.swing?' sw:'+MusicBrain.swing.toFixed(2):'')) : 'init...'),
         'echo ' + Object.keys(EchoBrain.edges).length + ' randen · motieven ' + Object.keys(MotifBrain.motifs).length + (EchoBrain.anticipation() ? ' · verwacht:' + EchoBrain.anticipation().tag : ''),
+        'droom ' + DreamBrain.phase + (DreamBrain.depth>0?' d:'+DreamBrain.depth.toFixed(2):'') + ' · geteld:' + DreamBrain.dreamCount,
         'visitor ' + VisitorBrain.phase + ' ' + VisitorBrain.archetype,
       ].join('\n');
     }
@@ -5650,6 +5877,7 @@
       updateBackgroundEvents(now);
       updateCosmic(now);
       EchoBrain.tick(now);
+      dreamTick(now);
       maybeGlitch(now);
       AudioBrain.tick(now);
       if (MusicBrain.initialized) mu_syncToMood();
@@ -6272,6 +6500,7 @@
           ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
         } else { RarityBrain.paletteFlash=null; }
       }
+      drawDream(now);
       drawSpeechBubble(now);
       drawDebug(now);
       if (window._flushCaptures) window._flushCaptures();
@@ -6385,7 +6614,7 @@
         bril:'gouden bril',hoed:'sterrenhoed',helm:'glazen helm',veer:'pauwenveer',milandes_garden:'tuin van milandes',milandes_peacock:'pauwenschaduw',milandes_feather:'vallende veer',josephine_echo:'joséphines echo'
       };
       const SYM = {
-        kosmisch:'✦',vloot:'▷',bezoekers:'◧',orakel:'◉',verhaal:'❉',hemel:'✵',accessoire:'◎',stem:'♪',milandes:'♛'
+        kosmisch:'✦',vloot:'▷',bezoekers:'◧',orakel:'◉',verhaal:'❉',hemel:'✵',accessoire:'◎',stem:'♪',milandes:'♛',droom:'☽'
       };
 
       // Hemel — de grote, zeldzame set-pieces (poollicht, kolossale planeet).
@@ -6668,7 +6897,9 @@
         observe(cat, key, ev){
           const now=Date.now();
           // Warm-start: bestaande toestand niet als ontdekking registreren.
-          if (meta.suppressUntil && now < meta.suppressUntil) return null;
+          // (force: afwezigheidsdromen mogen wél — die zijn juist het bewijs
+          // dat de wereld doorliep terwijl de app dicht was)
+          if (meta.suppressUntil && now < meta.suppressUntil && !(ev&&ev.force)) return null;
           if (THROTTLE[cat] && _last[key] && now-_last[key]<THROTTLE[cat]) return null;
           const isStory = cat==='verhaal';
           const rar = (ev && ev.stars!=null) ? Rarity.fromStars(ev.stars) : Rarity.fromProb(probFor(cat,key));
@@ -6687,7 +6918,7 @@
             if (cat==='vloot') thumb=shipPortrait(ev);
             else if (cat==='kosmisch') thumb=cosmicPortrait(ev);
           }catch(e){ thumb=null; }
-          const entry={ id, t:now, cat, key, title:lore.title, line:lore.line, stars:rar.stars, score:rar.score, sym:(ev&&ev.sym)||SYM[cat]||'✦', thumb };
+          const entry={ id, t:(ev&&ev.t)||now, cat, key, title:lore.title, line:lore.line, stars:rar.stars, score:rar.score, sym:(ev&&ev.sym)||SYM[cat]||'✦', thumb };
           chronicle.unshift(entry);
           if (chronicle.length>CH_MAX) chronicle.length=CH_MAX;
           meta.total++; meta.best=Math.max(meta.best, rar.stars);
@@ -7027,7 +7258,7 @@
       }
       const lbOpen=()=> lb.classList.contains('open');
 
-      const CAT_LABELS={ alle:'alle', hemel:'hemel', kosmisch:'kosmisch', vloot:'vloot', orakel:'orakel', verhaal:'verhaal', accessoire:'accessoire', milandes:'milandes', stem:'stem', bezoekers:'bezoekers' };
+      const CAT_LABELS={ alle:'alle', hemel:'hemel', kosmisch:'kosmisch', vloot:'vloot', orakel:'orakel', verhaal:'verhaal', accessoire:'accessoire', milandes:'milandes', stem:'stem', bezoekers:'bezoekers', droom:'droom' };
 
       const renderLog=()=>{
         const body=document.getElementById('wa-log-body');
@@ -7078,7 +7309,7 @@
 
           <div class="jr-filter-title">categorie</div>
           <div class="jr-filters compact">
-            ${['alle','hemel','kosmisch','vloot','orakel','verhaal','accessoire','milandes','stem','bezoekers'].map(v=>
+            ${['alle','hemel','kosmisch','vloot','orakel','verhaal','accessoire','milandes','stem','bezoekers','droom'].map(v=>
               `<div class="jr-chip cat-chip${catFilter===v?' on':''}" data-c="${v}">${CAT_LABELS[v]||v}</div>`).join('')}
           </div>
 
