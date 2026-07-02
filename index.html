@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — WA-2026.07.01-audiovisual-sync-v1.9.1</title>
+  <title>Wandering Art — 1.10.1</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -45,6 +45,12 @@
       acquireWakeLock();
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && !window._wakeLock) acquireWakeLock();
+        // Geheugen veiligstellen zodra de tab naar de achtergrond gaat
+        if (document.visibilityState === 'hidden' && typeof EchoBrain!=="undefined") EchoBrain.save(true);
+      });
+    } else {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && typeof EchoBrain!=="undefined") EchoBrain.save(true);
       });
     }
   </script>
@@ -880,7 +886,7 @@
     const FRAME_MIN_MS = TARGET_FPS ? (1000 / TARGET_FPS) : 0;
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = 'WA-2026.07.01-audiovisual-sync-v1.9.1';
+    const APP_VERSION = '1.10.1';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -917,7 +923,37 @@
     const canvas = document.getElementById('entity');
     const ctx = canvas.getContext('2d', { alpha:false });
     const dbgEl = document.getElementById('dbg');
-    if (DEBUG && dbgEl) dbgEl.style.display = 'block';
+
+    // ── Debug-HUD toggle: ?debug in de URL óf triple-tap + wachtwoord ──
+    // Drie snelle tikken (binnen 600ms, dicht bij elkaar) op het scherm
+    // vragen om het wachtwoord en tonen de HUD; nogmaals triple-tappen
+    // verbergt hem weer (zonder wachtwoord). Handig op mobiel.
+    let HUD_VISIBLE = DEBUG;
+    const HUD_PIN = 'orakel';   // ← wachtwoord hier aanpassen
+    if (HUD_VISIBLE && dbgEl) dbgEl.style.display = 'block';
+    (() => {
+      let taps = [];
+      window.addEventListener('pointerdown', (e) => {
+        const now = performance.now();
+        taps = taps.filter(t => now - t.t < 600);
+        if (taps.length && (Math.abs(e.clientX - taps[0].x) > 60 || Math.abs(e.clientY - taps[0].y) > 60)) taps = [];
+        taps.push({ t: now, x: e.clientX, y: e.clientY });
+        if (taps.length >= 3){
+          taps = [];
+          if (HUD_VISIBLE){
+            HUD_VISIBLE = false;
+            if (dbgEl) dbgEl.style.display = 'none';
+          } else {
+            const pin = prompt('wachtwoord');
+            if (pin === HUD_PIN){
+              HUD_VISIBLE = true;
+              if (dbgEl) dbgEl.style.display = 'block';
+            }
+          }
+        }
+      }, { passive: true });
+    })();
+
     const W = canvas.width;
     const H = canvas.height;
     ctx.imageSmoothingEnabled = false;
@@ -1032,6 +1068,227 @@
       bias:{ valence:0, curiosity:0 },
       lastDominant:'neutral', lastSpeechAt:0, pressure:0, silence:1, recentWeather:'clear', recentOutfit:'cloak',
       visits:1, lastSave:0
+    };
+
+    // ════════════════════════════════════════════════════════════
+    //  EchoBrain — associatief langetermijngeheugen (Hebbiaans)
+    //  "Wat samen gebeurt, raakt verbonden." Gebeurtenissen (rarity,
+    //  bezoekers, zeldzaam kosmisch) verbinden zich met de context
+    //  waarin ze vielen (weer, tijd, bioom) én met het gevoel van
+    //  dat moment. Verbindingen vervallen over weken. Twee installaties
+    //  van dezelfde code groeien zo uit tot verschillende individuen
+    //  met een temperament dat niemand meer helemaal kan verklaren.
+    // ════════════════════════════════════════════════════════════
+    const EchoBrain = {
+      KEY:'wa_echo_v1',
+      edges:{}, nodes:{},          // edges['a|b'] = gewicht 0..1
+      recent:[],                   // recente events: [{tag, at}]
+      WINDOW:90000,                // co-occurrence-venster (ms)
+      LR:.14,                      // leersnelheid per samenval
+      _dirty:false, _lastSave:0, _lastAmbient:0, _ambientTags:[],
+
+      load(){
+        try{
+          const d=JSON.parse(safeStorage.get(this.KEY)||'null');
+          if(d&&d.edges){
+            // Verval sinds vorige sessie: halfwaardetijd ≈ 5 weken.
+            // Een associatie die maanden overleeft, is per definitie zeldzaam.
+            const days=Math.max(0,(Date.now()-(d.savedAt||Date.now()))/86400000);
+            const k=Math.exp(-days*.02);
+            for(const e in d.edges){ const w=d.edges[e]*k; if(w>.02) this.edges[e]=w; }
+            this.nodes=d.nodes||{};
+          }
+        }catch(e){}
+      },
+      save(force){
+        const now=Date.now();
+        if(!force&&(!this._dirty||now-this._lastSave<60000)) return;
+        this._dirty=false; this._lastSave=now;
+        try{ safeStorage.set(this.KEY, JSON.stringify({edges:this.edges,nodes:this.nodes,savedAt:now})); }catch(e){}
+      },
+      _ekey(a,b){ return a<b ? a+'|'+b : b+'|'+a; },
+      _learn(a,b){
+        if(a===b) return;
+        const k=this._ekey(a,b), w=this.edges[k]||0;
+        this.edges[k]=w+this.LR*(1-w);
+        this._dirty=true;
+      },
+      assoc(a,b){ return this.edges[this._ekey(a,b)]||0; },
+
+      // Een gebeurtenis vond plaats: verbind haar met alle actieve context
+      // en met het gevoelsanker van dít moment.
+      note(tag){
+        const now=performance.now();
+        this.nodes[tag]=(this.nodes[tag]||0)+1;
+        for(const t of this.activeTags(now)) this._learn(tag,t);
+        const feel=this._feelNow();
+        if(feel) this._learn(tag,feel);
+        this.recent.push({tag,at:now});
+        if(this.recent.length>40) this.recent.shift();
+      },
+      _feelNow(){
+        if(emotion.sadness>.45||weights.cry>.3) return 'gevoel:weemoed';
+        if(emotion.tension>.5||weights.angry>.3) return 'gevoel:onrust';
+        if(weights.happy>.4||emotion.valence>.35) return 'gevoel:vreugde';
+        if(weights.surprised>.4||emotion.curiosity>.65) return 'gevoel:ontzag';
+        return null;
+      },
+      activeTags(now){
+        now=now==null?performance.now():now;
+        const evs=this.recent.filter(r=>now-r.at<this.WINDOW).map(r=>r.tag);
+        return [...new Set([...this._ambientTags,...evs])];
+      },
+      ambientNow(){
+        const wv=WorldBrain.weather.visual, tags=[];
+        if(wv.storm>.4) tags.push('weer:storm');
+        else if(wv.rain>.35) tags.push('weer:regen');
+        if(wv.snow>.3) tags.push('weer:sneeuw');
+        if(wv.fog>.4) tags.push('weer:mist');
+        if(wv.heat>.5) tags.push('weer:hitte');
+        if(!tags.length&&(wv.clarity==null||wv.clarity>.8)) tags.push('weer:helder');
+        const ph=(WorldBrain.time&&WorldBrain.time.phaseName)||'day';
+        tags.push('tijd:'+(ph.indexOf('night')>=0?'nacht':ph.indexOf('dawn')>=0?'dageraad':ph.indexOf('dusk')>=0?'schemer':'dag'));
+        if(typeof SceneBrain!=='undefined'&&SceneBrain.biome) tags.push('bioom:'+SceneBrain.biome);
+        return tags;
+      },
+      tick(now){
+        if(now-this._lastAmbient>20000){
+          this._lastAmbient=now;
+          this._ambientTags=this.ambientNow();
+          // Ambient-tags verbinden NIET onderling — alleen events verbinden
+          // met ambient. Anders verwatert het netwerk tot één klont.
+        }
+        this.save(false);
+      },
+      // Geleerde bias: wat de huidige context ooit "voelde", kleurt de
+      // emotionele targets nu zachtjes mee. Klein en begrensd, maar over
+      // weken van associaties wordt dit een eigen temperament.
+      moodBias(){
+        const out={sadness:0,valence:0,curiosity:0,tension:0};
+        for(const t of this._ambientTags){
+          out.sadness  += this.assoc(t,'gevoel:weemoed')*.05;
+          out.tension  += this.assoc(t,'gevoel:onrust')*.05;
+          out.valence  += this.assoc(t,'gevoel:vreugde')*.05 - this.assoc(t,'gevoel:weemoed')*.02;
+          out.curiosity+= this.assoc(t,'gevoel:ontzag')*.05;
+        }
+        for(const k in out) out[k]=clamp(out[k],-.06,.06);
+        return out;
+      },
+      // Anticipatie: is de huidige context verweven geraakt met een
+      // gebeurtenis? Dan "verwacht" ze iets — blik en spraak reageren.
+      anticipation(){
+        let best=null, bw=.22;
+        for(const t of this._ambientTags){
+          for(const e in this.edges){
+            if(this.edges[e]<=bw) continue;
+            const i=e.indexOf('|');
+            const a=e.slice(0,i), b=e.slice(i+1);
+            const other = a===t ? b : (b===t ? a : null);
+            if(!other) continue;
+            if(/^(rarity|bezoeker|kosmisch):/.test(other)){ bw=this.edges[e]; best={tag:other,w:bw,from:t}; }
+          }
+        }
+        return best;
+      }
+    };
+    EchoBrain.load();
+
+    // ════════════════════════════════════════════════════════════
+    //  MotifBrain — leidmotieven. Elke bezoeker en zeldzame
+    //  gebeurtenis krijgt een eigen motief van 3–5 toonladderstappen
+    //  dat bij elke terugkeer klinkt — en soms één stap muteert.
+    //  Omdat het motief in gráden is opgeslagen, kleurt het mee met
+    //  de actuele modus: dezelfde contour, andere stemming.
+    //  Zoals een herinnering.
+    // ════════════════════════════════════════════════════════════
+    const MotifBrain = {
+      KEY:'wa_motif_v1',
+      motifs:{}, _lastPlay:0,
+      load(){ try{ this.motifs=JSON.parse(safeStorage.get(this.KEY)||'{}')||{}; }catch(e){ this.motifs={}; } },
+      save(){ try{ safeStorage.set(this.KEY, JSON.stringify(this.motifs)); }catch(e){} },
+      _birth(){
+        const len=rndInt(3,5);
+        let d=rndInt(5,9); const deg=[d];
+        for(let i=1;i<len;i++){ d=clamp(d+pick([-2,-1,-1,1,1,2,(i===1?3:-3)]),2,13); deg.push(d); }
+        const rhy=Array.from({length:len},()=>pick([.5,1,1,1.5]));
+        return { deg, rhy, gen:0 };
+      },
+      _mutate(m){
+        // Genetische drift: één graad ±1. De modus garandeert dat elke
+        // mutatie "past" — het motief kan nooit vals worden, alleen anders.
+        const i=rndInt(0,m.deg.length-1);
+        m.deg[i]=clamp(m.deg[i]+pick([-1,1]),2,13);
+        m.gen++;
+      },
+      play(key, gain=.06){
+        if(!MusicBrain.initialized||!AudioBrain.ctx) return;
+        const now=performance.now();
+        if(now-this._lastPlay<8000) return; // motieven verdringen elkaar niet
+        this._lastPlay=now;
+        let m=this.motifs[key];
+        if(!m){ m=this._birth(); this.motifs[key]=m; }
+        else if(Math.random()<.22) this._mutate(m);
+        this.save();
+        const scale=MU_SCALES[MusicBrain.scale]||MU_SCALES.aeolian;
+        const beatDur=60/MusicBrain.bpm;
+        let t=AudioBrain.ctx.currentTime+.15;
+        m.deg.forEach((d,i)=>{
+          const oct=Math.floor(d/scale.length);
+          const s=scale[mod(d,scale.length)]+12*oct;
+          const f=muf(MusicBrain.rootHz*2,s);
+          if(f>140&&f<1100){
+            mu_melo(f,t,beatDur*m.rhy[i]*1.4,gain*(i===0?1.15:1));
+            if(i===0) mu_bell(f*2,t,.020); // signatuur-glinster op de eerste noot
+          }
+          t+=beatDur*m.rhy[i];
+        });
+      }
+    };
+    MotifBrain.load();
+
+    // ════════════════════════════════════════════════════════════
+    //  GrammarBrain — combinatorische micro-verhalen. Fragmenten
+    //  (onderwerp / wending / naklank) worden per context gefilterd
+    //  en gecombineerd; het geheugen kan een echo injecteren
+    //  ("... net als toen ..."). Zo voelen duizenden gegenereerde
+    //  momenten nog steeds gecraft aan.
+    // ════════════════════════════════════════════════════════════
+    const GrammarBrain = {
+      SUBJ:{
+        'weer:storm':['de lucht scheurt','het raast daarbuiten','de storm kent mijn naam'],
+        'weer:regen':['de regen telt','elke druppel een teken','het water spreekt zacht'],
+        'weer:sneeuw':['wit valt zonder geluid','de kou tekent iets','sneeuw bewaart stilte'],
+        'weer:mist':['de rand is weg','alles wordt suggestie','de mist houdt iets vast'],
+        'weer:hitte':['de lucht trilt','warmte drukt op alles','zelfs de sterren zweten'],
+        'weer:helder':['alles staat scherp','geen sluier vannacht','de leegte is eerlijk nu'],
+        'tijd:nacht':['de nacht luistert mee','donker genoeg om te zien','sterren als oude ogen'],
+        'tijd:dageraad':['het licht keert aarzelend','de eerste kleur breekt','iets ontwaakt'],
+        'tijd:schemer':['de dag laat los','kleuren nemen afscheid','de overgang fluistert'],
+        'tijd:dag':['het licht draagt alles','de dag rolt verder','helder en gewoon'],
+      },
+      TURN:['en ik kijk','en iets kijkt terug','maar ik blijf','dus ik wacht','en ik onthoud het','zoals altijd','voor even','en het klopt'],
+      CODA:['dat is genoeg','meer hoeft niet','ik vergeet het niet','wie weet wat volgt','het patroon herhaalt','zeldzaam genoeg'],
+      LORE:{
+        'rarity:visitor':'de bezoeker','rarity:breach':'de breuk','rarity:worldShift':'de verschuiving',
+        'rarity:rareTear':'de traan','rarity:notices':'dat ene moment','rarity:paletteFlash':'de kleurbreuk',
+        'kosmisch:driftMoon':'de dwaalmaan','kosmisch:aurora':'het noorderlicht','kosmisch:meteorShower':'de stenenregen',
+        'bezoeker:cloaked':'de gesluierde','bezoeker:traveler':'de reiziger','bezoeker:scholar':'de geleerde',
+        'bezoeker:ghost':'de geest','bezoeker:astronaut':'de ruimtereiziger'
+      },
+      compose(){
+        const tags=EchoBrain._ambientTags||[];
+        const pools=tags.map(t=>this.SUBJ[t]).filter(Boolean);
+        if(!pools.length) return null;
+        let line='... '+pick(pick(pools));
+        const ant=EchoBrain.anticipation();
+        if(ant&&this.LORE[ant.tag]&&Math.random()<.55){
+          line+=' ... net als toen ... '+this.LORE[ant.tag]+' ...';
+        } else {
+          line+=' ... '+pick(this.TURN)+' ...';
+          if(Math.random()<.45) line+=' '+pick(this.CODA)+' ...';
+        }
+        return line;
+      }
     };
 
     const WardrobeBrain = {
@@ -1977,8 +2234,11 @@
 
       const middle = fragments.join(joiner);
       if (meaningful) {
+        // GrammarBrain eerst: combinatorische, contextuele micro-verhalen.
+        // Valt terug op de vaste mood-zinnen als er geen context is.
+        const gLine = Math.random() < .60 ? GrammarBrain.compose() : null;
         return {
-          text: `${left} ${pick(phrases[mood] || phrases.neutral)} ${middle} ${right}`,
+          text: `${left} ${gLine || pick(phrases[mood] || phrases.neutral)} ${middle} ${right}`,
           meaningful: true
         };
       }
@@ -2025,6 +2285,16 @@
       let targetCuriosity = clamp(.48 + slowNoise(t,.12,.07,.09,.019,4.2) + night*.20 + (NewsBrain.keywords.length ? .06 : 0), .08, 1);
       let targetSadness   = clamp(.08 + slowNoise(t,.08,.05,.07,.021,3.3) + wv.rain*.22 + wv.fog*.12 - targetValence*.10, 0, .82);
       let targetShyness   = clamp(.10 + slowNoise(t,.06,.06,.05,.018,5.1) + night*.08 + wv.fog*.10, 0, .74);
+
+      // EchoBrain: geleerde associaties verschuiven het emotionele
+      // evenwicht. Kwam de bezoeker ooit tijdens storm? Dan maakt storm
+      // haar voortaan een tikje weemoedig-verwachtingsvol. Dit is waar
+      // de biografie het temperament wordt.
+      const eb=EchoBrain.moodBias();
+      targetSadness   = clamp(targetSadness  + eb.sadness,   0, .82);
+      targetValence   = clamp(targetValence  + eb.valence, -.55, .62);
+      targetCuriosity = clamp(targetCuriosity+ eb.curiosity, .08, 1);
+      targetTension   = clamp(targetTension  + eb.tension,  .03, .92);
 
       emotion.valence   = damp(emotion.valence,   targetValence,   .36, dt);
       emotion.arousal   = damp(emotion.arousal,   targetArousal,   .40, dt);
@@ -2368,10 +2638,22 @@
       V.phaseStart = now;
       V.gazeOverride = null;
       weights.surprised = clamp(weights.surprised + .35, 0, 1);
+      // Geheugen + leidmotief: déze bezoeker, in déze context. Bij een
+      // volgende ontmoeting klinkt zijn motief opnieuw — licht veranderd.
+      EchoBrain.note('bezoeker:'+V.archetype);
+      MotifBrain.play('bezoeker:'+V.archetype, .068);
     }
 
     function triggerRarity(id, now){
       const debug = DEBUG ? .05 : 1;
+      // Geheugen + leidmotief: elke zeldzame gebeurtenis wordt onthouden
+      // in de context van dit moment, en klinkt (vanaf tier 4) met haar
+      // eigen, langzaam muterende motief.
+      const _tier=RarityBrain.tiers.find(t=>t.id===id);
+      if (_tier){
+        EchoBrain.note('rarity:'+_tier.name);
+        if (id>=4) MotifBrain.play('rarity:'+_tier.name, .055);
+      }
       if (id === 2){
         EyeBrain.state='slowClose'; EyeBrain.stateStart=now; EyeBrain.stateDur=rnd(3000,4400);
       } else if (id === 3){
@@ -2911,6 +3193,16 @@
       // Bezoeker trekt maximale aandacht
       if (VisitorBrain.phase === 'present' && VisitorBrain.alpha > .3) {
         best = { x:VisitorBrain.x, y:VisitorBrain.y - 28, strength:.92, kind:'visitor' };
+      }
+
+      // Geheugen-anticipatie: als de huidige context (bijv. storm) verweven
+      // is geraakt met een gebeurtenis, dwaalt haar blik af en toe naar de
+      // horizon — ze verwácht iets, zonder te weten wat. Alleen als er
+      // niets concreets te zien is.
+      if (!best && Math.random() < .10){
+        const ant = EchoBrain.anticipation();
+        if (ant) best = { x: Math.random()<.5 ? 16 : W-16, y: rnd(52, 92),
+                          strength:.34, kind:'herinnering:'+ant.tag };
       }
 
       return best && best.strength > .30 ? best : null;
@@ -3724,6 +4016,11 @@
       }
       CosmicBrain.events.push(ev);
       AudioBrain.event(ev.type);
+      // De drie zeldzaamste hemellichamen krijgen geheugen + leidmotief.
+      if (type==='driftMoon'||type==='aurora'||type==='meteorShower'){
+        EchoBrain.note('kosmisch:'+type);
+        MotifBrain.play('kosmisch:'+type, .048);
+      }
     }
 
     function updateCosmic(now){
@@ -5183,7 +5480,7 @@
     }
 
     function drawDebug(now){
-      if (!DEBUG || !dbgEl) return;
+      if (!HUD_VISIBLE || !dbgEl) return;
       const w = WorldBrain.weather.visual;
       dbgEl.textContent = [
         'Wandering Art v13 ethereal oracle',
@@ -5193,6 +5490,7 @@
         'ships ' + ShipBrain.ships.length + ' cosmic ' + CosmicBrain.events.length + ' news ' + NewsBrain.keywords.length,
         'audio ' + (AudioBrain.enabled ? (AudioBrain.started ? ('on root ' + AudioBrain.root.toFixed(1) + 'Hz') : 'wacht op gesture') : 'uit'),
         'music ' + (MusicBrain.initialized ? (MusicBrain.scale + ' ' + (MU_CHORDS[MusicBrain.chord]?.n||'—') + ' ' + MusicBrain.bpm + 'bpm ' + MusicBrain.bpb + '/4 pat:' + MusicBrain.pattern + ' int:' + mu_intensity().toFixed(2) + (MusicBrain.breakdown?' BRK':'') + (MusicBrain.swing?' sw:'+MusicBrain.swing.toFixed(2):'')) : 'init...'),
+        'echo ' + Object.keys(EchoBrain.edges).length + ' randen · motieven ' + Object.keys(MotifBrain.motifs).length + (EchoBrain.anticipation() ? ' · verwacht:' + EchoBrain.anticipation().tag : ''),
         'visitor ' + VisitorBrain.phase + ' ' + VisitorBrain.archetype,
       ].join('\n');
     }
@@ -5232,6 +5530,7 @@
       updateDriftGlyphs(now,dt);
       updateBackgroundEvents(now);
       updateCosmic(now);
+      EchoBrain.tick(now);
       maybeGlitch(now);
       AudioBrain.tick(now);
       if (MusicBrain.initialized) mu_syncToMood();
