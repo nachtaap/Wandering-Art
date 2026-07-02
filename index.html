@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — 1.10.1</title>
+  <title>Wandering Art — 1.10.2</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -212,6 +212,22 @@
     }
     #enter .ring:focus-visible{
       box-shadow:0 0 0 2px rgba(213,166,77,.82), 0 0 24px rgba(213,166,77,.45);
+    }
+    /* Versienummer: onopvallend onderin het startscherm, in de goud/teal
+       familie van de plaat. env(safe-area-inset-bottom) houdt hem boven
+       de home-indicator op moderne telefoons. */
+    #enter .start-version{
+      position:absolute;
+      z-index:2;
+      left:50%;
+      bottom:calc(10px + env(safe-area-inset-bottom, 0px));
+      transform:translateX(-50%);
+      font:10px/1 monospace;
+      letter-spacing:.18em;
+      color:rgba(213,166,77,.42);
+      text-shadow:0 0 6px rgba(0,0,0,.8);
+      pointer-events:none;
+      user-select:none;
     }
     @keyframes startPlateBreathe{
       0%{ transform:translate3d(0,-2px,0) scale(1); }
@@ -836,6 +852,7 @@
     <div class="start-art" aria-hidden="true">
       <button class="ring" type="button" aria-label="Treedt binnen">Treedt binnen</button>
     </div>
+    <div class="start-version" id="start-version" aria-hidden="true"></div>
   </div>
 
   <!-- Publiek: event-logboek (enkele tap) -->
@@ -886,7 +903,10 @@
     const FRAME_MIN_MS = TARGET_FPS ? (1000 / TARGET_FPS) : 0;
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = '1.10.1';
+    const APP_VERSION = '1.10.2';
+    // Versienummer op het startscherm — gevoed vanuit APP_VERSION zodat
+    // er maar één plek is om te bumpen (naast de <title>).
+    { const sv=document.getElementById('start-version'); if (sv) sv.textContent='v'+APP_VERSION; }
 
     const CONFIG = {
       locationDelayMs: 12000,
