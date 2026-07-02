@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Wandering Art — WA-2026.07.01-music-arrangement-v1.9.0</title>
+  <title>Wandering Art — WA-2026.07.01-audiovisual-sync-v1.9.1</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/Wandering-Art/manifest.json" />
@@ -880,7 +880,7 @@
     const FRAME_MIN_MS = TARGET_FPS ? (1000 / TARGET_FPS) : 0;
 
     // Zichtbaar in het logboek zodat je meteen ziet welke HTML-build GitHub serveert.
-    const APP_VERSION = 'WA-2026.07.01-music-arrangement-v1.9.0';
+    const APP_VERSION = 'WA-2026.07.01-audiovisual-sync-v1.9.1';
 
     const CONFIG = {
       locationDelayMs: 12000,
@@ -1604,6 +1604,8 @@
       breakdown: false,     // sectie met alleen pad+bas (ademruimte)
       voicing: 0,           // akkoord-inversie (0..2), wisselt per akkoord
       swing: 0,             // 0..~.16 — offbeat-vertraging, per sectie gekozen
+      visChordAt: -9,       // audio-kloktijd van laatste akkoordwisseling (voor mu_visPulse)
+      visChordSign: 1,      // richting van de visuele tilt-impuls (-1/+1)
       // Mood-vlaggen voor speciale events
       forceChord: null,     // forceer volgend akkoord (bijv. bij fourthWall)
       forceScale: null,     // forceer toonladder (bijv. bij worldShift)
@@ -2266,6 +2268,18 @@
         blink.nextAt = now + rnd(2600,6800) - WorldBrain.weather.visual.wind * 260;
         if (Math.random() > .88) blink.nextAt += 190;
       }
+      // Cross-modale sync: ~30% van de akkoordwisselingen triggert een knipper.
+      // Niet elke wisseling (dat wordt metronomisch), en nooit vlak na een
+      // gewone knipper. visChordAt loopt in de audio-klok.
+      if (MusicBrain.initialized && AudioBrain.ctx &&
+          MusicBrain.visChordAt > (blink.lastChordAt||-1) &&
+          AudioBrain.ctx.currentTime >= MusicBrain.visChordAt){
+        blink.lastChordAt = MusicBrain.visChordAt;
+        if (Math.random() < .30 && now > blink.until + 600){
+          blink.until = now + rnd(95,150);
+          blink.nextAt = Math.max(blink.nextAt, now + 1400); // reguliere knipper opschuiven
+        }
+      }
       const b = clamp(1 - Math.abs(now - (blink.until - 76)) / 78, 0, 1);
       blink.strength = Math.max(blink.strength * .65, b);
     }
@@ -2679,6 +2693,17 @@
       return clamp(v,0,1);
     }
 
+    // Visuele puls 0..1: piekt op het moment dat een akkoordwisseling klinkt,
+    // vervalt in ~1.2s. Renderlaag leest dit voor cross-modale sync
+    // (mini scale/tilt-impuls, knipperkans). visChordAt staat in audio-klok.
+    function mu_visPulse(){
+      const M=MusicBrain;
+      if (!M.initialized||!AudioBrain.ctx) return 0;
+      const dt=AudioBrain.ctx.currentTime-M.visChordAt;
+      if (dt<0||dt>1.6) return 0;
+      return Math.exp(-dt*2.6);
+    }
+
     // Melodische frase: 3–6 noten die stapsgewijs door de toonladder wandelen
     // (niet alleen akkoordtonen). Vervangt de losse eenzame melodienoot.
     function mu_phrase(time){
@@ -2709,6 +2734,9 @@
       M.voicing=rndInt(0,2); // andere ligging per akkoord
       M.patNotes=mu_chordNotes(M.chord);
       M.pattern=mu_selectPattern();
+      // Visuele sync: renderlaag ziet deze wisseling via mu_visPulse()
+      M.visChordAt=time;
+      M.visChordSign=Math.random()<.5?-1:1;
       const inten=mu_intensity();
       // Bas op akkoordwisseling
       const bassHz=muf(M.rootHz*2, MU_CHORDS[M.chord].t[0]);
@@ -2838,12 +2866,46 @@
         const t = clamp((performance.now() - e.start) / e.duration, 0, 1);
         const x = lerp(e.x0, e.x1, t);
         const y = lerp(e.y0, e.y1, t);
-        if (.58 > score) best = { x, y, strength:.58, kind:'falling-star' };
+        if (.58 > score) { score = .58; best = { x, y, strength:.58, kind:'falling-star' }; }
+      }
+
+      // Kosmische events: het orakel kijkt naar wat er aan de hemel gebeurt.
+      // Zeldzame/grote verschijnselen trekken meer aandacht; op- en aflopende
+      // ramp zodat de blik niet vastklikt op een event dat nog onzichtbaar is.
+      const nowP = performance.now();
+      for (const e of CosmicBrain.events){
+        const prog = clamp((nowP - e.start) / e.dur, 0, 1);
+        const ramp = Math.min(1, prog*6, (1-prog)*6);
+        let ex=null, ey=null, str=0;
+        switch (e.type){
+          case 'driftMoon':    ex=lerp(e.x0,e.x1,prog); ey=lerp(e.y0,e.y1,prog); str=.72; break;
+          case 'meteorShower': if (e.streaks&&e.streaks.length){
+                                 ex=e.streaks.reduce((s,k)=>s+k.x,0)/e.streaks.length;
+                                 ey=e.streaks.reduce((s,k)=>s+k.y,0)/e.streaks.length; str=.66; }
+                               break;
+          case 'comet':        ex=lerp(e.x0,e.x1,prog); ey=lerp(e.y0,e.y1,prog); str=.62; break;
+          case 'flash':        ex=e.x; ey=e.y; str=.55; break;
+          case 'riftGlow':     ex=e.x; ey=e.y; str=.50; break;
+          case 'aurora':       ex=W/2; ey=e.y; str=.46; break;
+          case 'pulsar':       ex=e.x; ey=e.y; str=.45; break;
+          case 'ripple':       ex=e.x; ey=e.y; str=.42; break;
+          case 'satellite':    ex=lerp(e.x0,e.x1,prog); ey=lerp(e.y0,e.y1,prog); str=.40; break;
+          case 'debris':       if (e.bits&&e.bits.length){
+                                 const b=e.bits[0];
+                                 ex=b.x + b.vx*((nowP-e.start)/1000);
+                                 ey=b.y; str=.38; }
+                               break;
+        }
+        if (ex==null) continue;
+        const sc = str*ramp;
+        if (sc > score && ex > -16 && ex < W+16){
+          score = sc; best = { x:ex, y:ey, strength:sc, kind:e.type };
+        }
       }
 
       if (DriftGlyphBrain.glyphs.length && Math.random() < .18) {
         const g = pick(DriftGlyphBrain.glyphs);
-        if (.38 > score) best = { x:g.x, y:g.y, strength:.38, kind:'word' };
+        if (.38 > score) { score = .38; best = { x:g.x, y:g.y, strength:.38, kind:'word' }; }
       }
 
       // Bezoeker trekt maximale aandacht
@@ -3382,7 +3444,11 @@
           color: Math.random() < .5 ? C.cyan4 : (Math.random() < .55 ? C.green2 : C.magentaSoft),
           size: Math.random() < .25 ? 10 : 9
         });
-        DriftGlyphBrain.nextAt = now + rnd(9000, 22000) / (1 + urge * 6);
+        // Muziekintensiteit versnelt/vertraagt de glyph-stroom (tot ~1.6x sneller
+        // bij hoge intensiteit, trager in rustige passages) — beeld en klank
+        // worden samen drukker en samen stiller.
+        const mGlyph = MusicBrain.initialized ? (.65 + mu_intensity()*.95) : 1;
+        DriftGlyphBrain.nextAt = now + rnd(9000, 22000) / ((1 + urge * 6) * mGlyph);
       }
       for (const g of DriftGlyphBrain.glyphs) {
         g.x += g.vx * 1000 * dt;
@@ -5067,10 +5133,16 @@
       if (entityAlpha <= .01) return;
       const t=now*.001, p=expr;
       const FRAME_SCALE=.92, FIGURE_DROP=16;   // iets kleiner + lager: ruimte boven het hoofd, marge onder
-      const breath=1+Math.sin(t*1.12)*.003;
-      const driftX=motion.x+Math.sin(t*.37)*1.1+Math.sin(t*.19+1.2)*.7;
-      const driftY=motion.y+Math.sin(t*.43+.8)*.8 + (WardrobeBrain.offsetY || 0) + FIGURE_DROP;
-      const tilt=motion.tilt+Math.sin(t*.31)*.009 + Math.sin(t*.12+.5)*.005;
+      // Cross-modale sync: de zweefamplitude ademt mee met de muziekintensiteit
+      // (.82x in rust tot 1.18x bij hoge energie); een akkoordwisseling geeft
+      // een minieme, afwisselend gerichte scale/tilt-impuls. Onbewust voelbaar.
+      const mi=(typeof mu_intensity==='function'&&MusicBrain.initialized)?mu_intensity():.5;
+      const mAmp=.82+mi*.36;
+      const mPulse=(typeof mu_visPulse==='function')?mu_visPulse():0;
+      const breath=1+Math.sin(t*1.12)*.003 + mPulse*.0045;
+      const driftX=motion.x+(Math.sin(t*.37)*1.1+Math.sin(t*.19+1.2)*.7)*mAmp;
+      const driftY=motion.y+Math.sin(t*.43+.8)*.8*mAmp + (WardrobeBrain.offsetY || 0) + FIGURE_DROP;
+      const tilt=motion.tilt+Math.sin(t*.31)*.009 + Math.sin(t*.12+.5)*.005 + mPulse*.006*(MusicBrain.visChordSign||1);
       ctx.save();
       ctx.globalAlpha *= entityAlpha;
       ctx.translate(W/2+driftX,H/2+driftY);
