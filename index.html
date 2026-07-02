@@ -6837,11 +6837,12 @@
       // Stabiele startversie: echt leeg logboek + opwarmfase.
       // Oude testdata uit v1/v2 blijft lokaal staan, maar deze build leest v3.
       const CH_KEY='wa_chronicle_v3', META_KEY='wa_chmeta_v3', SEEDS_KEY='wa_seeds_v3';
-      // Reset-sleutel afgeleid van APP_VERSION: elke nieuwe versie begint
-      // met een leeg logboek en verse verhaal-unlocks. Het geheugen van het
-      // orakel (EchoBrain/MotifBrain) blijft bewust wél bewaard — de
-      // biografie overleeft releases, de waarnemingen niet.
-      const RESET_KEY='wa_clean_start_'+APP_VERSION;
+      // Reset-sleutel afgeleid van het HOOFDVERSIENUMMER: het logboek
+      // overleeft patches en minor-updates (2.0.1 → 2.x.y) en wordt alleen
+      // gewist bij een nieuw tijdperk (3.0). Vanaf de ingebruikname (2.0.1)
+      // is het logboek dus blijvend — geen demo meer. Het geheugen van het
+      // orakel (EchoBrain/MotifBrain) blijft sowieso bewaard.
+      const RESET_KEY='wa_clean_start_major_'+APP_VERSION.split('.')[0];
       const nowBoot=Date.now();
       const CH_MAX=140;                 // tijdlijn-lengte
       let chronicle=[], seeds=[];
